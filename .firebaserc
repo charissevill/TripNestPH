@@ -1,0 +1,15 @@
+{
+  "projects": {
+    "default": "tripnest-ph"
+  },
+  "targets": {
+    "tripnest-ph": {
+      "storage": {
+        "rules": [
+          "tripnest-ph.firebasestorage.app"
+        ]
+      }
+    }
+  },
+  "etags": {}
+}

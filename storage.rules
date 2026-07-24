@@ -1,0 +1,88 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isImage() {
+      return request.resource.contentType.matches('image/.*');
+    }
+
+    // ---- Admin Portal role helpers ---------------------------------------
+    // Deliberately NOT using the firestore.get()/firestore.exists() bridge
+    // that firestore.rules' own admin helpers use — that cross-service call
+    // from Storage rules into Firestore proved unreliable in practice (an
+    // owner-only write with no Firestore lookup succeeds; the same write
+    // gated by firestore.exists(admin_users/{uid}) fails with a bare
+    // "Permission denied" even though the document is correct). Instead,
+    // `functions/index.js`'s `syncAdminClaims` mirrors admin_users/{uid}
+    // into this user's Auth custom claims on every write, so these checks
+    // read straight from the ID token with zero cross-service calls.
+    function isAdminAccount() {
+      return isSignedIn() && request.auth.token.adminRole != null;
+    }
+
+    function hasAdminRole(roles) {
+      return isAdminAccount() && request.auth.token.adminStatus == 'active' && request.auth.token.adminRole in roles;
+    }
+
+    // Profile photos: readable by anyone signed in, writable only by the
+    // owning user, capped at 5MB.
+    match /profile_photos/{userId}/{fileName} {
+      allow read: if isSignedIn();
+      allow write: if isOwner(userId) && isImage() && request.resource.size < 5 * 1024 * 1024;
+    }
+
+    // Review photos: readable by anyone signed in, writable only by the
+    // review's author, capped at 5MB each.
+    match /review_photos/{userId}/{fileName} {
+      allow read: if isSignedIn();
+      allow write: if isOwner(userId) && isImage() && request.resource.size < 5 * 1024 * 1024;
+    }
+
+    // Destination/restaurant/festival photos are managed from the Admin
+    // Portal (tourist spots by admin/lgu, restaurants by admin/businessOwner,
+    // festivals by admin/lgu/eventOrganizer) — matches firestore.rules'
+    // write permissions for those same collections. Reads stay open to any
+    // signed-in traveler.
+    match /destination_photos/{allPaths=**} {
+      allow read: if isSignedIn();
+      allow write: if hasAdminRole(['admin', 'lgu', 'businessOwner', 'eventOrganizer']) && isImage() && request.resource.size < 10 * 1024 * 1024;
+    }
+
+    // Business permits: private to the owning Business Owner and admins
+    // reviewing the submission — never publicly readable.
+    match /business_permits/{userId}/{fileName} {
+      allow read: if isOwner(userId) || hasAdminRole(['admin']);
+      allow write: if isOwner(userId) && hasAdminRole(['businessOwner']) && isImage() && request.resource.size < 10 * 1024 * 1024;
+    }
+
+    // Business gallery photos: public once approved, writable only by the
+    // owning Business Owner.
+    match /business_gallery/{userId}/{fileName} {
+      allow read: if isSignedIn();
+      allow write: if isOwner(userId) && hasAdminRole(['businessOwner']) && isImage() && request.resource.size < 5 * 1024 * 1024;
+    }
+
+    // Notification broadcast images: writable by the Admin Portal roles
+    // allowed to send notifications (mirrors the notifications/{id} rule in
+    // firestore.rules).
+    match /notification_images/{fileName} {
+      allow read: if isSignedIn();
+      allow write: if hasAdminRole(['admin', 'lgu', 'eventOrganizer']) && isImage() && request.resource.size < 5 * 1024 * 1024;
+    }
+
+    // Admin Portal account photos: self-service, any admin role.
+    match /admin_profile_photos/{userId}/{fileName} {
+      allow read: if isSignedIn();
+      allow write: if isOwner(userId) && isAdminAccount() && isImage() && request.resource.size < 5 * 1024 * 1024;
+    }
+  }
+}

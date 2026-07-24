@@ -1,0 +1,237 @@
+import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:material_symbols_icons/symbols.dart';
+
+import '../../core/routes/route_paths.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_spacing.dart';
+import '../../core/utils/app_exception.dart';
+import '../../core/widgets/dialogs/confirmation_dialog.dart';
+import '../../core/widgets/states/empty_state_widget.dart';
+import '../../data/repositories/festival_repository.dart';
+import '../../domain/models/festival.dart';
+
+enum _FestivalSort { name, date, province, upcoming }
+
+extension on _FestivalSort {
+  String get label {
+    switch (this) {
+      case _FestivalSort.name:
+        return 'Name (A–Z)';
+      case _FestivalSort.date:
+        return 'Date (Soonest)';
+      case _FestivalSort.province:
+        return 'Province';
+      case _FestivalSort.upcoming:
+        return 'Upcoming Status';
+    }
+  }
+}
+
+/// Festival management — shows every festival for admin/lgu (full
+/// curatorial control), or only the signed-in [organizerUid]'s own
+/// festivals for an `eventOrganizer` account, matching `firestore.rules`'s
+/// organizerId-scoped write permissions.
+class AdminFestivalListScreen extends StatefulWidget {
+  const AdminFestivalListScreen({super.key, this.organizerUid});
+
+  /// Non-null for an `eventOrganizer` account — restricts both the list and
+  /// every new festival created here to their own uid.
+  final String? organizerUid;
+
+  @override
+  State<AdminFestivalListScreen> createState() => _AdminFestivalListScreenState();
+}
+
+class _AdminFestivalListScreenState extends State<AdminFestivalListScreen> {
+  final FestivalRepository _repository = FestivalRepository();
+  late Future<List<Festival>> _future;
+  String _query = '';
+  _FestivalSort _sort = _FestivalSort.name;
+
+  bool get _ownedOnly => widget.organizerUid != null;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  void _load() {
+    _future = _ownedOnly ? _repository.getAllForOwner(widget.organizerUid!) : _repository.getAllForAdmin();
+  }
+
+  /// Groups + sorts for display. Name/date has no group headers (a single
+  /// `''` group); province/upcoming get one header per group, each
+  /// internally still alphabetical by name.
+  Map<String, List<Festival>> _grouped(List<Festival> festivals) {
+    switch (_sort) {
+      case _FestivalSort.name:
+        return {'': [...festivals]..sort((a, b) => a.name.compareTo(b.name))};
+      case _FestivalSort.date:
+        // Festivals without a structured startDate (not yet migrated off
+        // the old free-text date field) sort after every dated one, since
+        // there's no reliable way to place them chronologically.
+        return {
+          '': [...festivals]..sort((a, b) {
+            final aDate = a.startDate;
+            final bDate = b.startDate;
+            if (aDate == null && bDate == null) return a.name.compareTo(b.name);
+            if (aDate == null) return 1;
+            if (bDate == null) return -1;
+            return aDate.compareTo(bDate);
+          }),
+        };
+      case _FestivalSort.province:
+        final groups = <String, List<Festival>>{};
+        for (final f in festivals) {
+          groups.putIfAbsent(f.provinceName, () => []).add(f);
+        }
+        for (final list in groups.values) {
+          list.sort((a, b) => a.name.compareTo(b.name));
+        }
+        final orderedKeys = groups.keys.toList()..sort();
+        return {for (final key in orderedKeys) key: groups[key]!};
+      case _FestivalSort.upcoming:
+        final groups = <String, List<Festival>>{};
+        for (final f in festivals) {
+          groups.putIfAbsent(f.isUpcoming ? 'Upcoming' : 'Not Upcoming', () => []).add(f);
+        }
+        for (final list in groups.values) {
+          list.sort((a, b) => a.name.compareTo(b.name));
+        }
+        return {for (final key in ['Upcoming', 'Not Upcoming']) if (groups.containsKey(key)) key: groups[key]!};
+    }
+  }
+
+  Future<void> _delete(Festival festival) async {
+    final confirmed = await showConfirmationDialog(
+      context,
+      title: 'Delete this festival?',
+      message: '"${festival.name}" will be permanently removed and no longer shown to travelers.',
+      confirmLabel: 'Delete',
+      isDestructive: true,
+    );
+    if (!confirmed || !mounted) return;
+    try {
+      await _repository.delete(festival.id);
+      setState(_load);
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(AppException.from(e).message)));
+    }
+  }
+
+  Future<void> _openForm({Festival? existing}) async {
+    await context.push(RoutePaths.adminFestivalForm, extra: {'existing': existing, 'organizerUid': widget.organizerUid});
+    if (mounted) setState(_load);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        leading: IconButton(icon: const Icon(Symbols.arrow_back_rounded), onPressed: () => context.pop()),
+        title: Text(_ownedOnly ? 'My Events' : 'Festivals'),
+      ),
+      floatingActionButton: FloatingActionButton(onPressed: () => _openForm(), child: const Icon(Symbols.add_rounded)),
+      body: SafeArea(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.sm, AppSpacing.lg, 0),
+              child: TextField(
+                decoration: const InputDecoration(hintText: 'Search festivals...', prefixIcon: Icon(Symbols.search_rounded)),
+                onChanged: (value) => setState(() => _query = value),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.sm, AppSpacing.lg, AppSpacing.xs),
+              child: Row(
+                children: [
+                  const Icon(Symbols.sort_rounded, size: 18, color: AppColors.textTertiary),
+                  const SizedBox(width: AppSpacing.xs),
+                  Text('Sort by', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textTertiary)),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<_FestivalSort>(
+                        isDense: true,
+                        isExpanded: true,
+                        value: _sort,
+                        items: _FestivalSort.values.map((s) => DropdownMenuItem(value: s, child: Text(s.label))).toList(),
+                        onChanged: (value) => setState(() => _sort = value ?? _sort),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: FutureBuilder<List<Festival>>(
+                future: _future,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState != ConnectionState.done) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  if (snapshot.hasError) {
+                    return EmptyStateWidget(icon: Symbols.error_outline_rounded, title: 'Couldn\'t load festivals', message: AppException.from(snapshot.error!).message);
+                  }
+                  final allFestivals = snapshot.data ?? const [];
+                  if (allFestivals.isEmpty) {
+                    return EmptyStateWidget(
+                      icon: Symbols.celebration_rounded,
+                      title: _ownedOnly ? 'No events yet' : 'No festivals yet',
+                      message: 'Tap + to add the first one.',
+                    );
+                  }
+                  final festivals = allFestivals.where((f) => f.name.toLowerCase().contains(_query.toLowerCase())).toList();
+                  if (festivals.isEmpty) {
+                    return const EmptyStateWidget(icon: Symbols.search_off_rounded, title: 'No matches', message: 'No festivals match your search.');
+                  }
+                  final groups = _grouped(festivals);
+                  return ListView(
+                    padding: const EdgeInsets.fromLTRB(AppSpacing.lg, 0, AppSpacing.lg, AppSpacing.huge),
+                    children: [
+                      for (final entry in groups.entries) ...[
+                        if (entry.key.isNotEmpty) _GroupHeader(label: entry.key),
+                        for (final festival in entry.value)
+                          ListTile(
+                            title: Text(festival.name),
+                            subtitle: Text('${festival.provinceName} · ${festival.dateLabel}'),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(icon: const Icon(Symbols.edit_rounded, size: 20), onPressed: () => _openForm(existing: festival)),
+                                IconButton(icon: const Icon(Symbols.delete_outline_rounded, size: 20, color: AppColors.error), onPressed: () => _delete(festival)),
+                              ],
+                            ),
+                          ),
+                      ],
+                    ],
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _GroupHeader extends StatelessWidget {
+  const _GroupHeader({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: AppSpacing.md, bottom: AppSpacing.xs),
+      child: Text(
+        label,
+        style: Theme.of(context).textTheme.labelLarge?.copyWith(color: AppColors.primary, fontWeight: FontWeight.w700),
+      ),
+    );
+  }
+}

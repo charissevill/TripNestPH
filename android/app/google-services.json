@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "142704120607",
+    "project_id": "tripnest-ph",
+    "storage_bucket": "tripnest-ph.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:142704120607:android:89c57c4139e792dd1e962a",
+        "android_client_info": {
+          "package_name": "com.tripnest.ph"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBZyWgCVC1WrSZbt_pcvqUXWZdKGdGLLzY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:142704120607:android:e273db688f90af7f1e962a",
+        "android_client_info": {
+          "package_name": "com.tripnest.tripnest_ph"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBZyWgCVC1WrSZbt_pcvqUXWZdKGdGLLzY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

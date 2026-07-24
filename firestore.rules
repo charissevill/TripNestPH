@@ -1,0 +1,318 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function onlyChangedFields(fields) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(fields);
+    }
+
+    // ---- Data validation helpers ------------------------------------------
+    // Defense-in-depth: the app's own form validation already keeps ratings
+    // in range and comments a sane length, but these rules stop a malicious
+    // or buggy client from writing garbage straight to Firestore regardless.
+    function isValidReview() {
+      return request.resource.data.userId == request.auth.uid
+        && request.resource.data.targetId is string && request.resource.data.targetId.size() > 0
+        && request.resource.data.targetType in ['destination', 'restaurant', 'festival']
+        && request.resource.data.rating is number && request.resource.data.rating >= 1 && request.resource.data.rating <= 5
+        && request.resource.data.comment is string && request.resource.data.comment.size() <= 2000;
+    }
+
+    // ---- Admin Portal role helpers ---------------------------------------
+    // admin_users/{uid} is the Admin Portal's own account directory
+    // (Phase 4), entirely separate from the mobile app's traveler `users`
+    // collection — a fundamentally different trust level that shouldn't be
+    // mixed into the tight owner-only rules travelers rely on.
+    function isAdminAccount() {
+      return isSignedIn() && exists(/databases/$(database)/documents/admin_users/$(request.auth.uid));
+    }
+
+    function adminData() {
+      return get(/databases/$(database)/documents/admin_users/$(request.auth.uid)).data;
+    }
+
+    function isActiveAdmin() {
+      return isAdminAccount() && adminData().status == 'active';
+    }
+
+    function hasAdminRole(roles) {
+      return isActiveAdmin() && adminData().role in roles;
+    }
+
+    // Invites are keyed by the invited person's lowercased email so a
+    // client can look up "is there a pending invite for me" using their own
+    // auth token email, with no admin-only read required.
+    function invitedEmailKey() {
+      return request.auth.token.email.lower();
+    }
+
+    function hasPendingInvite() {
+      return isSignedIn() && request.auth.token.email is string
+        && exists(/databases/$(database)/documents/admin_invites/$(invitedEmailKey()));
+    }
+
+    function pendingInviteRole() {
+      return get(/databases/$(database)/documents/admin_invites/$(invitedEmailKey())).data.role;
+    }
+
+    // ---- admin_users/{uid} — Admin Portal accounts -----------------------
+    // The very first admin account is created out-of-band by a one-time
+    // seed script (an IAM-authenticated token, bypassing these rules),
+    // since no admin exists yet to satisfy hasAdminRole(['admin']) on that
+    // very first write.
+    match /admin_users/{uid} {
+      allow read: if isOwner(uid) || isActiveAdmin();
+      // An admin can directly create any account. Alternatively, a signed-in
+      // user with no existing admin_users doc can self-claim their *own*
+      // uid — but only using the exact role an admin already staged for
+      // their email in admin_invites, and only as an 'active' account, so
+      // there's no path to self-granting a role nobody offered.
+      allow create: if hasAdminRole(['admin'])
+                    || (isOwner(uid) && hasPendingInvite()
+                        && request.resource.data.role == pendingInviteRole()
+                        && request.resource.data.status == 'active');
+      // Any admin account can edit their own name/photo/business name
+      // (self-service profile) — status and role changes are a separate,
+      // admin-only door (see setStatus/promotions), never bundled with a
+      // self-edit.
+      allow update: if (isOwner(uid) && onlyChangedFields(['name', 'photoUrl', 'businessName']))
+                    || (hasAdminRole(['admin']) && onlyChangedFields(['status', 'role']));
+      allow delete: if hasAdminRole(['admin']);
+    }
+
+    // ---- admin_invites/{lowercasedEmail} — staged Admin Portal roles -----
+    // An admin stages a role for an email address; the invited person (who
+    // must already have an ordinary TripNest account under that email)
+    // reads it to know an invite exists, then self-claims via admin_users'
+    // create rule above. Either side can remove the invite once it's used
+    // or no longer wanted.
+    match /admin_invites/{email} {
+      allow read: if hasAdminRole(['admin']) || (isSignedIn() && invitedEmailKey() == email);
+      allow create, update: if hasAdminRole(['admin']);
+      allow delete: if hasAdminRole(['admin']) || (isSignedIn() && invitedEmailKey() == email);
+    }
+
+    // ---- users/{uid} ----------------------------------------------------
+    // Every traveler can read/write only their own profile document and
+    // their own recently-viewed history. Admin Portal accounts can also
+    // read (never write) for the Users module and dashboard stats.
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isActiveAdmin();
+      allow create: if isOwner(userId) && request.resource.data.email is string;
+      // Travelers can update their own profile but never their own
+      // `status` — that's the Admin Portal's suspend/activate switch, and
+      // an admin (write access here is intentionally limited to just that
+      // one field) is the only one who can flip it.
+      allow update: if (isOwner(userId) && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['status']))
+                    || (hasAdminRole(['admin']) && onlyChangedFields(['status']));
+      // Self-delete is the traveler's own account-deletion flow (Settings ->
+      // Delete Account); an admin can also remove an account directly.
+      allow delete: if isOwner(userId) || hasAdminRole(['admin']);
+
+      match /recently_viewed/{destinationId} {
+        allow read, write: if isOwner(userId);
+      }
+    }
+
+    // ---- Public content: tourist_spots / restaurants / festivals -------
+    // Read is open to any signed-in traveler. tourist_spots and restaurants
+    // are curated catalog content — only Admin/LGU accounts write them, the
+    // same stewardship model as provinces. (businessOwner accounts get
+    // their own properly owner-scoped self-service lane via `businesses`
+    // below, rather than broad unscoped write access to every restaurant.)
+    // Travelers can still only touch the aggregate rating/reviewCount
+    // fields, which ReviewRepository recalculates after a review is added,
+    // edited or deleted.
+    match /tourist_spots/{spotId} {
+      allow read: if isSignedIn();
+      allow update: if (isSignedIn() && onlyChangedFields(['rating', 'reviewCount'])) || hasAdminRole(['admin', 'lgu']);
+      allow create, delete: if hasAdminRole(['admin', 'lgu']);
+    }
+
+    match /restaurants/{restaurantId} {
+      allow read: if isSignedIn();
+      allow update: if (isSignedIn() && onlyChangedFields(['rating', 'reviewCount'])) || hasAdminRole(['admin', 'lgu']);
+      allow create, delete: if hasAdminRole(['admin', 'lgu']);
+    }
+
+    // Festivals: admin/lgu keep full curatorial control (official,
+    // province-run festivals). eventOrganizer accounts can create their own
+    // festivals and may only ever update/delete the ones they created —
+    // `organizerId` must equal their own uid on both the existing document
+    // and the write, so they can't adopt or edit someone else's listing.
+    match /festivals/{festivalId} {
+      allow read: if isSignedIn();
+      allow create: if hasAdminRole(['admin', 'lgu'])
+                    || (hasAdminRole(['eventOrganizer']) && request.resource.data.organizerId == request.auth.uid);
+      allow update: if (isSignedIn() && onlyChangedFields(['rating', 'reviewCount']))
+                    || hasAdminRole(['admin', 'lgu'])
+                    || (hasAdminRole(['eventOrganizer']) && resource.data.organizerId == request.auth.uid
+                        && request.resource.data.organizerId == request.auth.uid);
+      allow delete: if hasAdminRole(['admin', 'lgu'])
+                    || (hasAdminRole(['eventOrganizer']) && resource.data.organizerId == request.auth.uid);
+    }
+
+    match /travel_tips/{tipId} {
+      allow read: if isSignedIn();
+      allow write: if false;
+    }
+
+    // ---- Geography: regions / provinces / cities ------------------------
+    // Fixed reference data (17 regions, 83 provinces incl. the Metro Manila
+    // pseudo-province). Regions are a closed taxonomy, seeded once. Province
+    // page content (overview, tips, hotlines, ...) is fillable over time by
+    // Admin/LGU Portal accounts; cities are created on demand as content
+    // references them, same roles as their parent province.
+    match /regions/{regionId} {
+      allow read: if isSignedIn();
+      allow write: if false;
+    }
+
+    match /provinces/{provinceId} {
+      allow read: if isSignedIn();
+      allow create, delete: if hasAdminRole(['admin']);
+      allow update: if hasAdminRole(['admin', 'lgu']);
+
+      match /cities/{cityId} {
+        allow read: if isSignedIn();
+        allow create, update, delete: if hasAdminRole(['admin', 'lgu']);
+      }
+    }
+
+    // ---- favorites/{uid}_{type}_{itemId} --------------------------------
+    // Admin Portal accounts get read access too, for the "Most Saved
+    // Places" dashboard metric — never write.
+    match /favorites/{favoriteId} {
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isActiveAdmin());
+      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+    }
+
+    // ---- saved_itineraries/{id} — owner + shared-trip collaborators ------
+    // Admin Portal accounts get read access too, for the Analytics
+    // "Saved Trips" trend — never write.
+    //
+    // A collaborator (added via a share-code "join") can read the trip,
+    // check off the shared packing list, and join/leave — but never touch
+    // the itinerary content, title, or budget; that stays owner-only.
+    function isCollaborator() {
+      return ('collaboratorIds' in resource.data) && request.auth.uid in resource.data.collaboratorIds;
+    }
+
+    match /saved_itineraries/{itineraryId} {
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isCollaborator() || hasAdminRole(['admin']));
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow update: if isSignedIn() && (
+        // Owner: full control.
+        resource.data.userId == request.auth.uid
+        // Self-join: add only yourself to collaboratorIds, nothing else changes.
+        || (
+          onlyChangedFields(['collaboratorIds'])
+          && request.resource.data.collaboratorIds.hasOnly(
+               ('collaboratorIds' in resource.data ? resource.data.collaboratorIds : []).concat([request.auth.uid])
+             )
+        )
+        // Self-leave: remove only yourself from collaboratorIds, nothing else changes.
+        || (
+          onlyChangedFields(['collaboratorIds'])
+          && ('collaboratorIds' in resource.data)
+          && resource.data.collaboratorIds.hasOnly(request.resource.data.collaboratorIds.concat([request.auth.uid]))
+        )
+        // Existing collaborator: may check off / edit the shared packing list only.
+        || (isCollaborator() && onlyChangedFields(['packingItems']))
+      );
+
+      match /expenses/{expenseId} {
+        allow read, write: if isSignedIn() && (
+          get(/databases/$(database)/documents/saved_itineraries/$(itineraryId)).data.userId == request.auth.uid
+          || (
+            ('collaboratorIds' in get(/databases/$(database)/documents/saved_itineraries/$(itineraryId)).data)
+            && request.auth.uid in get(/databases/$(database)/documents/saved_itineraries/$(itineraryId)).data.collaboratorIds
+          )
+        );
+      }
+    }
+
+    // ---- businesses/{id} — Business Owner submissions, admin-verified ---
+    // A Business Owner can create and edit only their own listing's info
+    // fields (never their own `status`/`rejectionReason` — that's the
+    // Admin Portal's approve/reject/suspend workflow). An admin can read
+    // every business, and can only touch `status`/`rejectionReason`,
+    // never rewrite someone's business info themselves. Any signed-in
+    // traveler can read an 'approved' listing (the "Local Businesses"
+    // province section) — pending/rejected/suspended stay visible only to
+    // their owner or an admin.
+    match /businesses/{businessId} {
+      allow read: if isSignedIn() && (
+        resource.data.status == 'approved' || resource.data.ownerId == request.auth.uid || hasAdminRole(['admin'])
+      );
+      allow create: if hasAdminRole(['businessOwner'])
+                    && request.resource.data.ownerId == request.auth.uid
+                    && request.resource.data.status == 'pending';
+      // The owner can edit their info freely, and additionally — only as
+      // part of the same write — move their own listing from rejected
+      // back to pending (fix-and-resubmit). They can never set 'approved'
+      // or 'suspended' themselves, and never touch ownerId.
+      allow update: if (hasAdminRole(['businessOwner']) && resource.data.ownerId == request.auth.uid && (
+                        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['status', 'rejectionReason', 'ownerId'])
+                        || (resource.data.status == 'rejected' && request.resource.data.status == 'pending' && request.resource.data.rejectionReason == '')
+                      ))
+                    || (hasAdminRole(['admin']) && onlyChangedFields(['status', 'rejectionReason']));
+      allow delete: if hasAdminRole(['admin']);
+    }
+
+    // ---- reviews/{id} — public read, owner-write, admin-moderated -------
+    // Admins can only flip `isHidden` (moderation), never rewrite someone
+    // else's rating/comment; delete is available to the owner or an admin.
+    match /reviews/{reviewId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidReview();
+      // An owner's edit must still pass validation and can't repoint the
+      // review at a different listing or targetType.
+      allow update: if (isSignedIn() && resource.data.userId == request.auth.uid && isValidReview()
+                        && request.resource.data.targetId == resource.data.targetId
+                        && request.resource.data.targetType == resource.data.targetType)
+                    || (hasAdminRole(['admin']) && onlyChangedFields(['isHidden']));
+      allow delete: if (isSignedIn() && resource.data.userId == request.auth.uid) || hasAdminRole(['admin']);
+    }
+
+    // ---- review_reports/{id} — traveler flags, admin-only moderation ----
+    // A traveler can file a report on any review (immutable once filed —
+    // no update, so a report can't be edited after the fact); only an
+    // admin can read the queue or clear a report once handled. The actual
+    // hide/restore action still happens on the `reviews` doc itself via the
+    // existing `isHidden` rule above.
+    match /review_reports/{reportId} {
+      allow read: if hasAdminRole(['admin']) || (isSignedIn() && resource.data.userId == request.auth.uid);
+      allow create: if isSignedIn()
+                    && request.resource.data.userId == request.auth.uid
+                    && request.resource.data.reviewId is string && request.resource.data.reviewId.size() > 0
+                    && request.resource.data.reason is string && request.resource.data.reason.size() > 0
+                    && request.resource.data.reason.size() <= 500;
+      allow update: if false;
+      allow delete: if hasAdminRole(['admin']);
+    }
+
+    // ---- notifications/{id} ----------------------------------------------
+    // A doc with an empty userId is a broadcast sent to every traveler.
+    // Marking a broadcast notification "read" is a simplification for this
+    // phase (no per-user read-state doc yet), so any signed-in user may
+    // flip `isRead` on any notification — nothing else is writable here.
+    match /notifications/{notificationId} {
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || resource.data.userId == '');
+      allow update: if (isSignedIn() && onlyChangedFields(['isRead'])) || hasAdminRole(['admin', 'lgu', 'eventOrganizer']);
+      allow create: if hasAdminRole(['admin', 'lgu', 'eventOrganizer']) && request.resource.data.userId == '';
+      allow delete: if hasAdminRole(['admin', 'lgu', 'eventOrganizer']);
+    }
+  }
+}

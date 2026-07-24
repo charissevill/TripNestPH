@@ -1,0 +1,15 @@
+# Copy this file to `android/key.properties` (already gitignored — never
+# commit the real file) and fill in your own release keystore's details.
+#
+# Create a keystore first if you don't have one:
+#   keytool -genkey -v -keystore ~/tripnest-ph-release.jks -keyalg RSA \
+#     -keysize 2048 -validity 10000 -alias tripnest-ph
+#
+# Without this file present, release builds fall back to debug signing
+# (fine for local testing, but Google Play will reject a debug-signed
+# upload) — see android/app/build.gradle.kts.
+
+storePassword=your-keystore-password
+keyPassword=your-key-password
+keyAlias=tripnest-ph
+storeFile=/absolute/path/to/tripnest-ph-release.jks

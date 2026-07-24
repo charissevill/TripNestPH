@@ -1,0 +1,256 @@
+import '../../core/constants/app_images.dart';
+import '../../domain/models/restaurant.dart';
+
+/// Realistic restaurants and eateries used to seed the `restaurants`
+/// Firestore collection (see `tool/seed_firestore.js`).
+final List<Restaurant> mockRestaurants = [
+  Restaurant(
+    id: 'bohol-bee-farm',
+    name: 'Bohol Bee Farm',
+    cuisine: 'Farm-to-table Filipino',
+    provinceId: 'bohol',
+    provinceName: 'Bohol',
+    regionId: 'region-7',
+    cityId: 'panglao',
+    heroImageUrl: AppImages.restaurantInterior,
+    galleryImageUrls: [AppImages.restaurantInterior, AppImages.filipinoFeast, AppImages.grilledSeafood],
+    rating: 0,
+    reviewCount: 0,
+    priceRange: '₱₱',
+    isPopular: true,
+    description:
+        'A cliffside organic farm-and-restaurant serving vegetables and herbs grown on-site, '
+        'famous for its buffet spread and homemade malunggay ice cream.',
+    openingHours: '7:00 AM – 9:00 PM daily',
+    menuHighlights: [
+      MenuItem(name: 'Organic Buffet Lunch', price: '₱650', imageUrl: AppImages.filipinoFeast),
+      MenuItem(name: 'Malunggay Ice Cream', price: '₱120', imageUrl: AppImages.coffeeLatteArt),
+      MenuItem(name: 'Grilled Talakitok', price: '₱480', imageUrl: AppImages.grilledSeafood),
+    ],
+    latitude: 9.5372,
+    longitude: 123.7517,
+  ),
+  Restaurant(
+    id: 'loboc-river-grill',
+    name: 'Loboc River Floating Restaurant',
+    cuisine: 'Filipino buffet',
+    provinceId: 'bohol',
+    provinceName: 'Bohol',
+    regionId: 'region-7',
+    cityId: 'loboc',
+    heroImageUrl: AppImages.grilledSeafood,
+    galleryImageUrls: [AppImages.grilledSeafood, AppImages.filipinoFeast, AppImages.riceTerraces],
+    rating: 0,
+    reviewCount: 0,
+    priceRange: '₱₱',
+    description:
+        'A floating buffet raft that cruises down the Loboc River past jungle scenery, with live '
+        'acoustic performances and traditional Filipino dishes served family-style.',
+    openingHours: '9:00 AM – 3:00 PM daily',
+    menuHighlights: [
+      MenuItem(name: 'Lechon Kawali', price: '₱420', imageUrl: AppImages.filipinoFeast),
+      MenuItem(name: 'Grilled Bangus', price: '₱380', imageUrl: AppImages.grilledSeafood),
+    ],
+    latitude: 9.6335,
+    longitude: 124.0325,
+  ),
+  Restaurant(
+    id: 'small-talk-cafe',
+    name: 'Small Talk Cafe',
+    cuisine: 'Cafe & Bicolano fusion',
+    provinceId: 'albay',
+    provinceName: 'Albay',
+    regionId: 'region-5',
+    cityId: 'legazpi',
+    heroImageUrl: AppImages.cafeInterior,
+    galleryImageUrls: [AppImages.cafeInterior, AppImages.coffeeLatteArt, AppImages.noodleBowl],
+    rating: 0,
+    reviewCount: 0,
+    priceRange: '₱₱',
+    isPopular: true,
+    description:
+        'A cozy Legazpi cafe with a rooftop view of Mayon Volcano, known for its Bicol Express '
+        'pasta and specialty coffee sourced from local Albay farms.',
+    openingHours: '10:00 AM – 10:00 PM daily',
+    menuHighlights: [
+      MenuItem(name: 'Bicol Express Pasta', price: '₱295', imageUrl: AppImages.noodleBowl),
+      MenuItem(name: 'Albay Brew Latte', price: '₱150', imageUrl: AppImages.coffeeLatteArt),
+    ],
+    latitude: 13.1391,
+    longitude: 123.7438,
+  ),
+  Restaurant(
+    id: 'kermit-surf-resto',
+    name: 'Kermit Surf Resort & Restaurant',
+    cuisine: 'International & seafood',
+    provinceId: 'surigao-del-norte',
+    provinceName: 'Surigao del Norte',
+    regionId: 'region-13',
+    cityId: 'general-luna',
+    heroImageUrl: AppImages.grilledSeafood,
+    galleryImageUrls: [AppImages.grilledSeafood, AppImages.restaurantInterior, AppImages.friedChickenPlate],
+    rating: 0,
+    reviewCount: 0,
+    priceRange: '₱₱',
+    isPopular: true,
+    description:
+        'Siargao\'s legendary surfer hangout — beachfront tables, live reggae most nights, and a '
+        'menu spanning fresh catch, wood-fired pizza and hearty American breakfasts.',
+    openingHours: '7:00 AM – 12:00 AM daily',
+    menuHighlights: [
+      MenuItem(name: 'Grilled Tuna Belly', price: '₱420', imageUrl: AppImages.grilledSeafood),
+      MenuItem(name: 'Wood-fired Pizza', price: '₱380', imageUrl: AppImages.friedChickenPlate),
+    ],
+    latitude: 9.7897,
+    longitude: 126.1571,
+  ),
+  Restaurant(
+    id: 'shaka-cafe',
+    name: 'Shaka Cafe',
+    cuisine: 'Healthy bowls & smoothies',
+    provinceId: 'surigao-del-norte',
+    provinceName: 'Surigao del Norte',
+    regionId: 'region-13',
+    cityId: 'general-luna',
+    heroImageUrl: AppImages.streetFood,
+    galleryImageUrls: [AppImages.streetFood, AppImages.noodleBowl, AppImages.cafeInterior],
+    rating: 0,
+    reviewCount: 0,
+    priceRange: '₱₱',
+    description:
+        'A laid-back surfer cafe serving acai bowls, fresh smoothies and vegan-friendly plates '
+        'just steps from the Cloud 9 boardwalk.',
+    openingHours: '6:30 AM – 6:00 PM daily',
+    menuHighlights: [
+      MenuItem(name: 'Dragonfruit Acai Bowl', price: '₱280', imageUrl: AppImages.noodleBowl),
+      MenuItem(name: 'Green Detox Smoothie', price: '₱190', imageUrl: AppImages.coffeeLatteArt),
+    ],
+    latitude: 9.7900,
+    longitude: 126.1580,
+  ),
+  Restaurant(
+    id: 'cafe-leona',
+    name: 'Cafe Leona',
+    cuisine: 'Ilocano heritage cuisine',
+    provinceId: 'ilocos-sur',
+    provinceName: 'Ilocos Sur',
+    regionId: 'region-1',
+    cityId: 'vigan',
+    heroImageUrl: AppImages.restaurantInterior,
+    galleryImageUrls: [AppImages.restaurantInterior, AppImages.filipinoFeast, AppImages.calleCrisologo],
+    rating: 0,
+    reviewCount: 0,
+    priceRange: '₱₱',
+    isPopular: true,
+    description:
+        'Housed in a restored 1800s ancestral home right on Calle Crisologo, serving classic '
+        'Ilocano dishes like pinakbet and bagnet in a heritage-house dining room.',
+    openingHours: '11:00 AM – 9:00 PM daily',
+    menuHighlights: [
+      MenuItem(name: 'Bagnet with Kbl', price: '₱350', imageUrl: AppImages.filipinoFeast),
+      MenuItem(name: 'Pinakbet', price: '₱220', imageUrl: AppImages.friedChickenPlate),
+    ],
+    latitude: 17.5745,
+    longitude: 120.3869,
+  ),
+  Restaurant(
+    id: 'vigan-empanadaan',
+    name: 'Vigan Empanadaan',
+    cuisine: 'Street food',
+    provinceId: 'ilocos-sur',
+    provinceName: 'Ilocos Sur',
+    regionId: 'region-1',
+    cityId: 'vigan',
+    heroImageUrl: AppImages.streetFood,
+    galleryImageUrls: [AppImages.streetFood, AppImages.friedChickenPlate],
+    rating: 0,
+    reviewCount: 0,
+    priceRange: '₱',
+    description:
+        'The most famous empanada stall row near Plaza Burgos, frying up the signature orange '
+        'Vigan empanada stuffed with longganisa, egg and papaya right in front of you.',
+    openingHours: '8:00 AM – 8:00 PM daily',
+    menuHighlights: [
+      MenuItem(name: 'Vigan Special Empanada', price: '₱60', imageUrl: AppImages.friedChickenPlate),
+      MenuItem(name: 'Okoy', price: '₱45', imageUrl: AppImages.streetFood),
+    ],
+    latitude: 17.5746,
+    longitude: 120.3873,
+  ),
+  Restaurant(
+    id: 'lucap-seafood-market',
+    name: 'Lucap Seafood Market & Grill',
+    cuisine: 'Fresh seafood',
+    provinceId: 'pangasinan',
+    provinceName: 'Pangasinan',
+    regionId: 'region-1',
+    cityId: 'alaminos',
+    heroImageUrl: AppImages.grilledSeafood,
+    galleryImageUrls: [AppImages.grilledSeafood, AppImages.streetFood],
+    rating: 0,
+    reviewCount: 0,
+    priceRange: '₱₱',
+    description:
+        'A wet-market-style seafood grill by the wharf — pick your catch, name your cooking '
+        'style, and eat it fresh off the fire before your island-hopping boat departs.',
+    openingHours: '6:00 AM – 8:00 PM daily',
+    menuHighlights: [
+      MenuItem(name: 'Grilled Squid', price: '₱260', imageUrl: AppImages.grilledSeafood),
+      MenuItem(name: 'Sinigang na Hipon', price: '₱310', imageUrl: AppImages.noodleBowl),
+    ],
+    latitude: 16.1725,
+    longitude: 119.9847,
+  ),
+  Restaurant(
+    id: 'altrove-el-nido',
+    name: 'Altrove El Nido',
+    cuisine: 'Italian',
+    provinceId: 'palawan',
+    provinceName: 'Palawan',
+    regionId: 'region-4b',
+    cityId: 'el-nido',
+    heroImageUrl: AppImages.restaurantInterior,
+    galleryImageUrls: [AppImages.restaurantInterior, AppImages.noodleBowl, AppImages.elNidoLagoon],
+    rating: 0,
+    reviewCount: 0,
+    priceRange: '₱₱₱',
+    isPopular: true,
+    description:
+        'An Italian-run trattoria in the middle of El Nido town serving wood-fired Neapolitan '
+        'pizza and fresh pasta after a full day of island hopping.',
+    openingHours: '5:00 PM – 11:00 PM daily',
+    menuHighlights: [
+      MenuItem(name: 'Frutti di Mare Pizza', price: '₱480', imageUrl: AppImages.noodleBowl),
+      MenuItem(name: 'Truffle Tagliatelle', price: '₱520', imageUrl: AppImages.noodleBowl),
+    ],
+    latitude: 11.1800,
+    longitude: 119.4100,
+  ),
+  Restaurant(
+    id: 'barbaras-intramuros',
+    name: "Barbara's Heritage Restaurant",
+    cuisine: 'Filipino fine dining',
+    provinceId: 'metro-manila',
+    provinceName: 'Metro Manila',
+    regionId: 'ncr',
+    cityId: 'manila',
+    heroImageUrl: AppImages.restaurantInterior,
+    galleryImageUrls: [AppImages.restaurantInterior, AppImages.filipinoFeast, AppImages.intramurosWalls],
+    rating: 0,
+    reviewCount: 0,
+    priceRange: '₱₱₱',
+    description:
+        'A grand colonial-era dining hall inside Intramuros offering a nightly cultural show and '
+        'a Filipino buffet spanning regional specialties from Luzon to Mindanao.',
+    openingHours: '11:00 AM – 10:00 PM daily',
+    menuHighlights: [
+      MenuItem(name: 'Kare-Kare', price: '₱480', imageUrl: AppImages.filipinoFeast),
+      MenuItem(name: 'Crispy Pata', price: '₱620', imageUrl: AppImages.friedChickenPlate),
+    ],
+    latitude: 14.5896,
+    longitude: 120.9754,
+  ),
+];
+
+Restaurant restaurantById(String id) =>
+    mockRestaurants.firstWhere((r) => r.id == id, orElse: () => mockRestaurants.first);

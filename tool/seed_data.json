@@ -1,0 +1,2666 @@
+{
+  "tourist_spots": {
+    "chocolate-hills": {
+      "name": "Chocolate Hills",
+      "provinceId": "bohol",
+      "provinceName": "Bohol",
+      "regionId": "region-7",
+      "cityId": "",
+      "categoryId": "nature",
+      "heroImageUrl": "https://images.unsplash.com/photo-1500534623283-312aade485b7?auto=format&fit=crop&w=1200&q=80",
+      "galleryImageUrls": [
+        "https://images.unsplash.com/photo-1500534623283-312aade485b7?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=1200&q=80"
+      ],
+      "rating": 0.0,
+      "reviewCount": 0,
+      "shortDescription": "Over 1,700 cone-shaped hills that turn cocoa-brown every dry season.",
+      "longDescription": "One of the most iconic natural wonders in the Philippines, the Chocolate Hills of Bohol are a geological marvel of more than 1,700 near-identical grass-covered mounds spread across 50 square kilometers. During the dry season the grass turns a rich brown, giving the hills their unmistakable chocolate-kiss appearance. A viewing deck in Carmen town offers a sweeping panorama that photographs best at sunrise, when soft light rakes across the hills and mist still lingers in the valleys.",
+      "entranceFee": "₱75 per person",
+      "bestTimeToVisit": "March – May (dry season, hills turn brown)",
+      "travelTips": [
+        "Arrive before 8 AM to beat the tour buses and the heat.",
+        "Combine with the Tarsier Sanctuary and Loboc River Cruise for a full-day loop.",
+        "Wear comfortable shoes — the viewing deck has about 200 steps."
+      ],
+      "highlights": [
+        "Sunrise viewpoint",
+        "Zipline nearby",
+        "ATV adventure park"
+      ],
+      "isHiddenGem": false,
+      "isFeatured": true,
+      "nearbyRestaurantIds": [
+        "loboc-river-grill",
+        "bohol-bee-farm"
+      ],
+      "nearbyDestinationIds": [
+        "tinuy-an-falls"
+      ],
+      "latitude": 9.9298,
+      "longitude": 124.1636,
+      "phoneNumber": "",
+      "websiteUrl": "",
+      "facebookUrl": "",
+      "openingHours": "6:00 AM – 6:00 PM daily",
+      "nameLower": "chocolate hills",
+      "status": "published"
+    },
+    "mayon-volcano": {
+      "name": "Mayon Volcano",
+      "provinceId": "albay",
+      "provinceName": "Albay",
+      "regionId": "region-5",
+      "cityId": "",
+      "categoryId": "mountains",
+      "heroImageUrl": "https://images.unsplash.com/photo-1760876037275-a19e32a51047?auto=format&fit=crop&w=1200&q=80",
+      "galleryImageUrls": [
+        "https://images.unsplash.com/photo-1760876037275-a19e32a51047?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1470770841072-f978cf4d019e?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?auto=format&fit=crop&w=1200&q=80"
+      ],
+      "rating": 0.0,
+      "reviewCount": 0,
+      "shortDescription": "The world-famous perfect cone volcano overlooking Legazpi City.",
+      "longDescription": "Mayon is celebrated as having the most symmetrical volcanic cone in the world, rising 2,463 meters above Albay with almost mathematical precision. It remains an active volcano, which only adds to its dramatic presence on the skyline. The best vantage points are Lignon Hill and the Cagsawa Ruins, where a centuries-old bell tower — buried by a 1814 eruption — frames the volcano in one of the most photographed shots in the country.",
+      "entranceFee": "₱20 (Cagsawa Ruins entrance)",
+      "bestTimeToVisit": "December – May for the clearest skies",
+      "travelTips": [
+        "Check the latest PHIVOLCS alert level before planning an ATV or trek near the base.",
+        "Cagsawa Ruins is best photographed in late afternoon light.",
+        "Try ATV rides on the volcano's lower slopes for an adrenaline boost."
+      ],
+      "highlights": [
+        "Cagsawa Ruins",
+        "ATV adventure",
+        "Lignon Hill viewpoint"
+      ],
+      "isHiddenGem": false,
+      "isFeatured": true,
+      "nearbyRestaurantIds": [
+        "small-talk-cafe"
+      ],
+      "nearbyDestinationIds": [
+        "chocolate-hills"
+      ],
+      "latitude": 13.2571,
+      "longitude": 123.6856,
+      "phoneNumber": "",
+      "websiteUrl": "",
+      "facebookUrl": "",
+      "openingHours": "Cagsawa Ruins: 7:00 AM – 7:00 PM daily",
+      "nameLower": "mayon volcano",
+      "status": "published"
+    },
+    "cloud-9": {
+      "name": "Cloud 9",
+      "provinceId": "surigao-del-norte",
+      "provinceName": "Surigao del Norte",
+      "regionId": "region-13",
+      "cityId": "general-luna",
+      "categoryId": "beaches",
+      "heroImageUrl": "https://images.unsplash.com/photo-1544551763-46a013bb70d5?auto=format&fit=crop&w=1200&q=80",
+      "galleryImageUrls": [
+        "https://images.unsplash.com/photo-1544551763-46a013bb70d5?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1519046904884-53103b34b206?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1200&q=80"
+      ],
+      "rating": 0.0,
+      "reviewCount": 0,
+      "shortDescription": "World-class surf break and the beating heart of Siargao's surf town.",
+      "longDescription": "Cloud 9 put Siargao on the global surfing map, thanks to a powerful reef break that hosts international competitions every year. A raised wooden boardwalk winds through mangroves out to the famous surf tower, where you can watch riders carve the barrel even if you never touch a board. Beyond the waves, General Luna's stretch of cafes, surf shops and beach bars has made this one of the most laid-back, Instagram-friendly towns in the country.",
+      "entranceFee": "Free (boardwalk); surfboard rental from ₱300/hr",
+      "bestTimeToVisit": "August – November for the best swells",
+      "travelTips": [
+        "Beginners should book a lesson at nearby Jom's Surf Camp before paddling out at Cloud 9 itself.",
+        "Rent a scooter to explore Sugba Lagoon and Magpupungko Rock Pools nearby.",
+        "Sunset at the Cloud 9 boardwalk is free and spectacular."
+      ],
+      "highlights": [
+        "Surf tower boardwalk",
+        "Sugba Lagoon day trip",
+        "Beach bars & live music"
+      ],
+      "isHiddenGem": false,
+      "isFeatured": true,
+      "nearbyRestaurantIds": [
+        "kermit-surf-resto",
+        "shaka-cafe"
+      ],
+      "nearbyDestinationIds": [
+        "hundred-islands"
+      ],
+      "latitude": 9.8756,
+      "longitude": 126.1683,
+      "phoneNumber": "",
+      "websiteUrl": "",
+      "facebookUrl": "",
+      "openingHours": "Boardwalk open 24 hours",
+      "nameLower": "cloud 9",
+      "status": "published"
+    },
+    "calle-crisologo": {
+      "name": "Calle Crisologo",
+      "provinceId": "ilocos-sur",
+      "provinceName": "Ilocos Sur",
+      "regionId": "region-1",
+      "cityId": "vigan",
+      "categoryId": "historical",
+      "heroImageUrl": "https://images.unsplash.com/photo-1523906834658-6e24ef2386f9?auto=format&fit=crop&w=1200&q=80",
+      "galleryImageUrls": [
+        "https://images.unsplash.com/photo-1523906834658-6e24ef2386f9?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1766890411463-1ae640720e0c?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1596386461350-326ccb383e9f?auto=format&fit=crop&w=1200&q=80"
+      ],
+      "rating": 0.0,
+      "reviewCount": 0,
+      "shortDescription": "A cobblestone street of Spanish colonial mansions, frozen in the 1800s.",
+      "longDescription": "Calle Crisologo is the postcard heart of Vigan, a UNESCO World Heritage city that preserved its Spanish colonial architecture better than almost anywhere else in Asia. Capiz-shell windows, wrought-iron balconies and horse-drawn kalesa carriages clatter over cobblestones at dusk when the street closes to cars and lanterns flicker on. Antique shops, weaving workshops and empanada stalls line the route, making it as much a living museum as a place to shop and eat.",
+      "entranceFee": "Free to walk; kalesa ride ₱150–₱300",
+      "bestTimeToVisit": "Year-round; evenings after 5 PM are most atmospheric",
+      "travelTips": [
+        "Visit after 5 PM when the street turns pedestrian-only and lanterns are lit.",
+        "Try Vigan empanada and bagnet from the street stalls near the plaza.",
+        "Rent a kalesa for a slow loop of the heritage village."
+      ],
+      "highlights": [
+        "Kalesa horse-carriage rides",
+        "Vigan empanada stalls",
+        "Syquia Mansion museum"
+      ],
+      "isHiddenGem": false,
+      "isFeatured": true,
+      "nearbyRestaurantIds": [
+        "cafe-leona",
+        "vigan-empanadaan"
+      ],
+      "nearbyDestinationIds": [
+        "calle-crisologo"
+      ],
+      "latitude": 17.5747,
+      "longitude": 120.3869,
+      "phoneNumber": "",
+      "websiteUrl": "",
+      "facebookUrl": "",
+      "openingHours": "Open 24 hours (pedestrian-only after 5 PM)",
+      "nameLower": "calle crisologo",
+      "status": "published"
+    },
+    "hundred-islands": {
+      "name": "Hundred Islands",
+      "provinceId": "pangasinan",
+      "provinceName": "Pangasinan",
+      "regionId": "region-1",
+      "cityId": "alaminos",
+      "categoryId": "beaches",
+      "heroImageUrl": "https://images.unsplash.com/photo-1439405326854-014607f694d7?auto=format&fit=crop&w=1200&q=80",
+      "galleryImageUrls": [
+        "https://images.unsplash.com/photo-1439405326854-014607f694d7?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1573843981267-be1999ff37cd?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1544644181-1484b3fdfc62?auto=format&fit=crop&w=1200&q=80"
+      ],
+      "rating": 0.0,
+      "reviewCount": 0,
+      "shortDescription": "124 limestone islets scattered across the Lingayen Gulf.",
+      "longDescription": "The Hundred Islands National Park is a sprawling marine park of over a hundred small limestone islands, only a handful of which are developed for visitors. Governor Island has a viewing tower with a 360-degree panorama, Quezon Island offers a wide swimming beach, and Children's Island is known for calm, shallow water. Island-hopping boats can be chartered for a half or full day, making it an easy weekend escape from Manila.",
+      "entranceFee": "₱200 environmental fee + boat rental from ₱1,200/group",
+      "bestTimeToVisit": "November – May for calm seas",
+      "travelTips": [
+        "Book a boat at Lucap Wharf early — prices are fixed per boat, so group up to split cost.",
+        "Bring reef-safe sunscreen; snorkeling gear can be rented at Quezon Island.",
+        "Camping overnight on Marcos Island is allowed with a permit."
+      ],
+      "highlights": [
+        "Island hopping",
+        "Governor Island viewing tower",
+        "Cave exploring on Quezon Island"
+      ],
+      "isHiddenGem": false,
+      "isFeatured": false,
+      "nearbyRestaurantIds": [
+        "lucap-seafood-market"
+      ],
+      "nearbyDestinationIds": [
+        "cloud-9"
+      ],
+      "latitude": 16.2,
+      "longitude": 120.0167,
+      "phoneNumber": "",
+      "websiteUrl": "",
+      "facebookUrl": "",
+      "openingHours": "7:00 AM – 5:00 PM daily",
+      "nameLower": "hundred islands",
+      "status": "published"
+    },
+    "tinuy-an-falls": {
+      "name": "Tinuy-an Falls",
+      "provinceId": "surigao-del-sur",
+      "provinceName": "Surigao del Sur",
+      "regionId": "region-13",
+      "cityId": "bislig",
+      "categoryId": "nature",
+      "heroImageUrl": "https://images.unsplash.com/photo-1780635823961-9dad96633019?auto=format&fit=crop&w=1200&q=80",
+      "galleryImageUrls": [
+        "https://images.unsplash.com/photo-1780635823961-9dad96633019?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1432405972618-c60b0225b8f9?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?auto=format&fit=crop&w=1200&q=80"
+      ],
+      "rating": 0.0,
+      "reviewCount": 0,
+      "shortDescription": "The \"Niagara Falls of the Philippines\" cascading over three wide tiers.",
+      "longDescription": "Tucked deep in Surigao del Sur, Tinuy-an Falls spreads across a 95-meter-wide curtain of milky turquoise water tumbling down three limestone tiers into a wide natural pool. Bamboo rafts ferry visitors right up to the base of the falls, where the spray and roar make for one of the most dramatic swims in Mindanao. Because it sits off the usual tourist trail, mornings here are often quiet enough to have the entire pool to yourself.",
+      "entranceFee": "₱50 entrance + ₱150 bamboo raft rental",
+      "bestTimeToVisit": "March – May for the clearest turquoise water",
+      "travelTips": [
+        "Go on a weekday morning to avoid local day-trip crowds.",
+        "Combine with Hagukan Cave and Enchanted River in Hinatuan for a full Surigao del Sur loop.",
+        "Water is strongest (and muddiest) right after rain — check the forecast."
+      ],
+      "highlights": [
+        "Bamboo raft ride",
+        "Three-tier cascade",
+        "Nearby Enchanted River"
+      ],
+      "isHiddenGem": true,
+      "isFeatured": false,
+      "nearbyRestaurantIds": [],
+      "nearbyDestinationIds": [
+        "cloud-9"
+      ],
+      "latitude": 8.1957,
+      "longitude": 126.3622,
+      "phoneNumber": "",
+      "websiteUrl": "",
+      "facebookUrl": "",
+      "openingHours": "6:00 AM – 5:00 PM daily",
+      "nameLower": "tinuy-an falls",
+      "status": "published"
+    },
+    "el-nido-lagoons": {
+      "name": "El Nido Lagoons",
+      "provinceId": "palawan",
+      "provinceName": "Palawan",
+      "regionId": "region-4b",
+      "cityId": "el-nido",
+      "categoryId": "beaches",
+      "heroImageUrl": "https://images.unsplash.com/photo-1552733407-5d5c46c3bb3b?auto=format&fit=crop&w=1200&q=80",
+      "galleryImageUrls": [
+        "https://images.unsplash.com/photo-1552733407-5d5c46c3bb3b?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1573790387438-4da905039392?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1200&q=80"
+      ],
+      "rating": 0.0,
+      "reviewCount": 0,
+      "shortDescription": "Limestone karsts and hidden lagoons accessible only by boat.",
+      "longDescription": "El Nido's Bacuit Archipelago is a maze of towering limestone cliffs, secret lagoons and powder-white beaches that consistently ranks among the world's best island destinations. The Big and Small Lagoon tours (Tour A) are the most iconic, with kayaks gliding through narrow rock crevices into perfectly still turquoise pools. Tour C ventures further out to wilder, less-visited reefs and beaches for travelers chasing a quieter island-hopping day.",
+      "entranceFee": "Island-hopping tours from ₱1,400/person (boat + lunch)",
+      "bestTimeToVisit": "November – May, dry season",
+      "travelTips": [
+        "Book Tour A (Big/Small Lagoon) at least a day ahead — it's the most popular route.",
+        "Bring cash; most boat operators and beach cafes don't accept cards.",
+        "Pack a dry bag — you will get splashed climbing into the lagoons."
+      ],
+      "highlights": [
+        "Big Lagoon kayaking",
+        "Secret Beach",
+        "Matinloc Shrine"
+      ],
+      "isHiddenGem": false,
+      "isFeatured": true,
+      "nearbyRestaurantIds": [
+        "altrove-el-nido"
+      ],
+      "nearbyDestinationIds": [
+        "hundred-islands"
+      ],
+      "latitude": 11.1949,
+      "longitude": 119.4116,
+      "phoneNumber": "",
+      "websiteUrl": "",
+      "facebookUrl": "",
+      "openingHours": "Island-hopping tours depart 8:00 AM – 9:00 AM",
+      "nameLower": "el nido lagoons",
+      "status": "published"
+    },
+    "banaue-rice-terraces": {
+      "name": "Banaue Rice Terraces",
+      "provinceId": "ifugao",
+      "provinceName": "Ifugao",
+      "regionId": "car",
+      "cityId": "",
+      "categoryId": "mountains",
+      "heroImageUrl": "https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=1200&q=80",
+      "galleryImageUrls": [
+        "https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1470770841072-f978cf4d019e?auto=format&fit=crop&w=1200&q=80"
+      ],
+      "rating": 0.0,
+      "reviewCount": 0,
+      "shortDescription": "2,000-year-old terraces carved by hand into the Cordillera mountains.",
+      "longDescription": "Often called the \"Eighth Wonder of the World,\" the Banaue Rice Terraces were carved into the mountainside by the Ifugao people using little more than hand tools, forming a vast staircase of paddies that still feeds local communities today. The Batad terraces, shaped like a natural amphitheater, require a short trek to reach but reward hikers with one of the most striking landscapes in Southeast Asia.",
+      "entranceFee": "₱50 viewpoint fee; Batad village fee ₱20",
+      "bestTimeToVisit": "April – May (planting) or October – November (harvest, terraces turn gold)",
+      "travelTips": [
+        "Hire a local Ifugao guide for the Batad trek — trails fork often and guides support the community.",
+        "Bring layers; Banaue nights get cool at around 20°C year-round.",
+        "The night bus from Manila is the most common way to arrive — book seats in advance."
+      ],
+      "highlights": [
+        "Batad amphitheater terraces",
+        "Tappiya Waterfall trek",
+        "Ifugao weaving villages"
+      ],
+      "isHiddenGem": true,
+      "isFeatured": false,
+      "nearbyRestaurantIds": [],
+      "nearbyDestinationIds": [
+        "tinuy-an-falls"
+      ],
+      "latitude": 16.9107,
+      "longitude": 121.0583,
+      "phoneNumber": "",
+      "websiteUrl": "",
+      "facebookUrl": "",
+      "openingHours": "Viewpoint open 24 hours",
+      "nameLower": "banaue rice terraces",
+      "status": "published"
+    },
+    "intramuros": {
+      "name": "Intramuros",
+      "provinceId": "metro-manila",
+      "provinceName": "Metro Manila",
+      "regionId": "ncr",
+      "cityId": "manila",
+      "categoryId": "historical",
+      "heroImageUrl": "https://images.unsplash.com/photo-1766890411463-1ae640720e0c?auto=format&fit=crop&w=1200&q=80",
+      "galleryImageUrls": [
+        "https://images.unsplash.com/photo-1766890411463-1ae640720e0c?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1518877593221-1f28583780b4?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1596386461350-326ccb383e9f?auto=format&fit=crop&w=1200&q=80"
+      ],
+      "rating": 0.0,
+      "reviewCount": 0,
+      "shortDescription": "The walled Spanish city at the historic core of Manila.",
+      "longDescription": "Intramuros is the original 16th-century walled city that Spanish colonizers built at the mouth of the Pasig River, and it remains Manila's best-preserved link to that era. Fort Santiago, San Agustin Church (a UNESCO World Heritage Site), and the cobbled streets around Plaza Roma are best explored by bike or calesa, with the massive stone walls themselves offering a walkable perimeter loop above the moat-turned-golf-course.",
+      "entranceFee": "Fort Santiago ₱75; San Agustin Church ₱200",
+      "bestTimeToVisit": "Early morning or late afternoon to avoid the heat",
+      "travelTips": [
+        "Join a bamboo-bike tour for the most efficient way to see the whole district.",
+        "Visit Fort Santiago's Rizal Shrine to learn the story of the national hero's final days.",
+        "Barbara's Restaurant nearby hosts a nightly cultural dinner show."
+      ],
+      "highlights": [
+        "Fort Santiago",
+        "San Agustin Church",
+        "Bamboo bike tours"
+      ],
+      "isHiddenGem": false,
+      "isFeatured": false,
+      "nearbyRestaurantIds": [
+        "barbaras-intramuros"
+      ],
+      "nearbyDestinationIds": [
+        "calle-crisologo"
+      ],
+      "latitude": 14.5895,
+      "longitude": 120.975,
+      "phoneNumber": "",
+      "websiteUrl": "",
+      "facebookUrl": "",
+      "openingHours": "Fort Santiago: 8:00 AM – 7:00 PM daily",
+      "nameLower": "intramuros",
+      "status": "published"
+    },
+    "kawasan-falls": {
+      "name": "Kawasan Falls",
+      "provinceId": "cebu",
+      "provinceName": "Cebu",
+      "regionId": "region-7",
+      "cityId": "badian",
+      "categoryId": "nature",
+      "heroImageUrl": "https://images.unsplash.com/photo-1432405972618-c60b0225b8f9?auto=format&fit=crop&w=1200&q=80",
+      "galleryImageUrls": [
+        "https://images.unsplash.com/photo-1432405972618-c60b0225b8f9?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1780635823961-9dad96633019?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?auto=format&fit=crop&w=1200&q=80"
+      ],
+      "rating": 0.0,
+      "reviewCount": 0,
+      "shortDescription": "Turquoise waterfalls famous for canyoneering adventures.",
+      "longDescription": "Kawasan Falls is the centerpiece of one of the Philippines' most thrilling canyoneering routes, where cliff jumps, rope swings and river-scrambling lead you through a series of cascades before ending at the main three-tier falls. Even without the adventure trek, the main pool's milky-blue water framed by limestone cliffs makes it worth the trip on its own.",
+      "entranceFee": "₱30 entrance; canyoneering tours from ₱1,500/person",
+      "bestTimeToVisit": "November – May, avoid after heavy rain (water turns brown)",
+      "travelTips": [
+        "Book canyoneering through a licensed local guide association for safety gear and insurance.",
+        "Wear a rash guard — the rocks can scrape bare skin on the jumps.",
+        "Arrive early; the falls get crowded with day-trippers by 11 AM."
+      ],
+      "highlights": [
+        "Canyoneering trek",
+        "Cliff jumping",
+        "Bamboo raft floating cafes"
+      ],
+      "isHiddenGem": true,
+      "isFeatured": false,
+      "nearbyRestaurantIds": [],
+      "nearbyDestinationIds": [
+        "el-nido-lagoons"
+      ],
+      "latitude": 9.8167,
+      "longitude": 123.3833,
+      "phoneNumber": "",
+      "websiteUrl": "",
+      "facebookUrl": "",
+      "openingHours": "6:00 AM – 5:00 PM daily",
+      "nameLower": "kawasan falls",
+      "status": "published"
+    }
+  },
+  "restaurants": {
+    "bohol-bee-farm": {
+      "name": "Bohol Bee Farm",
+      "cuisine": "Farm-to-table Filipino",
+      "provinceId": "bohol",
+      "provinceName": "Bohol",
+      "regionId": "region-7",
+      "cityId": "panglao",
+      "heroImageUrl": "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=1200&q=80",
+      "galleryImageUrls": [
+        "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1559847844-5315695dadae?auto=format&fit=crop&w=1200&q=80"
+      ],
+      "rating": 0.0,
+      "reviewCount": 0,
+      "priceRange": "₱₱",
+      "description": "A cliffside organic farm-and-restaurant serving vegetables and herbs grown on-site, famous for its buffet spread and homemade malunggay ice cream.",
+      "openingHours": "7:00 AM – 9:00 PM daily",
+      "menuHighlights": [
+        {
+          "name": "Organic Buffet Lunch",
+          "price": "₱650",
+          "imageUrl": "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?auto=format&fit=crop&w=1200&q=80"
+        },
+        {
+          "name": "Malunggay Ice Cream",
+          "price": "₱120",
+          "imageUrl": "https://images.unsplash.com/photo-1509042239860-f550ce710b93?auto=format&fit=crop&w=1200&q=80"
+        },
+        {
+          "name": "Grilled Talakitok",
+          "price": "₱480",
+          "imageUrl": "https://images.unsplash.com/photo-1559847844-5315695dadae?auto=format&fit=crop&w=1200&q=80"
+        }
+      ],
+      "isPopular": true,
+      "latitude": 9.5372,
+      "longitude": 123.7517,
+      "phoneNumber": "",
+      "websiteUrl": "",
+      "facebookUrl": "",
+      "nameLower": "bohol bee farm",
+      "status": "published"
+    },
+    "loboc-river-grill": {
+      "name": "Loboc River Floating Restaurant",
+      "cuisine": "Filipino buffet",
+      "provinceId": "bohol",
+      "provinceName": "Bohol",
+      "regionId": "region-7",
+      "cityId": "loboc",
+      "heroImageUrl": "https://images.unsplash.com/photo-1559847844-5315695dadae?auto=format&fit=crop&w=1200&q=80",
+      "galleryImageUrls": [
+        "https://images.unsplash.com/photo-1559847844-5315695dadae?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=1200&q=80"
+      ],
+      "rating": 0.0,
+      "reviewCount": 0,
+      "priceRange": "₱₱",
+      "description": "A floating buffet raft that cruises down the Loboc River past jungle scenery, with live acoustic performances and traditional Filipino dishes served family-style.",
+      "openingHours": "9:00 AM – 3:00 PM daily",
+      "menuHighlights": [
+        {
+          "name": "Lechon Kawali",
+          "price": "₱420",
+          "imageUrl": "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?auto=format&fit=crop&w=1200&q=80"
+        },
+        {
+          "name": "Grilled Bangus",
+          "price": "₱380",
+          "imageUrl": "https://images.unsplash.com/photo-1559847844-5315695dadae?auto=format&fit=crop&w=1200&q=80"
+        }
+      ],
+      "isPopular": false,
+      "latitude": 9.6335,
+      "longitude": 124.0325,
+      "phoneNumber": "",
+      "websiteUrl": "",
+      "facebookUrl": "",
+      "nameLower": "loboc river floating restaurant",
+      "status": "published"
+    },
+    "small-talk-cafe": {
+      "name": "Small Talk Cafe",
+      "cuisine": "Cafe & Bicolano fusion",
+      "provinceId": "albay",
+      "provinceName": "Albay",
+      "regionId": "region-5",
+      "cityId": "legazpi",
+      "heroImageUrl": "https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&w=1200&q=80",
+      "galleryImageUrls": [
+        "https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1509042239860-f550ce710b93?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1569718212165-3a8278d5f624?auto=format&fit=crop&w=1200&q=80"
+      ],
+      "rating": 0.0,
+      "reviewCount": 0,
+      "priceRange": "₱₱",
+      "description": "A cozy Legazpi cafe with a rooftop view of Mayon Volcano, known for its Bicol Express pasta and specialty coffee sourced from local Albay farms.",
+      "openingHours": "10:00 AM – 10:00 PM daily",
+      "menuHighlights": [
+        {
+          "name": "Bicol Express Pasta",
+          "price": "₱295",
+          "imageUrl": "https://images.unsplash.com/photo-1569718212165-3a8278d5f624?auto=format&fit=crop&w=1200&q=80"
+        },
+        {
+          "name": "Albay Brew Latte",
+          "price": "₱150",
+          "imageUrl": "https://images.unsplash.com/photo-1509042239860-f550ce710b93?auto=format&fit=crop&w=1200&q=80"
+        }
+      ],
+      "isPopular": true,
+      "latitude": 13.1391,
+      "longitude": 123.7438,
+      "phoneNumber": "",
+      "websiteUrl": "",
+      "facebookUrl": "",
+      "nameLower": "small talk cafe",
+      "status": "published"
+    },
+    "kermit-surf-resto": {
+      "name": "Kermit Surf Resort & Restaurant",
+      "cuisine": "International & seafood",
+      "provinceId": "surigao-del-norte",
+      "provinceName": "Surigao del Norte",
+      "regionId": "region-13",
+      "cityId": "general-luna",
+      "heroImageUrl": "https://images.unsplash.com/photo-1559847844-5315695dadae?auto=format&fit=crop&w=1200&q=80",
+      "galleryImageUrls": [
+        "https://images.unsplash.com/photo-1559847844-5315695dadae?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1562967914-608f82629710?auto=format&fit=crop&w=1200&q=80"
+      ],
+      "rating": 0.0,
+      "reviewCount": 0,
+      "priceRange": "₱₱",
+      "description": "Siargao's legendary surfer hangout — beachfront tables, live reggae most nights, and a menu spanning fresh catch, wood-fired pizza and hearty American breakfasts.",
+      "openingHours": "7:00 AM – 12:00 AM daily",
+      "menuHighlights": [
+        {
+          "name": "Grilled Tuna Belly",
+          "price": "₱420",
+          "imageUrl": "https://images.unsplash.com/photo-1559847844-5315695dadae?auto=format&fit=crop&w=1200&q=80"
+        },
+        {
+          "name": "Wood-fired Pizza",
+          "price": "₱380",
+          "imageUrl": "https://images.unsplash.com/photo-1562967914-608f82629710?auto=format&fit=crop&w=1200&q=80"
+        }
+      ],
+      "isPopular": true,
+      "latitude": 9.7897,
+      "longitude": 126.1571,
+      "phoneNumber": "",
+      "websiteUrl": "",
+      "facebookUrl": "",
+      "nameLower": "kermit surf resort & restaurant",
+      "status": "published"
+    },
+    "shaka-cafe": {
+      "name": "Shaka Cafe",
+      "cuisine": "Healthy bowls & smoothies",
+      "provinceId": "surigao-del-norte",
+      "provinceName": "Surigao del Norte",
+      "regionId": "region-13",
+      "cityId": "general-luna",
+      "heroImageUrl": "https://images.unsplash.com/photo-1541014741259-de529411b96a?auto=format&fit=crop&w=1200&q=80",
+      "galleryImageUrls": [
+        "https://images.unsplash.com/photo-1541014741259-de529411b96a?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1569718212165-3a8278d5f624?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&w=1200&q=80"
+      ],
+      "rating": 0.0,
+      "reviewCount": 0,
+      "priceRange": "₱₱",
+      "description": "A laid-back surfer cafe serving acai bowls, fresh smoothies and vegan-friendly plates just steps from the Cloud 9 boardwalk.",
+      "openingHours": "6:30 AM – 6:00 PM daily",
+      "menuHighlights": [
+        {
+          "name": "Dragonfruit Acai Bowl",
+          "price": "₱280",
+          "imageUrl": "https://images.unsplash.com/photo-1569718212165-3a8278d5f624?auto=format&fit=crop&w=1200&q=80"
+        },
+        {
+          "name": "Green Detox Smoothie",
+          "price": "₱190",
+          "imageUrl": "https://images.unsplash.com/photo-1509042239860-f550ce710b93?auto=format&fit=crop&w=1200&q=80"
+        }
+      ],
+      "isPopular": false,
+      "latitude": 9.79,
+      "longitude": 126.158,
+      "phoneNumber": "",
+      "websiteUrl": "",
+      "facebookUrl": "",
+      "nameLower": "shaka cafe",
+      "status": "published"
+    },
+    "cafe-leona": {
+      "name": "Cafe Leona",
+      "cuisine": "Ilocano heritage cuisine",
+      "provinceId": "ilocos-sur",
+      "provinceName": "Ilocos Sur",
+      "regionId": "region-1",
+      "cityId": "vigan",
+      "heroImageUrl": "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=1200&q=80",
+      "galleryImageUrls": [
+        "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1523906834658-6e24ef2386f9?auto=format&fit=crop&w=1200&q=80"
+      ],
+      "rating": 0.0,
+      "reviewCount": 0,
+      "priceRange": "₱₱",
+      "description": "Housed in a restored 1800s ancestral home right on Calle Crisologo, serving classic Ilocano dishes like pinakbet and bagnet in a heritage-house dining room.",
+      "openingHours": "11:00 AM – 9:00 PM daily",
+      "menuHighlights": [
+        {
+          "name": "Bagnet with Kbl",
+          "price": "₱350",
+          "imageUrl": "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?auto=format&fit=crop&w=1200&q=80"
+        },
+        {
+          "name": "Pinakbet",
+          "price": "₱220",
+          "imageUrl": "https://images.unsplash.com/photo-1562967914-608f82629710?auto=format&fit=crop&w=1200&q=80"
+        }
+      ],
+      "isPopular": true,
+      "latitude": 17.5745,
+      "longitude": 120.3869,
+      "phoneNumber": "",
+      "websiteUrl": "",
+      "facebookUrl": "",
+      "nameLower": "cafe leona",
+      "status": "published"
+    },
+    "vigan-empanadaan": {
+      "name": "Vigan Empanadaan",
+      "cuisine": "Street food",
+      "provinceId": "ilocos-sur",
+      "provinceName": "Ilocos Sur",
+      "regionId": "region-1",
+      "cityId": "vigan",
+      "heroImageUrl": "https://images.unsplash.com/photo-1541014741259-de529411b96a?auto=format&fit=crop&w=1200&q=80",
+      "galleryImageUrls": [
+        "https://images.unsplash.com/photo-1541014741259-de529411b96a?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1562967914-608f82629710?auto=format&fit=crop&w=1200&q=80"
+      ],
+      "rating": 0.0,
+      "reviewCount": 0,
+      "priceRange": "₱",
+      "description": "The most famous empanada stall row near Plaza Burgos, frying up the signature orange Vigan empanada stuffed with longganisa, egg and papaya right in front of you.",
+      "openingHours": "8:00 AM – 8:00 PM daily",
+      "menuHighlights": [
+        {
+          "name": "Vigan Special Empanada",
+          "price": "₱60",
+          "imageUrl": "https://images.unsplash.com/photo-1562967914-608f82629710?auto=format&fit=crop&w=1200&q=80"
+        },
+        {
+          "name": "Okoy",
+          "price": "₱45",
+          "imageUrl": "https://images.unsplash.com/photo-1541014741259-de529411b96a?auto=format&fit=crop&w=1200&q=80"
+        }
+      ],
+      "isPopular": false,
+      "latitude": 17.5746,
+      "longitude": 120.3873,
+      "phoneNumber": "",
+      "websiteUrl": "",
+      "facebookUrl": "",
+      "nameLower": "vigan empanadaan",
+      "status": "published"
+    },
+    "lucap-seafood-market": {
+      "name": "Lucap Seafood Market & Grill",
+      "cuisine": "Fresh seafood",
+      "provinceId": "pangasinan",
+      "provinceName": "Pangasinan",
+      "regionId": "region-1",
+      "cityId": "alaminos",
+      "heroImageUrl": "https://images.unsplash.com/photo-1559847844-5315695dadae?auto=format&fit=crop&w=1200&q=80",
+      "galleryImageUrls": [
+        "https://images.unsplash.com/photo-1559847844-5315695dadae?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1541014741259-de529411b96a?auto=format&fit=crop&w=1200&q=80"
+      ],
+      "rating": 0.0,
+      "reviewCount": 0,
+      "priceRange": "₱₱",
+      "description": "A wet-market-style seafood grill by the wharf — pick your catch, name your cooking style, and eat it fresh off the fire before your island-hopping boat departs.",
+      "openingHours": "6:00 AM – 8:00 PM daily",
+      "menuHighlights": [
+        {
+          "name": "Grilled Squid",
+          "price": "₱260",
+          "imageUrl": "https://images.unsplash.com/photo-1559847844-5315695dadae?auto=format&fit=crop&w=1200&q=80"
+        },
+        {
+          "name": "Sinigang na Hipon",
+          "price": "₱310",
+          "imageUrl": "https://images.unsplash.com/photo-1569718212165-3a8278d5f624?auto=format&fit=crop&w=1200&q=80"
+        }
+      ],
+      "isPopular": false,
+      "latitude": 16.1725,
+      "longitude": 119.9847,
+      "phoneNumber": "",
+      "websiteUrl": "",
+      "facebookUrl": "",
+      "nameLower": "lucap seafood market & grill",
+      "status": "published"
+    },
+    "altrove-el-nido": {
+      "name": "Altrove El Nido",
+      "cuisine": "Italian",
+      "provinceId": "palawan",
+      "provinceName": "Palawan",
+      "regionId": "region-4b",
+      "cityId": "el-nido",
+      "heroImageUrl": "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=1200&q=80",
+      "galleryImageUrls": [
+        "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1569718212165-3a8278d5f624?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1552733407-5d5c46c3bb3b?auto=format&fit=crop&w=1200&q=80"
+      ],
+      "rating": 0.0,
+      "reviewCount": 0,
+      "priceRange": "₱₱₱",
+      "description": "An Italian-run trattoria in the middle of El Nido town serving wood-fired Neapolitan pizza and fresh pasta after a full day of island hopping.",
+      "openingHours": "5:00 PM – 11:00 PM daily",
+      "menuHighlights": [
+        {
+          "name": "Frutti di Mare Pizza",
+          "price": "₱480",
+          "imageUrl": "https://images.unsplash.com/photo-1569718212165-3a8278d5f624?auto=format&fit=crop&w=1200&q=80"
+        },
+        {
+          "name": "Truffle Tagliatelle",
+          "price": "₱520",
+          "imageUrl": "https://images.unsplash.com/photo-1569718212165-3a8278d5f624?auto=format&fit=crop&w=1200&q=80"
+        }
+      ],
+      "isPopular": true,
+      "latitude": 11.18,
+      "longitude": 119.41,
+      "phoneNumber": "",
+      "websiteUrl": "",
+      "facebookUrl": "",
+      "nameLower": "altrove el nido",
+      "status": "published"
+    },
+    "barbaras-intramuros": {
+      "name": "Barbara's Heritage Restaurant",
+      "cuisine": "Filipino fine dining",
+      "provinceId": "metro-manila",
+      "provinceName": "Metro Manila",
+      "regionId": "ncr",
+      "cityId": "manila",
+      "heroImageUrl": "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=1200&q=80",
+      "galleryImageUrls": [
+        "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1766890411463-1ae640720e0c?auto=format&fit=crop&w=1200&q=80"
+      ],
+      "rating": 0.0,
+      "reviewCount": 0,
+      "priceRange": "₱₱₱",
+      "description": "A grand colonial-era dining hall inside Intramuros offering a nightly cultural show and a Filipino buffet spanning regional specialties from Luzon to Mindanao.",
+      "openingHours": "11:00 AM – 10:00 PM daily",
+      "menuHighlights": [
+        {
+          "name": "Kare-Kare",
+          "price": "₱480",
+          "imageUrl": "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?auto=format&fit=crop&w=1200&q=80"
+        },
+        {
+          "name": "Crispy Pata",
+          "price": "₱620",
+          "imageUrl": "https://images.unsplash.com/photo-1562967914-608f82629710?auto=format&fit=crop&w=1200&q=80"
+        }
+      ],
+      "isPopular": false,
+      "latitude": 14.5896,
+      "longitude": 120.9754,
+      "phoneNumber": "",
+      "websiteUrl": "",
+      "facebookUrl": "",
+      "nameLower": "barbara's heritage restaurant",
+      "status": "published"
+    }
+  },
+  "festivals": {
+    "sinulog": {
+      "name": "Sinulog Festival",
+      "provinceId": "cebu",
+      "provinceName": "Cebu",
+      "regionId": "region-7",
+      "cityId": "cebu-city",
+      "heroImageUrl": "https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?auto=format&fit=crop&w=1200&q=80",
+      "galleryImageUrls": [
+        "https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1517457373958-b7bdd4587205?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1583225214464-9296029427aa?auto=format&fit=crop&w=1200&q=80"
+      ],
+      "dateLabel": "January 18, 2026",
+      "month": "JAN",
+      "description": "One of the grandest festivals in the Philippines, Sinulog honors the Santo Niño with a thunderous street parade of drums, vibrant costumes and the iconic \"sinulog\" two-steps-forward-one-step-back dance. Contingents from across the Visayas compete in the main parade route through downtown Cebu, drawing millions of spectators and turning the entire city into an open-air celebration.",
+      "highlights": [
+        "Grand street parade",
+        "Fluvial procession",
+        "Street party at Fuente Circle"
+      ],
+      "rating": 0.0,
+      "reviewCount": 0,
+      "isUpcoming": true,
+      "organizer": "",
+      "registrationLink": "",
+      "venue": "",
+      "facebookUrl": "",
+      "latitude": null,
+      "longitude": null,
+      "nameLower": "sinulog festival",
+      "status": "published"
+    },
+    "panagbenga": {
+      "name": "Panagbenga Flower Festival",
+      "provinceId": "benguet",
+      "provinceName": "Benguet",
+      "regionId": "car",
+      "cityId": "baguio-city",
+      "heroImageUrl": "https://images.unsplash.com/photo-1573455494060-c5595004fb6c?auto=format&fit=crop&w=1200&q=80",
+      "galleryImageUrls": [
+        "https://images.unsplash.com/photo-1573455494060-c5595004fb6c?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1517457373958-b7bdd4587205?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?auto=format&fit=crop&w=1200&q=80"
+      ],
+      "dateLabel": "February 1–28, 2026",
+      "month": "FEB",
+      "description": "A month-long celebration of Baguio's cool-climate flowers, Panagbenga fills the city's streets with flower-covered floats and vibrant costume dance parades. Session Road closes to traffic for the grand float parade, while the market and park areas host flower exhibits, food fairs, and a street-dancing competition among schools from across the Cordillera region.",
+      "highlights": [
+        "Flower float parade",
+        "Street dance competition",
+        "Session Road night market"
+      ],
+      "rating": 0.0,
+      "reviewCount": 0,
+      "isUpcoming": true,
+      "organizer": "",
+      "registrationLink": "",
+      "venue": "",
+      "facebookUrl": "",
+      "latitude": null,
+      "longitude": null,
+      "nameLower": "panagbenga flower festival",
+      "status": "published"
+    },
+    "kadayawan": {
+      "name": "Kadayawan Festival",
+      "provinceId": "davao-del-sur",
+      "provinceName": "Davao del Sur",
+      "regionId": "region-11",
+      "cityId": "davao-city",
+      "heroImageUrl": "https://images.unsplash.com/photo-1583225214464-9296029427aa?auto=format&fit=crop&w=1200&q=80",
+      "galleryImageUrls": [
+        "https://images.unsplash.com/photo-1583225214464-9296029427aa?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1517457373958-b7bdd4587205?auto=format&fit=crop&w=1200&q=80"
+      ],
+      "dateLabel": "August 15–21, 2026",
+      "month": "AUG",
+      "description": "Kadayawan is Davao's thanksgiving celebration for a bountiful harvest and the region's rich indigenous heritage. Eleven tribes of Mindanao showcase their traditional dress, music and dance, while the streets fill with fruit displays, flower arrangements and a showcase of Davao's famous durian.",
+      "highlights": [
+        "Indak-Indak street dance",
+        "Floral float competition",
+        "Fruit and produce fair"
+      ],
+      "rating": 0.0,
+      "reviewCount": 0,
+      "isUpcoming": false,
+      "organizer": "",
+      "registrationLink": "",
+      "venue": "",
+      "facebookUrl": "",
+      "latitude": null,
+      "longitude": null,
+      "nameLower": "kadayawan festival",
+      "status": "published"
+    },
+    "ati-atihan": {
+      "name": "Ati-Atihan Festival",
+      "provinceId": "aklan",
+      "provinceName": "Aklan",
+      "regionId": "region-6",
+      "cityId": "kalibo",
+      "heroImageUrl": "https://images.unsplash.com/photo-1517457373958-b7bdd4587205?auto=format&fit=crop&w=1200&q=80",
+      "galleryImageUrls": [
+        "https://images.unsplash.com/photo-1517457373958-b7bdd4587205?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1583225214464-9296029427aa?auto=format&fit=crop&w=1200&q=80"
+      ],
+      "dateLabel": "January 11, 2026",
+      "month": "JAN",
+      "description": "Considered the \"Mother of all Philippine Festivals,\" Ati-Atihan features revelers painting their skin with soot to honor the indigenous Ati people, dancing through Kalibo's streets to relentless drumbeats in tribute to the Santo Niño. The energy is infectious and famously spontaneous — anyone can join the procession.",
+      "highlights": [
+        "Soot-painted street dancing",
+        "Drum processions",
+        "Free-for-all street revelry"
+      ],
+      "rating": 0.0,
+      "reviewCount": 0,
+      "isUpcoming": true,
+      "organizer": "",
+      "registrationLink": "",
+      "venue": "",
+      "facebookUrl": "",
+      "latitude": null,
+      "longitude": null,
+      "nameLower": "ati-atihan festival",
+      "status": "published"
+    },
+    "moriones": {
+      "name": "Moriones Festival",
+      "provinceId": "marinduque",
+      "provinceName": "Marinduque",
+      "regionId": "region-4b",
+      "cityId": "",
+      "heroImageUrl": "https://images.unsplash.com/photo-1583225214464-9296029427aa?auto=format&fit=crop&w=1200&q=80",
+      "galleryImageUrls": [
+        "https://images.unsplash.com/photo-1583225214464-9296029427aa?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1517457373958-b7bdd4587205?auto=format&fit=crop&w=1200&q=80"
+      ],
+      "dateLabel": "March 28 – April 4, 2026",
+      "month": "MAR",
+      "description": "During Holy Week, the island of Marinduque transforms as locals don elaborate Roman centurion masks and armor to re-enact the story of Longinus, the biblical soldier said to have gained sight after piercing Christ's side. The masked \"Moriones\" roam entire towns for a week, staying in character for street performances and a dramatic beheading re-enactment finale.",
+      "highlights": [
+        "Roman centurion masks",
+        "Passion play re-enactments",
+        "Island-wide street theater"
+      ],
+      "rating": 0.0,
+      "reviewCount": 0,
+      "isUpcoming": false,
+      "organizer": "",
+      "registrationLink": "",
+      "venue": "",
+      "facebookUrl": "",
+      "latitude": null,
+      "longitude": null,
+      "nameLower": "moriones festival",
+      "status": "published"
+    },
+    "pahiyas": {
+      "name": "Pahiyas Festival",
+      "provinceId": "quezon",
+      "provinceName": "Quezon",
+      "regionId": "region-4a",
+      "cityId": "lucban",
+      "heroImageUrl": "https://images.unsplash.com/photo-1517457373958-b7bdd4587205?auto=format&fit=crop&w=1200&q=80",
+      "galleryImageUrls": [
+        "https://images.unsplash.com/photo-1517457373958-b7bdd4587205?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?auto=format&fit=crop&w=1200&q=80"
+      ],
+      "dateLabel": "May 15, 2026",
+      "month": "MAY",
+      "description": "Farmers in Lucban give thanks for their harvest by decorating their houses with kiping — colorful, leaf-shaped rice wafers — alongside fruits, vegetables and woven crafts, turning entire streets into an edible art gallery. Visitors are welcome to pick kiping straight off the house facades to snack on.",
+      "highlights": [
+        "Kiping-decorated houses",
+        "Harvest offerings display",
+        "Lucban longganisa food stalls"
+      ],
+      "rating": 0.0,
+      "reviewCount": 0,
+      "isUpcoming": false,
+      "organizer": "",
+      "registrationLink": "",
+      "venue": "",
+      "facebookUrl": "",
+      "latitude": null,
+      "longitude": null,
+      "nameLower": "pahiyas festival",
+      "status": "published"
+    }
+  },
+  "regions": {
+    "ncr": {
+      "name": "National Capital Region",
+      "islandGroup": "Luzon"
+    },
+    "car": {
+      "name": "Cordillera Administrative Region",
+      "islandGroup": "Luzon"
+    },
+    "region-1": {
+      "name": "Ilocos Region",
+      "islandGroup": "Luzon"
+    },
+    "region-2": {
+      "name": "Cagayan Valley",
+      "islandGroup": "Luzon"
+    },
+    "region-3": {
+      "name": "Central Luzon",
+      "islandGroup": "Luzon"
+    },
+    "region-4a": {
+      "name": "CALABARZON",
+      "islandGroup": "Luzon"
+    },
+    "region-4b": {
+      "name": "MIMAROPA",
+      "islandGroup": "Luzon"
+    },
+    "region-5": {
+      "name": "Bicol Region",
+      "islandGroup": "Luzon"
+    },
+    "region-6": {
+      "name": "Western Visayas",
+      "islandGroup": "Visayas"
+    },
+    "region-7": {
+      "name": "Central Visayas",
+      "islandGroup": "Visayas"
+    },
+    "region-8": {
+      "name": "Eastern Visayas",
+      "islandGroup": "Visayas"
+    },
+    "region-9": {
+      "name": "Zamboanga Peninsula",
+      "islandGroup": "Mindanao"
+    },
+    "region-10": {
+      "name": "Northern Mindanao",
+      "islandGroup": "Mindanao"
+    },
+    "region-11": {
+      "name": "Davao Region",
+      "islandGroup": "Mindanao"
+    },
+    "region-12": {
+      "name": "SOCCSKSARGEN",
+      "islandGroup": "Mindanao"
+    },
+    "region-13": {
+      "name": "Caraga",
+      "islandGroup": "Mindanao"
+    },
+    "barmm": {
+      "name": "Bangsamoro Autonomous Region in Muslim Mindanao",
+      "islandGroup": "Mindanao"
+    }
+  },
+  "provinces": {
+    "metro-manila": {
+      "name": "Metro Manila",
+      "regionId": "ncr",
+      "regionName": "National Capital Region",
+      "islandGroup": "Luzon",
+      "isPseudoProvince": true,
+      "hasContent": true,
+      "overview": "The country's capital region, anchored by Intramuros' Spanish-colonial walled city, Rizal Park, and a dense mix of historic, business and entertainment districts across its cities.",
+      "localCulture": "The most culturally diverse part of the country, drawing migrants from every region — Filipino and English are both widely spoken, alongside every regional language.",
+      "bestTimeToVisit": "November to February, the coolest and driest stretch, is most comfortable for walking tours.",
+      "estimatedDailyBudgetMin": 2000.0,
+      "estimatedDailyBudgetMax": 5000.0,
+      "travelTips": [
+        "Traffic is often the single biggest time cost — factor in significant buffer between destinations.",
+        "Intramuros is best explored on foot or by kalesa (horse-drawn calash) rather than by car.",
+        "Use ride-hailing apps or the LRT/MRT for predictable travel times over street-hailed taxis."
+      ],
+      "emergencyHotlines": [
+        {
+          "label": "National Emergency Hotline",
+          "number": "911"
+        }
+      ],
+      "heroImageUrl": "https://images.unsplash.com/photo-1766890411463-1ae640720e0c?auto=format&fit=crop&w=1200&q=80",
+      "featuredDestinationIds": []
+    },
+    "abra": {
+      "name": "Abra",
+      "regionId": "car",
+      "regionName": "Cordillera Administrative Region",
+      "islandGroup": "Luzon",
+      "isPseudoProvince": false,
+      "hasContent": false,
+      "overview": "",
+      "localCulture": "",
+      "bestTimeToVisit": "",
+      "estimatedDailyBudgetMin": 0.0,
+      "estimatedDailyBudgetMax": 0.0,
+      "travelTips": [],
+      "emergencyHotlines": [],
+      "heroImageUrl": "",
+      "featuredDestinationIds": []
+    },
+    "apayao": {
+      "name": "Apayao",
+      "regionId": "car",
+      "regionName": "Cordillera Administrative Region",
+      "islandGroup": "Luzon",
+      "isPseudoProvince": false,
+      "hasContent": false,
+      "overview": "",
+      "localCulture": "",
+      "bestTimeToVisit": "",
+      "estimatedDailyBudgetMin": 0.0,
+      "estimatedDailyBudgetMax": 0.0,
+      "travelTips": [],
+      "emergencyHotlines": [],
+      "heroImageUrl": "",
+      "featuredDestinationIds": []
+    },
+    "benguet": {
+      "name": "Benguet",
+      "regionId": "car",
+      "regionName": "Cordillera Administrative Region",
+      "islandGroup": "Luzon",
+      "isPseudoProvince": false,
+      "hasContent": true,
+      "overview": "The Cordillera's most visited province, home to Baguio City's cool-climate parks, strawberry farms, and the surrounding pine-forested highlands.",
+      "localCulture": "Home to the Ibaloi and Kankanaey indigenous peoples; Baguio itself grew as an American-era hill station and remains the Cordillera's main commercial and cultural hub.",
+      "bestTimeToVisit": "December to February for the coolest weather, or late February–March for the Panagbenga Flower Festival.",
+      "estimatedDailyBudgetMin": 1500.0,
+      "estimatedDailyBudgetMax": 3500.0,
+      "travelTips": [
+        "Baguio gets genuinely cold at night by Philippine standards — pack a light jacket.",
+        "Book accommodations early for Panagbenga Festival and Holy Week — the city fills up fast.",
+        "Traffic into Baguio on weekends/holidays can be heavy; a weekday visit is far more relaxed."
+      ],
+      "emergencyHotlines": [
+        {
+          "label": "National Emergency Hotline",
+          "number": "911"
+        }
+      ],
+      "heroImageUrl": "https://images.unsplash.com/photo-1470770841072-f978cf4d019e?auto=format&fit=crop&w=1200&q=80",
+      "featuredDestinationIds": []
+    },
+    "ifugao": {
+      "name": "Ifugao",
+      "regionId": "car",
+      "regionName": "Cordillera Administrative Region",
+      "islandGroup": "Luzon",
+      "isPseudoProvince": false,
+      "hasContent": true,
+      "overview": "Home to the UNESCO World Heritage-listed Banaue and Batad Rice Terraces, carved into the Cordillera mountains over centuries.",
+      "localCulture": "Home to the Ifugao people, whose rice terrace farming, wood-carving (bulul figures), and indigenous rituals remain living traditions, not museum pieces.",
+      "bestTimeToVisit": "March to May (dry, clear mountain views) or November–December (post-harvest, terraces still green); the June–October wet season brings landslide risk on mountain roads.",
+      "estimatedDailyBudgetMin": 1200.0,
+      "estimatedDailyBudgetMax": 2800.0,
+      "travelTips": [
+        "Batad's rice terraces are only reachable on foot from the saddle point — pack proper footwear.",
+        "Mountain roads to Ifugao are winding; those prone to motion sickness should plan accordingly.",
+        "Hire a local guide in Batad — trails aren't well signed and guiding income directly supports the community."
+      ],
+      "emergencyHotlines": [
+        {
+          "label": "National Emergency Hotline",
+          "number": "911"
+        }
+      ],
+      "heroImageUrl": "https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=1200&q=80",
+      "featuredDestinationIds": []
+    },
+    "kalinga": {
+      "name": "Kalinga",
+      "regionId": "car",
+      "regionName": "Cordillera Administrative Region",
+      "islandGroup": "Luzon",
+      "isPseudoProvince": false,
+      "hasContent": false,
+      "overview": "",
+      "localCulture": "",
+      "bestTimeToVisit": "",
+      "estimatedDailyBudgetMin": 0.0,
+      "estimatedDailyBudgetMax": 0.0,
+      "travelTips": [],
+      "emergencyHotlines": [],
+      "heroImageUrl": "",
+      "featuredDestinationIds": []
+    },
+    "mountain-province": {
+      "name": "Mountain Province",
+      "regionId": "car",
+      "regionName": "Cordillera Administrative Region",
+      "islandGroup": "Luzon",
+      "isPseudoProvince": false,
+      "hasContent": false,
+      "overview": "",
+      "localCulture": "",
+      "bestTimeToVisit": "",
+      "estimatedDailyBudgetMin": 0.0,
+      "estimatedDailyBudgetMax": 0.0,
+      "travelTips": [],
+      "emergencyHotlines": [],
+      "heroImageUrl": "",
+      "featuredDestinationIds": []
+    },
+    "ilocos-norte": {
+      "name": "Ilocos Norte",
+      "regionId": "region-1",
+      "regionName": "Ilocos Region",
+      "islandGroup": "Luzon",
+      "isPseudoProvince": false,
+      "hasContent": false,
+      "overview": "",
+      "localCulture": "",
+      "bestTimeToVisit": "",
+      "estimatedDailyBudgetMin": 0.0,
+      "estimatedDailyBudgetMax": 0.0,
+      "travelTips": [],
+      "emergencyHotlines": [],
+      "heroImageUrl": "",
+      "featuredDestinationIds": []
+    },
+    "ilocos-sur": {
+      "name": "Ilocos Sur",
+      "regionId": "region-1",
+      "regionName": "Ilocos Region",
+      "islandGroup": "Luzon",
+      "isPseudoProvince": false,
+      "hasContent": true,
+      "overview": "Centers on Vigan, a UNESCO World Heritage-listed Spanish colonial town famous for Calle Crisologo's cobblestone streets and kalesa rides.",
+      "localCulture": "Ilocano culture and language dominate, known for a thrift-minded, hardworking reputation and dishes like bagnet and empanada.",
+      "bestTimeToVisit": "November to April, avoiding the wetter, typhoon-prone middle months.",
+      "estimatedDailyBudgetMin": 1200.0,
+      "estimatedDailyBudgetMax": 3000.0,
+      "travelTips": [
+        "Explore Vigan's heritage core on foot or by kalesa rather than car — many streets restrict vehicle access.",
+        "Try Vigan longganisa and empanada from a stall near the public market for the most authentic version.",
+        "Pottery-making at Pagburnayan is a hands-on stop worth booking ahead for groups."
+      ],
+      "emergencyHotlines": [
+        {
+          "label": "National Emergency Hotline",
+          "number": "911"
+        }
+      ],
+      "heroImageUrl": "https://images.unsplash.com/photo-1523906834658-6e24ef2386f9?auto=format&fit=crop&w=1200&q=80",
+      "featuredDestinationIds": []
+    },
+    "la-union": {
+      "name": "La Union",
+      "regionId": "region-1",
+      "regionName": "Ilocos Region",
+      "islandGroup": "Luzon",
+      "isPseudoProvince": false,
+      "hasContent": false,
+      "overview": "",
+      "localCulture": "",
+      "bestTimeToVisit": "",
+      "estimatedDailyBudgetMin": 0.0,
+      "estimatedDailyBudgetMax": 0.0,
+      "travelTips": [],
+      "emergencyHotlines": [],
+      "heroImageUrl": "",
+      "featuredDestinationIds": []
+    },
+    "pangasinan": {
+      "name": "Pangasinan",
+      "regionId": "region-1",
+      "regionName": "Ilocos Region",
+      "islandGroup": "Luzon",
+      "isPseudoProvince": false,
+      "hasContent": true,
+      "overview": "Known for Hundred Islands National Park and Manleluag Spring, a major Ilocano-Pangasinense coastal province in northwestern Luzon.",
+      "localCulture": "Home to the Pangasinense people and language, with strong Ilocano influence; bagoong (fish paste) and deep-sea fishing traditions run deep along its long coastline.",
+      "bestTimeToVisit": "November to May, avoiding the June–October typhoon-prone wet season — best for island hopping.",
+      "estimatedDailyBudgetMin": 1500.0,
+      "estimatedDailyBudgetMax": 3500.0,
+      "travelTips": [
+        "Hundred Islands is best visited early morning before boat crowds build up.",
+        "Bring cash — many small boat operators and beachside eateries in Alaminos don't accept cards.",
+        "Typhoons are most likely June–October; check PAGASA advisories before booking island tours."
+      ],
+      "emergencyHotlines": [
+        {
+          "label": "National Emergency Hotline",
+          "number": "911"
+        }
+      ],
+      "heroImageUrl": "https://images.unsplash.com/photo-1439405326854-014607f694d7?auto=format&fit=crop&w=1200&q=80",
+      "featuredDestinationIds": []
+    },
+    "batanes": {
+      "name": "Batanes",
+      "regionId": "region-2",
+      "regionName": "Cagayan Valley",
+      "islandGroup": "Luzon",
+      "isPseudoProvince": false,
+      "hasContent": false,
+      "overview": "",
+      "localCulture": "",
+      "bestTimeToVisit": "",
+      "estimatedDailyBudgetMin": 0.0,
+      "estimatedDailyBudgetMax": 0.0,
+      "travelTips": [],
+      "emergencyHotlines": [],
+      "heroImageUrl": "",
+      "featuredDestinationIds": []
+    },
+    "cagayan": {
+      "name": "Cagayan",
+      "regionId": "region-2",
+      "regionName": "Cagayan Valley",
+      "islandGroup": "Luzon",
+      "isPseudoProvince": false,
+      "hasContent": false,
+      "overview": "",
+      "localCulture": "",
+      "bestTimeToVisit": "",
+      "estimatedDailyBudgetMin": 0.0,
+      "estimatedDailyBudgetMax": 0.0,
+      "travelTips": [],
+      "emergencyHotlines": [],
+      "heroImageUrl": "",
+      "featuredDestinationIds": []
+    },
+    "isabela": {
+      "name": "Isabela",
+      "regionId": "region-2",
+      "regionName": "Cagayan Valley",
+      "islandGroup": "Luzon",
+      "isPseudoProvince": false,
+      "hasContent": false,
+      "overview": "",
+      "localCulture": "",
+      "bestTimeToVisit": "",
+      "estimatedDailyBudgetMin": 0.0,
+      "estimatedDailyBudgetMax": 0.0,
+      "travelTips": [],
+      "emergencyHotlines": [],
+      "heroImageUrl": "",
+      "featuredDestinationIds": []
+    },
+    "nueva-vizcaya": {
+      "name": "Nueva Vizcaya",
+      "regionId": "region-2",
+      "regionName": "Cagayan Valley",
+      "islandGroup": "Luzon",
+      "isPseudoProvince": false,
+      "hasContent": false,
+      "overview": "",
+      "localCulture": "",
+      "bestTimeToVisit": "",
+      "estimatedDailyBudgetMin": 0.0,
+      "estimatedDailyBudgetMax": 0.0,
+      "travelTips": [],
+      "emergencyHotlines": [],
+      "heroImageUrl": "",
+      "featuredDestinationIds": []
+    },
+    "quirino": {
+      "name": "Quirino",
+      "regionId": "region-2",
+      "regionName": "Cagayan Valley",
+      "islandGroup": "Luzon",
+      "isPseudoProvince": false,
+      "hasContent": false,
+      "overview": "",
+      "localCulture": "",
+      "bestTimeToVisit": "",
+      "estimatedDailyBudgetMin": 0.0,
+      "estimatedDailyBudgetMax": 0.0,
+      "travelTips": [],
+      "emergencyHotlines": [],
+      "heroImageUrl": "",
+      "featuredDestinationIds": []
+    },
+    "aurora": {
+      "name": "Aurora",
+      "regionId": "region-3",
+      "regionName": "Central Luzon",
+      "islandGroup": "Luzon",
+      "isPseudoProvince": false,
+      "hasContent": false,
+      "overview": "",
+      "localCulture": "",
+      "bestTimeToVisit": "",
+      "estimatedDailyBudgetMin": 0.0,
+      "estimatedDailyBudgetMax": 0.0,
+      "travelTips": [],
+      "emergencyHotlines": [],
+      "heroImageUrl": "",
+      "featuredDestinationIds": []
+    },
+    "bataan": {
+      "name": "Bataan",
+      "regionId": "region-3",
+      "regionName": "Central Luzon",
+      "islandGroup": "Luzon",
+      "isPseudoProvince": false,
+      "hasContent": false,
+      "overview": "",
+      "localCulture": "",
+      "bestTimeToVisit": "",
+      "estimatedDailyBudgetMin": 0.0,
+      "estimatedDailyBudgetMax": 0.0,
+      "travelTips": [],
+      "emergencyHotlines": [],
+      "heroImageUrl": "",
+      "featuredDestinationIds": []
+    },
+    "bulacan": {
+      "name": "Bulacan",
+      "regionId": "region-3",
+      "regionName": "Central Luzon",
+      "islandGroup": "Luzon",
+      "isPseudoProvince": false,
+      "hasContent": false,
+      "overview": "",
+      "localCulture": "",
+      "bestTimeToVisit": "",
+      "estimatedDailyBudgetMin": 0.0,
+      "estimatedDailyBudgetMax": 0.0,
+      "travelTips": [],
+      "emergencyHotlines": [],
+      "heroImageUrl": "",
+      "featuredDestinationIds": []
+    },
+    "nueva-ecija": {
+      "name": "Nueva Ecija",
+      "regionId": "region-3",
+      "regionName": "Central Luzon",
+      "islandGroup": "Luzon",
+      "isPseudoProvince": false,
+      "hasContent": false,
+      "overview": "",
+      "localCulture": "",
+      "bestTimeToVisit": "",
+      "estimatedDailyBudgetMin": 0.0,
+      "estimatedDailyBudgetMax": 0.0,
+      "travelTips": [],
+      "emergencyHotlines": [],
+      "heroImageUrl": "",
+      "featuredDestinationIds": []
+    },
+    "pampanga": {
+      "name": "Pampanga",
+      "regionId": "region-3",
+      "regionName": "Central Luzon",
+      "islandGroup": "Luzon",
+      "isPseudoProvince": false,
+      "hasContent": false,
+      "overview": "",
+      "localCulture": "",
+      "bestTimeToVisit": "",
+      "estimatedDailyBudgetMin": 0.0,
+      "estimatedDailyBudgetMax": 0.0,
+      "travelTips": [],
+      "emergencyHotlines": [],
+      "heroImageUrl": "",
+      "featuredDestinationIds": []
+    },
+    "tarlac": {
+      "name": "Tarlac",
+      "regionId": "region-3",
+      "regionName": "Central Luzon",
+      "islandGroup": "Luzon",
+      "isPseudoProvince": false,
+      "hasContent": false,
+      "overview": "",
+      "localCulture": "",
+      "bestTimeToVisit": "",
+      "estimatedDailyBudgetMin": 0.0,
+      "estimatedDailyBudgetMax": 0.0,
+      "travelTips": [],
+      "emergencyHotlines": [],
+      "heroImageUrl": "",
+      "featuredDestinationIds": []
+    },
+    "zambales": {
+      "name": "Zambales",
+      "regionId": "region-3",
+      "regionName": "Central Luzon",
+      "islandGroup": "Luzon",
+      "isPseudoProvince": false,
+      "hasContent": false,
+      "overview": "",
+      "localCulture": "",
+      "bestTimeToVisit": "",
+      "estimatedDailyBudgetMin": 0.0,
+      "estimatedDailyBudgetMax": 0.0,
+      "travelTips": [],
+      "emergencyHotlines": [],
+      "heroImageUrl": "",
+      "featuredDestinationIds": []
+    },
+    "batangas": {
+      "name": "Batangas",
+      "regionId": "region-4a",
+      "regionName": "CALABARZON",
+      "islandGroup": "Luzon",
+      "isPseudoProvince": false,
+      "hasContent": false,
+      "overview": "",
+      "localCulture": "",
+      "bestTimeToVisit": "",
+      "estimatedDailyBudgetMin": 0.0,
+      "estimatedDailyBudgetMax": 0.0,
+      "travelTips": [],
+      "emergencyHotlines": [],
+      "heroImageUrl": "",
+      "featuredDestinationIds": []
+    },
+    "cavite": {
+      "name": "Cavite",
+      "regionId": "region-4a",
+      "regionName": "CALABARZON",
+      "islandGroup": "Luzon",
+      "isPseudoProvince": false,
+      "hasContent": false,
+      "overview": "",
+      "localCulture": "",
+      "bestTimeToVisit": "",
+      "estimatedDailyBudgetMin": 0.0,
+      "estimatedDailyBudgetMax": 0.0,
+      "travelTips": [],
+      "emergencyHotlines": [],
+      "heroImageUrl": "",
+      "featuredDestinationIds": []
+    },
+    "laguna": {
+      "name": "Laguna",
+      "regionId": "region-4a",
+      "regionName": "CALABARZON",
+      "islandGroup": "Luzon",
+      "isPseudoProvince": false,
+      "hasContent": false,
+      "overview": "",
+      "localCulture": "",
+      "bestTimeToVisit": "",
+      "estimatedDailyBudgetMin": 0.0,
+      "estimatedDailyBudgetMax": 0.0,
+      "travelTips": [],
+      "emergencyHotlines": [],
+      "heroImageUrl": "",
+      "featuredDestinationIds": []
+    },
+    "quezon": {
+      "name": "Quezon",
+      "regionId": "region-4a",
+      "regionName": "CALABARZON",
+      "islandGroup": "Luzon",
+      "isPseudoProvince": false,
+      "hasContent": true,
+      "overview": "A large CALABARZON province stretching from Lucban's heritage streets to Quezon National Park's forest trails, and the Pahiyas Festival each May.",
+      "localCulture": "Tagalog-speaking with a strong Catholic agricultural heritage; the Pahiyas Festival's harvest offerings (kiping rice wafers decorating housefronts) are the province's signature tradition.",
+      "bestTimeToVisit": "May for the Pahiyas Festival itself, or November–April generally for drier weather.",
+      "estimatedDailyBudgetMin": 1200.0,
+      "estimatedDailyBudgetMax": 3000.0,
+      "travelTips": [
+        "Pahiyas Festival (May 15) draws huge crowds to Lucban — book accommodations well in advance.",
+        "Try Lucban longganisa, a distinctly garlicky, herb-flecked local sausage.",
+        "Quezon's coastline and mountain areas are far apart — plan for significant travel time between them."
+      ],
+      "emergencyHotlines": [
+        {
+          "label": "National Emergency Hotline",
+          "number": "911"
+        }
+      ],
+      "heroImageUrl": "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?auto=format&fit=crop&w=1200&q=80",
+      "featuredDestinationIds": []
+    },
+    "rizal": {
+      "name": "Rizal",
+      "regionId": "region-4a",
+      "regionName": "CALABARZON",
+      "islandGroup": "Luzon",
+      "isPseudoProvince": false,
+      "hasContent": false,
+      "overview": "",
+      "localCulture": "",
+      "bestTimeToVisit": "",
+      "estimatedDailyBudgetMin": 0.0,
+      "estimatedDailyBudgetMax": 0.0,
+      "travelTips": [],
+      "emergencyHotlines": [],
+      "heroImageUrl": "",
+      "featuredDestinationIds": []
+    },
+    "marinduque": {
+      "name": "Marinduque",
+      "regionId": "region-4b",
+      "regionName": "MIMAROPA",
+      "islandGroup": "Luzon",
+      "isPseudoProvince": false,
+      "hasContent": true,
+      "overview": "A small, quiet island province best known nationwide for the Moriones Festival's elaborately masked Holy Week street performances.",
+      "localCulture": "Tagalog-speaking with strong Holy Week religious traditions; the Moriones mask-making craft is a distinct local art form passed through generations.",
+      "bestTimeToVisit": "Holy Week (March/April, date varies yearly) for the Moriones Festival, or the dry season generally for beach-hopping.",
+      "estimatedDailyBudgetMin": 1200.0,
+      "estimatedDailyBudgetMax": 2800.0,
+      "travelTips": [
+        "Moriones Festival draws large domestic crowds during Holy Week — book ferry and lodging early.",
+        "Marinduque is reached by ferry from Batangas or Lucena — check schedules, as sailings can be weather-dependent.",
+        "The island is compact enough to circle by rented motorbike or tricycle in a day or two."
+      ],
+      "emergencyHotlines": [
+        {
+          "label": "National Emergency Hotline",
+          "number": "911"
+        }
+      ],
+      "heroImageUrl": "https://images.unsplash.com/photo-1573843981267-be1999ff37cd?auto=format&fit=crop&w=1200&q=80",
+      "featuredDestinationIds": []
+    },
+    "occidental-mindoro": {
+      "name": "Occidental Mindoro",
+      "regionId": "region-4b",
+      "regionName": "MIMAROPA",
+      "islandGroup": "Luzon",
+      "isPseudoProvince": false,
+      "hasContent": false,
+      "overview": "",
+      "localCulture": "",
+      "bestTimeToVisit": "",
+      "estimatedDailyBudgetMin": 0.0,
+      "estimatedDailyBudgetMax": 0.0,
+      "travelTips": [],
+      "emergencyHotlines": [],
+      "heroImageUrl": "",
+      "featuredDestinationIds": []
+    },
+    "oriental-mindoro": {
+      "name": "Oriental Mindoro",
+      "regionId": "region-4b",
+      "regionName": "MIMAROPA",
+      "islandGroup": "Luzon",
+      "isPseudoProvince": false,
+      "hasContent": false,
+      "overview": "",
+      "localCulture": "",
+      "bestTimeToVisit": "",
+      "estimatedDailyBudgetMin": 0.0,
+      "estimatedDailyBudgetMax": 0.0,
+      "travelTips": [],
+      "emergencyHotlines": [],
+      "heroImageUrl": "",
+      "featuredDestinationIds": []
+    },
+    "palawan": {
+      "name": "Palawan",
+      "regionId": "region-4b",
+      "regionName": "MIMAROPA",
+      "islandGroup": "Luzon",
+      "isPseudoProvince": false,
+      "hasContent": true,
+      "overview": "Stretching from El Nido's limestone lagoons to Puerto Princesa's Underground River, one of the Philippines' most internationally recognized island provinces.",
+      "localCulture": "Home to the Palaw'an, Tagbanua and Cuyunon indigenous communities alongside migrant settlers; a strong marine-conservation ethic given the province's reliance on reef tourism.",
+      "bestTimeToVisit": "November to May (dry season); island-hopping tours are frequently suspended during typhoons/rough seas from June–October.",
+      "estimatedDailyBudgetMin": 2000.0,
+      "estimatedDailyBudgetMax": 5000.0,
+      "travelTips": [
+        "El Nido and Coron are both in Palawan but far apart by road — most visitors fly into one and boat/fly to the other rather than drive.",
+        "Book Underground River slots in advance; daily visitor numbers are capped.",
+        "Bring reef-safe sunscreen — regular sunscreen is discouraged or banned in several marine protected areas."
+      ],
+      "emergencyHotlines": [
+        {
+          "label": "National Emergency Hotline",
+          "number": "911"
+        }
+      ],
+      "heroImageUrl": "https://images.unsplash.com/photo-1552733407-5d5c46c3bb3b?auto=format&fit=crop&w=1200&q=80",
+      "featuredDestinationIds": []
+    },
+    "romblon": {
+      "name": "Romblon",
+      "regionId": "region-4b",
+      "regionName": "MIMAROPA",
+      "islandGroup": "Luzon",
+      "isPseudoProvince": false,
+      "hasContent": false,
+      "overview": "",
+      "localCulture": "",
+      "bestTimeToVisit": "",
+      "estimatedDailyBudgetMin": 0.0,
+      "estimatedDailyBudgetMax": 0.0,
+      "travelTips": [],
+      "emergencyHotlines": [],
+      "heroImageUrl": "",
+      "featuredDestinationIds": []
+    },
+    "albay": {
+      "name": "Albay",
+      "regionId": "region-5",
+      "regionName": "Bicol Region",
+      "islandGroup": "Luzon",
+      "isPseudoProvince": false,
+      "hasContent": true,
+      "overview": "Home to the almost-perfect cone of Mayon Volcano, ATV and adventure tourism, and Bicol's famously spicy cuisine.",
+      "localCulture": "Bicolano cooking centers on coconut milk and chili (Bicol Express, laing), alongside deep local reverence for Mayon as a natural landmark.",
+      "bestTimeToVisit": "December to May (dry season); Mayon can be obscured by clouds and rain in the wet months.",
+      "estimatedDailyBudgetMin": 1500.0,
+      "estimatedDailyBudgetMax": 3500.0,
+      "travelTips": [
+        "Mayon Volcano's alert level can change — check PHIVOLCS advisories before trekking near it.",
+        "Bicolano food is genuinely spicy by Filipino standards — ask for 'hindi maanghang' if you prefer mild.",
+        "Legazpi is the main jump-off point for Cagsawa Ruins and ATV rides on Mayon's slopes."
+      ],
+      "emergencyHotlines": [
+        {
+          "label": "National Emergency Hotline",
+          "number": "911"
+        }
+      ],
+      "heroImageUrl": "https://images.unsplash.com/photo-1760876037275-a19e32a51047?auto=format&fit=crop&w=1200&q=80",
+      "featuredDestinationIds": []
+    },
+    "camarines-norte": {
+      "name": "Camarines Norte",
+      "regionId": "region-5",
+      "regionName": "Bicol Region",
+      "islandGroup": "Luzon",
+      "isPseudoProvince": false,
+      "hasContent": false,
+      "overview": "",
+      "localCulture": "",
+      "bestTimeToVisit": "",
+      "estimatedDailyBudgetMin": 0.0,
+      "estimatedDailyBudgetMax": 0.0,
+      "travelTips": [],
+      "emergencyHotlines": [],
+      "heroImageUrl": "",
+      "featuredDestinationIds": []
+    },
+    "camarines-sur": {
+      "name": "Camarines Sur",
+      "regionId": "region-5",
+      "regionName": "Bicol Region",
+      "islandGroup": "Luzon",
+      "isPseudoProvince": false,
+      "hasContent": false,
+      "overview": "",
+      "localCulture": "",
+      "bestTimeToVisit": "",
+      "estimatedDailyBudgetMin": 0.0,
+      "estimatedDailyBudgetMax": 0.0,
+      "travelTips": [],
+      "emergencyHotlines": [],
+      "heroImageUrl": "",
+      "featuredDestinationIds": []
+    },
+    "catanduanes": {
+      "name": "Catanduanes",
+      "regionId": "region-5",
+      "regionName": "Bicol Region",
+      "islandGroup": "Luzon",
+      "isPseudoProvince": false,
+      "hasContent": false,
+      "overview": "",
+      "localCulture": "",
+      "bestTimeToVisit": "",
+      "estimatedDailyBudgetMin": 0.0,
+      "estimatedDailyBudgetMax": 0.0,
+      "travelTips": [],
+      "emergencyHotlines": [],
+      "heroImageUrl": "",
+      "featuredDestinationIds": []
+    },
+    "masbate": {
+      "name": "Masbate",
+      "regionId": "region-5",
+      "regionName": "Bicol Region",
+      "islandGroup": "Luzon",
+      "isPseudoProvince": false,
+      "hasContent": false,
+      "overview": "",
+      "localCulture": "",
+      "bestTimeToVisit": "",
+      "estimatedDailyBudgetMin": 0.0,
+      "estimatedDailyBudgetMax": 0.0,
+      "travelTips": [],
+      "emergencyHotlines": [],
+      "heroImageUrl": "",
+      "featuredDestinationIds": []
+    },
+    "sorsogon": {
+      "name": "Sorsogon",
+      "regionId": "region-5",
+      "regionName": "Bicol Region",
+      "islandGroup": "Luzon",
+      "isPseudoProvince": false,
+      "hasContent": false,
+      "overview": "",
+      "localCulture": "",
+      "bestTimeToVisit": "",
+      "estimatedDailyBudgetMin": 0.0,
+      "estimatedDailyBudgetMax": 0.0,
+      "travelTips": [],
+      "emergencyHotlines": [],
+      "heroImageUrl": "",
+      "featuredDestinationIds": []
+    },
+    "aklan": {
+      "name": "Aklan",
+      "regionId": "region-6",
+      "regionName": "Western Visayas",
+      "islandGroup": "Visayas",
+      "isPseudoProvince": false,
+      "hasContent": true,
+      "overview": "Home to Boracay, one of the world's most awarded beach destinations, along with the Ati-Atihan Festival in Kalibo every January.",
+      "localCulture": "Akeanon is the local language; Kalibo's Ati-Atihan is considered the \"Mother of All Philippine Festivals,\" honoring the indigenous Ati people.",
+      "bestTimeToVisit": "November to May (dry season); Boracay periodically enforces environmental carrying-capacity limits, so booking ahead matters.",
+      "estimatedDailyBudgetMin": 2000.0,
+      "estimatedDailyBudgetMax": 5000.0,
+      "travelTips": [
+        "Boracay requires an environmental fee on arrival — keep a valid ID and some cash ready.",
+        "White Beach gets busy at sunset — Station 1 and the northern end are generally quieter.",
+        "Kalibo (not Caticlan) is the airport some flights use — check which one your flight actually uses before booking a transfer."
+      ],
+      "emergencyHotlines": [
+        {
+          "label": "National Emergency Hotline",
+          "number": "911"
+        }
+      ],
+      "heroImageUrl": "https://images.unsplash.com/photo-1519046904884-53103b34b206?auto=format&fit=crop&w=1200&q=80",
+      "featuredDestinationIds": []
+    },
+    "antique": {
+      "name": "Antique",
+      "regionId": "region-6",
+      "regionName": "Western Visayas",
+      "islandGroup": "Visayas",
+      "isPseudoProvince": false,
+      "hasContent": false,
+      "overview": "",
+      "localCulture": "",
+      "bestTimeToVisit": "",
+      "estimatedDailyBudgetMin": 0.0,
+      "estimatedDailyBudgetMax": 0.0,
+      "travelTips": [],
+      "emergencyHotlines": [],
+      "heroImageUrl": "",
+      "featuredDestinationIds": []
+    },
+    "capiz": {
+      "name": "Capiz",
+      "regionId": "region-6",
+      "regionName": "Western Visayas",
+      "islandGroup": "Visayas",
+      "isPseudoProvince": false,
+      "hasContent": false,
+      "overview": "",
+      "localCulture": "",
+      "bestTimeToVisit": "",
+      "estimatedDailyBudgetMin": 0.0,
+      "estimatedDailyBudgetMax": 0.0,
+      "travelTips": [],
+      "emergencyHotlines": [],
+      "heroImageUrl": "",
+      "featuredDestinationIds": []
+    },
+    "guimaras": {
+      "name": "Guimaras",
+      "regionId": "region-6",
+      "regionName": "Western Visayas",
+      "islandGroup": "Visayas",
+      "isPseudoProvince": false,
+      "hasContent": false,
+      "overview": "",
+      "localCulture": "",
+      "bestTimeToVisit": "",
+      "estimatedDailyBudgetMin": 0.0,
+      "estimatedDailyBudgetMax": 0.0,
+      "travelTips": [],
+      "emergencyHotlines": [],
+      "heroImageUrl": "",
+      "featuredDestinationIds": []
+    },
+    "iloilo": {
+      "name": "Iloilo",
+      "regionId": "region-6",
+      "regionName": "Western Visayas",
+      "islandGroup": "Visayas",
+      "isPseudoProvince": false,
+      "hasContent": false,
+      "overview": "",
+      "localCulture": "",
+      "bestTimeToVisit": "",
+      "estimatedDailyBudgetMin": 0.0,
+      "estimatedDailyBudgetMax": 0.0,
+      "travelTips": [],
+      "emergencyHotlines": [],
+      "heroImageUrl": "",
+      "featuredDestinationIds": []
+    },
+    "negros-occidental": {
+      "name": "Negros Occidental",
+      "regionId": "region-6",
+      "regionName": "Western Visayas",
+      "islandGroup": "Visayas",
+      "isPseudoProvince": false,
+      "hasContent": false,
+      "overview": "",
+      "localCulture": "",
+      "bestTimeToVisit": "",
+      "estimatedDailyBudgetMin": 0.0,
+      "estimatedDailyBudgetMax": 0.0,
+      "travelTips": [],
+      "emergencyHotlines": [],
+      "heroImageUrl": "",
+      "featuredDestinationIds": []
+    },
+    "bohol": {
+      "name": "Bohol",
+      "regionId": "region-7",
+      "regionName": "Central Visayas",
+      "islandGroup": "Visayas",
+      "isPseudoProvince": false,
+      "hasContent": true,
+      "overview": "Home to the Chocolate Hills, tarsier sanctuaries, and the Loboc River, plus Panglao Island's white-sand beaches and dive sites.",
+      "localCulture": "Boholano-Cebuano culture with a strong Spanish-colonial church heritage — Baclayon Church is among the oldest in the country.",
+      "bestTimeToVisit": "December to May; for diving specifically, avoid the amihan-driven rough seas of December–February.",
+      "estimatedDailyBudgetMin": 1500.0,
+      "estimatedDailyBudgetMax": 3500.0,
+      "travelTips": [
+        "Visit the Chocolate Hills early morning for cooler weather and better light.",
+        "Tarsiers are nocturnal and easily stressed — keep voices low and never use flash photography at the sanctuary.",
+        "Panglao and mainland Bohol are connected by bridge, so a single-base itinerary covering both is easy."
+      ],
+      "emergencyHotlines": [
+        {
+          "label": "National Emergency Hotline",
+          "number": "911"
+        }
+      ],
+      "heroImageUrl": "https://images.unsplash.com/photo-1500534623283-312aade485b7?auto=format&fit=crop&w=1200&q=80",
+      "featuredDestinationIds": []
+    },
+    "cebu": {
+      "name": "Cebu",
+      "regionId": "region-7",
+      "regionName": "Central Visayas",
+      "islandGroup": "Visayas",
+      "isPseudoProvince": false,
+      "hasContent": true,
+      "overview": "A major island province blending Cebu City's urban energy with Moalboal's turtles, Kawasan Falls' canyoneering, and Oslob's whale sharks.",
+      "localCulture": "Cebuano (Bisaya) is the dominant language; Cebu is one of the oldest Spanish colonial settlements in the country, centered on the Basilica del Santo Niño and Magellan's Cross.",
+      "bestTimeToVisit": "December to May; the Sinulog Festival (January) is the province's biggest cultural draw.",
+      "estimatedDailyBudgetMin": 1500.0,
+      "estimatedDailyBudgetMax": 4000.0,
+      "travelTips": [
+        "Book Kawasan Falls canyoneering with a certified guide — the route involves cliff jumps not suited to non-swimmers.",
+        "Whale shark encounters in Oslob are best done early morning; follow the no-touch, no-flash guidelines.",
+        "Cebu City traffic can be heavy — build in extra travel time between south Cebu spots."
+      ],
+      "emergencyHotlines": [
+        {
+          "label": "National Emergency Hotline",
+          "number": "911"
+        }
+      ],
+      "heroImageUrl": "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1200&q=80",
+      "featuredDestinationIds": []
+    },
+    "negros-oriental": {
+      "name": "Negros Oriental",
+      "regionId": "region-7",
+      "regionName": "Central Visayas",
+      "islandGroup": "Visayas",
+      "isPseudoProvince": false,
+      "hasContent": false,
+      "overview": "",
+      "localCulture": "",
+      "bestTimeToVisit": "",
+      "estimatedDailyBudgetMin": 0.0,
+      "estimatedDailyBudgetMax": 0.0,
+      "travelTips": [],
+      "emergencyHotlines": [],
+      "heroImageUrl": "",
+      "featuredDestinationIds": []
+    },
+    "siquijor": {
+      "name": "Siquijor",
+      "regionId": "region-7",
+      "regionName": "Central Visayas",
+      "islandGroup": "Visayas",
+      "isPseudoProvince": false,
+      "hasContent": false,
+      "overview": "",
+      "localCulture": "",
+      "bestTimeToVisit": "",
+      "estimatedDailyBudgetMin": 0.0,
+      "estimatedDailyBudgetMax": 0.0,
+      "travelTips": [],
+      "emergencyHotlines": [],
+      "heroImageUrl": "",
+      "featuredDestinationIds": []
+    },
+    "biliran": {
+      "name": "Biliran",
+      "regionId": "region-8",
+      "regionName": "Eastern Visayas",
+      "islandGroup": "Visayas",
+      "isPseudoProvince": false,
+      "hasContent": false,
+      "overview": "",
+      "localCulture": "",
+      "bestTimeToVisit": "",
+      "estimatedDailyBudgetMin": 0.0,
+      "estimatedDailyBudgetMax": 0.0,
+      "travelTips": [],
+      "emergencyHotlines": [],
+      "heroImageUrl": "",
+      "featuredDestinationIds": []
+    },
+    "eastern-samar": {
+      "name": "Eastern Samar",
+      "regionId": "region-8",
+      "regionName": "Eastern Visayas",
+      "islandGroup": "Visayas",
+      "isPseudoProvince": false,
+      "hasContent": false,
+      "overview": "",
+      "localCulture": "",
+      "bestTimeToVisit": "",
+      "estimatedDailyBudgetMin": 0.0,
+      "estimatedDailyBudgetMax": 0.0,
+      "travelTips": [],
+      "emergencyHotlines": [],
+      "heroImageUrl": "",
+      "featuredDestinationIds": []
+    },
+    "leyte": {
+      "name": "Leyte",
+      "regionId": "region-8",
+      "regionName": "Eastern Visayas",
+      "islandGroup": "Visayas",
+      "isPseudoProvince": false,
+      "hasContent": false,
+      "overview": "",
+      "localCulture": "",
+      "bestTimeToVisit": "",
+      "estimatedDailyBudgetMin": 0.0,
+      "estimatedDailyBudgetMax": 0.0,
+      "travelTips": [],
+      "emergencyHotlines": [],
+      "heroImageUrl": "",
+      "featuredDestinationIds": []
+    },
+    "northern-samar": {
+      "name": "Northern Samar",
+      "regionId": "region-8",
+      "regionName": "Eastern Visayas",
+      "islandGroup": "Visayas",
+      "isPseudoProvince": false,
+      "hasContent": false,
+      "overview": "",
+      "localCulture": "",
+      "bestTimeToVisit": "",
+      "estimatedDailyBudgetMin": 0.0,
+      "estimatedDailyBudgetMax": 0.0,
+      "travelTips": [],
+      "emergencyHotlines": [],
+      "heroImageUrl": "",
+      "featuredDestinationIds": []
+    },
+    "samar": {
+      "name": "Samar",
+      "regionId": "region-8",
+      "regionName": "Eastern Visayas",
+      "islandGroup": "Visayas",
+      "isPseudoProvince": false,
+      "hasContent": false,
+      "overview": "",
+      "localCulture": "",
+      "bestTimeToVisit": "",
+      "estimatedDailyBudgetMin": 0.0,
+      "estimatedDailyBudgetMax": 0.0,
+      "travelTips": [],
+      "emergencyHotlines": [],
+      "heroImageUrl": "",
+      "featuredDestinationIds": []
+    },
+    "southern-leyte": {
+      "name": "Southern Leyte",
+      "regionId": "region-8",
+      "regionName": "Eastern Visayas",
+      "islandGroup": "Visayas",
+      "isPseudoProvince": false,
+      "hasContent": false,
+      "overview": "",
+      "localCulture": "",
+      "bestTimeToVisit": "",
+      "estimatedDailyBudgetMin": 0.0,
+      "estimatedDailyBudgetMax": 0.0,
+      "travelTips": [],
+      "emergencyHotlines": [],
+      "heroImageUrl": "",
+      "featuredDestinationIds": []
+    },
+    "zamboanga-del-norte": {
+      "name": "Zamboanga del Norte",
+      "regionId": "region-9",
+      "regionName": "Zamboanga Peninsula",
+      "islandGroup": "Mindanao",
+      "isPseudoProvince": false,
+      "hasContent": false,
+      "overview": "",
+      "localCulture": "",
+      "bestTimeToVisit": "",
+      "estimatedDailyBudgetMin": 0.0,
+      "estimatedDailyBudgetMax": 0.0,
+      "travelTips": [],
+      "emergencyHotlines": [],
+      "heroImageUrl": "",
+      "featuredDestinationIds": []
+    },
+    "zamboanga-del-sur": {
+      "name": "Zamboanga del Sur",
+      "regionId": "region-9",
+      "regionName": "Zamboanga Peninsula",
+      "islandGroup": "Mindanao",
+      "isPseudoProvince": false,
+      "hasContent": false,
+      "overview": "",
+      "localCulture": "",
+      "bestTimeToVisit": "",
+      "estimatedDailyBudgetMin": 0.0,
+      "estimatedDailyBudgetMax": 0.0,
+      "travelTips": [],
+      "emergencyHotlines": [],
+      "heroImageUrl": "",
+      "featuredDestinationIds": []
+    },
+    "zamboanga-sibugay": {
+      "name": "Zamboanga Sibugay",
+      "regionId": "region-9",
+      "regionName": "Zamboanga Peninsula",
+      "islandGroup": "Mindanao",
+      "isPseudoProvince": false,
+      "hasContent": false,
+      "overview": "",
+      "localCulture": "",
+      "bestTimeToVisit": "",
+      "estimatedDailyBudgetMin": 0.0,
+      "estimatedDailyBudgetMax": 0.0,
+      "travelTips": [],
+      "emergencyHotlines": [],
+      "heroImageUrl": "",
+      "featuredDestinationIds": []
+    },
+    "bukidnon": {
+      "name": "Bukidnon",
+      "regionId": "region-10",
+      "regionName": "Northern Mindanao",
+      "islandGroup": "Mindanao",
+      "isPseudoProvince": false,
+      "hasContent": false,
+      "overview": "",
+      "localCulture": "",
+      "bestTimeToVisit": "",
+      "estimatedDailyBudgetMin": 0.0,
+      "estimatedDailyBudgetMax": 0.0,
+      "travelTips": [],
+      "emergencyHotlines": [],
+      "heroImageUrl": "",
+      "featuredDestinationIds": []
+    },
+    "camiguin": {
+      "name": "Camiguin",
+      "regionId": "region-10",
+      "regionName": "Northern Mindanao",
+      "islandGroup": "Mindanao",
+      "isPseudoProvince": false,
+      "hasContent": false,
+      "overview": "",
+      "localCulture": "",
+      "bestTimeToVisit": "",
+      "estimatedDailyBudgetMin": 0.0,
+      "estimatedDailyBudgetMax": 0.0,
+      "travelTips": [],
+      "emergencyHotlines": [],
+      "heroImageUrl": "",
+      "featuredDestinationIds": []
+    },
+    "lanao-del-norte": {
+      "name": "Lanao del Norte",
+      "regionId": "region-10",
+      "regionName": "Northern Mindanao",
+      "islandGroup": "Mindanao",
+      "isPseudoProvince": false,
+      "hasContent": false,
+      "overview": "",
+      "localCulture": "",
+      "bestTimeToVisit": "",
+      "estimatedDailyBudgetMin": 0.0,
+      "estimatedDailyBudgetMax": 0.0,
+      "travelTips": [],
+      "emergencyHotlines": [],
+      "heroImageUrl": "",
+      "featuredDestinationIds": []
+    },
+    "misamis-occidental": {
+      "name": "Misamis Occidental",
+      "regionId": "region-10",
+      "regionName": "Northern Mindanao",
+      "islandGroup": "Mindanao",
+      "isPseudoProvince": false,
+      "hasContent": false,
+      "overview": "",
+      "localCulture": "",
+      "bestTimeToVisit": "",
+      "estimatedDailyBudgetMin": 0.0,
+      "estimatedDailyBudgetMax": 0.0,
+      "travelTips": [],
+      "emergencyHotlines": [],
+      "heroImageUrl": "",
+      "featuredDestinationIds": []
+    },
+    "misamis-oriental": {
+      "name": "Misamis Oriental",
+      "regionId": "region-10",
+      "regionName": "Northern Mindanao",
+      "islandGroup": "Mindanao",
+      "isPseudoProvince": false,
+      "hasContent": false,
+      "overview": "",
+      "localCulture": "",
+      "bestTimeToVisit": "",
+      "estimatedDailyBudgetMin": 0.0,
+      "estimatedDailyBudgetMax": 0.0,
+      "travelTips": [],
+      "emergencyHotlines": [],
+      "heroImageUrl": "",
+      "featuredDestinationIds": []
+    },
+    "davao-de-oro": {
+      "name": "Davao de Oro",
+      "regionId": "region-11",
+      "regionName": "Davao Region",
+      "islandGroup": "Mindanao",
+      "isPseudoProvince": false,
+      "hasContent": false,
+      "overview": "",
+      "localCulture": "",
+      "bestTimeToVisit": "",
+      "estimatedDailyBudgetMin": 0.0,
+      "estimatedDailyBudgetMax": 0.0,
+      "travelTips": [],
+      "emergencyHotlines": [],
+      "heroImageUrl": "",
+      "featuredDestinationIds": []
+    },
+    "davao-del-norte": {
+      "name": "Davao del Norte",
+      "regionId": "region-11",
+      "regionName": "Davao Region",
+      "islandGroup": "Mindanao",
+      "isPseudoProvince": false,
+      "hasContent": false,
+      "overview": "",
+      "localCulture": "",
+      "bestTimeToVisit": "",
+      "estimatedDailyBudgetMin": 0.0,
+      "estimatedDailyBudgetMax": 0.0,
+      "travelTips": [],
+      "emergencyHotlines": [],
+      "heroImageUrl": "",
+      "featuredDestinationIds": []
+    },
+    "davao-del-sur": {
+      "name": "Davao del Sur",
+      "regionId": "region-11",
+      "regionName": "Davao Region",
+      "islandGroup": "Mindanao",
+      "isPseudoProvince": false,
+      "hasContent": true,
+      "overview": "Anchored by Davao City, one of Mindanao's major urban centers, and Mt. Apo, the Philippines' highest peak, on its western border.",
+      "localCulture": "An ethnically diverse mix of Cebuano-speaking settlers, Bagobo and other Lumad indigenous groups, and one of the country's most prominent Islamic communities.",
+      "bestTimeToVisit": "March to May for Mt. Apo trekking (avoiding wet-season trail closures); the Kadayawan Festival runs in August.",
+      "estimatedDailyBudgetMin": 1500.0,
+      "estimatedDailyBudgetMax": 3500.0,
+      "travelTips": [
+        "Mt. Apo requires a permit and registered guide — arrange this well ahead of a climb.",
+        "Davao City is known for strict public-safety ordinances (e.g. smoking bans in public areas) — they're enforced.",
+        "Try durian at the Magsaysay Fruit Market if you're curious — it's a genuinely divisive local specialty."
+      ],
+      "emergencyHotlines": [
+        {
+          "label": "National Emergency Hotline",
+          "number": "911"
+        }
+      ],
+      "heroImageUrl": "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?auto=format&fit=crop&w=1200&q=80",
+      "featuredDestinationIds": []
+    },
+    "davao-occidental": {
+      "name": "Davao Occidental",
+      "regionId": "region-11",
+      "regionName": "Davao Region",
+      "islandGroup": "Mindanao",
+      "isPseudoProvince": false,
+      "hasContent": false,
+      "overview": "",
+      "localCulture": "",
+      "bestTimeToVisit": "",
+      "estimatedDailyBudgetMin": 0.0,
+      "estimatedDailyBudgetMax": 0.0,
+      "travelTips": [],
+      "emergencyHotlines": [],
+      "heroImageUrl": "",
+      "featuredDestinationIds": []
+    },
+    "davao-oriental": {
+      "name": "Davao Oriental",
+      "regionId": "region-11",
+      "regionName": "Davao Region",
+      "islandGroup": "Mindanao",
+      "isPseudoProvince": false,
+      "hasContent": false,
+      "overview": "",
+      "localCulture": "",
+      "bestTimeToVisit": "",
+      "estimatedDailyBudgetMin": 0.0,
+      "estimatedDailyBudgetMax": 0.0,
+      "travelTips": [],
+      "emergencyHotlines": [],
+      "heroImageUrl": "",
+      "featuredDestinationIds": []
+    },
+    "cotabato": {
+      "name": "Cotabato",
+      "regionId": "region-12",
+      "regionName": "SOCCSKSARGEN",
+      "islandGroup": "Mindanao",
+      "isPseudoProvince": false,
+      "hasContent": false,
+      "overview": "",
+      "localCulture": "",
+      "bestTimeToVisit": "",
+      "estimatedDailyBudgetMin": 0.0,
+      "estimatedDailyBudgetMax": 0.0,
+      "travelTips": [],
+      "emergencyHotlines": [],
+      "heroImageUrl": "",
+      "featuredDestinationIds": []
+    },
+    "sarangani": {
+      "name": "Sarangani",
+      "regionId": "region-12",
+      "regionName": "SOCCSKSARGEN",
+      "islandGroup": "Mindanao",
+      "isPseudoProvince": false,
+      "hasContent": false,
+      "overview": "",
+      "localCulture": "",
+      "bestTimeToVisit": "",
+      "estimatedDailyBudgetMin": 0.0,
+      "estimatedDailyBudgetMax": 0.0,
+      "travelTips": [],
+      "emergencyHotlines": [],
+      "heroImageUrl": "",
+      "featuredDestinationIds": []
+    },
+    "south-cotabato": {
+      "name": "South Cotabato",
+      "regionId": "region-12",
+      "regionName": "SOCCSKSARGEN",
+      "islandGroup": "Mindanao",
+      "isPseudoProvince": false,
+      "hasContent": false,
+      "overview": "",
+      "localCulture": "",
+      "bestTimeToVisit": "",
+      "estimatedDailyBudgetMin": 0.0,
+      "estimatedDailyBudgetMax": 0.0,
+      "travelTips": [],
+      "emergencyHotlines": [],
+      "heroImageUrl": "",
+      "featuredDestinationIds": []
+    },
+    "sultan-kudarat": {
+      "name": "Sultan Kudarat",
+      "regionId": "region-12",
+      "regionName": "SOCCSKSARGEN",
+      "islandGroup": "Mindanao",
+      "isPseudoProvince": false,
+      "hasContent": false,
+      "overview": "",
+      "localCulture": "",
+      "bestTimeToVisit": "",
+      "estimatedDailyBudgetMin": 0.0,
+      "estimatedDailyBudgetMax": 0.0,
+      "travelTips": [],
+      "emergencyHotlines": [],
+      "heroImageUrl": "",
+      "featuredDestinationIds": []
+    },
+    "agusan-del-norte": {
+      "name": "Agusan del Norte",
+      "regionId": "region-13",
+      "regionName": "Caraga",
+      "islandGroup": "Mindanao",
+      "isPseudoProvince": false,
+      "hasContent": false,
+      "overview": "",
+      "localCulture": "",
+      "bestTimeToVisit": "",
+      "estimatedDailyBudgetMin": 0.0,
+      "estimatedDailyBudgetMax": 0.0,
+      "travelTips": [],
+      "emergencyHotlines": [],
+      "heroImageUrl": "",
+      "featuredDestinationIds": []
+    },
+    "agusan-del-sur": {
+      "name": "Agusan del Sur",
+      "regionId": "region-13",
+      "regionName": "Caraga",
+      "islandGroup": "Mindanao",
+      "isPseudoProvince": false,
+      "hasContent": false,
+      "overview": "",
+      "localCulture": "",
+      "bestTimeToVisit": "",
+      "estimatedDailyBudgetMin": 0.0,
+      "estimatedDailyBudgetMax": 0.0,
+      "travelTips": [],
+      "emergencyHotlines": [],
+      "heroImageUrl": "",
+      "featuredDestinationIds": []
+    },
+    "dinagat-islands": {
+      "name": "Dinagat Islands",
+      "regionId": "region-13",
+      "regionName": "Caraga",
+      "islandGroup": "Mindanao",
+      "isPseudoProvince": false,
+      "hasContent": false,
+      "overview": "",
+      "localCulture": "",
+      "bestTimeToVisit": "",
+      "estimatedDailyBudgetMin": 0.0,
+      "estimatedDailyBudgetMax": 0.0,
+      "travelTips": [],
+      "emergencyHotlines": [],
+      "heroImageUrl": "",
+      "featuredDestinationIds": []
+    },
+    "surigao-del-norte": {
+      "name": "Surigao del Norte",
+      "regionId": "region-13",
+      "regionName": "Caraga",
+      "islandGroup": "Mindanao",
+      "isPseudoProvince": false,
+      "hasContent": true,
+      "overview": "The \"surfing capital of the Philippines,\" anchored by Siargao's Cloud 9 break, alongside lagoon-hopping and island-hopping around General Luna.",
+      "localCulture": "A laid-back surf-town culture layered over traditional Surigaonon fishing communities; increasingly shaped by a growing digital-nomad and eco-tourism scene.",
+      "bestTimeToVisit": "Surf season (bigger swells) runs roughly August–November; calmer, more beginner-friendly water conditions run March–May.",
+      "estimatedDailyBudgetMin": 1500.0,
+      "estimatedDailyBudgetMax": 4000.0,
+      "travelTips": [
+        "Cloud 9's reef break is for experienced surfers — beginners should start at gentler breaks nearby.",
+        "Rent a scooter to get around General Luna; distances between spots are longer than they look on a map.",
+        "Siargao sits on a typhoon-prone stretch — check weather before travel during the wet season."
+      ],
+      "emergencyHotlines": [
+        {
+          "label": "National Emergency Hotline",
+          "number": "911"
+        }
+      ],
+      "heroImageUrl": "https://images.unsplash.com/photo-1544551763-46a013bb70d5?auto=format&fit=crop&w=1200&q=80",
+      "featuredDestinationIds": []
+    },
+    "surigao-del-sur": {
+      "name": "Surigao del Sur",
+      "regionId": "region-13",
+      "regionName": "Caraga",
+      "islandGroup": "Mindanao",
+      "isPseudoProvince": false,
+      "hasContent": true,
+      "overview": "Known for Tinuy-an Falls' wide tiered cascades and Britania Islands' hidden lagoons, a quieter alternative to nearby Siargao.",
+      "localCulture": "A mix of Surigaonon and Boholano-descended coastal communities; livelihoods center on fishing and, increasingly, ecotourism around Bislig.",
+      "bestTimeToVisit": "March to May for calmer seas and fuller falls without peak wet-season flooding.",
+      "estimatedDailyBudgetMin": 1200.0,
+      "estimatedDailyBudgetMax": 3000.0,
+      "travelTips": [
+        "Tinuy-an Falls' flow is strongest just after the wet season — expect a more turquoise, gentler flow in summer.",
+        "Britania Islands requires a boat transfer from Hinatuan — arrange this a day ahead.",
+        "Cell signal is patchy outside Bislig proper; download offline maps beforehand."
+      ],
+      "emergencyHotlines": [
+        {
+          "label": "National Emergency Hotline",
+          "number": "911"
+        }
+      ],
+      "heroImageUrl": "https://images.unsplash.com/photo-1780635823961-9dad96633019?auto=format&fit=crop&w=1200&q=80",
+      "featuredDestinationIds": []
+    },
+    "basilan": {
+      "name": "Basilan",
+      "regionId": "barmm",
+      "regionName": "Bangsamoro Autonomous Region in Muslim Mindanao",
+      "islandGroup": "Mindanao",
+      "isPseudoProvince": false,
+      "hasContent": false,
+      "overview": "",
+      "localCulture": "",
+      "bestTimeToVisit": "",
+      "estimatedDailyBudgetMin": 0.0,
+      "estimatedDailyBudgetMax": 0.0,
+      "travelTips": [],
+      "emergencyHotlines": [],
+      "heroImageUrl": "",
+      "featuredDestinationIds": []
+    },
+    "lanao-del-sur": {
+      "name": "Lanao del Sur",
+      "regionId": "barmm",
+      "regionName": "Bangsamoro Autonomous Region in Muslim Mindanao",
+      "islandGroup": "Mindanao",
+      "isPseudoProvince": false,
+      "hasContent": false,
+      "overview": "",
+      "localCulture": "",
+      "bestTimeToVisit": "",
+      "estimatedDailyBudgetMin": 0.0,
+      "estimatedDailyBudgetMax": 0.0,
+      "travelTips": [],
+      "emergencyHotlines": [],
+      "heroImageUrl": "",
+      "featuredDestinationIds": []
+    },
+    "maguindanao-del-norte": {
+      "name": "Maguindanao del Norte",
+      "regionId": "barmm",
+      "regionName": "Bangsamoro Autonomous Region in Muslim Mindanao",
+      "islandGroup": "Mindanao",
+      "isPseudoProvince": false,
+      "hasContent": false,
+      "overview": "",
+      "localCulture": "",
+      "bestTimeToVisit": "",
+      "estimatedDailyBudgetMin": 0.0,
+      "estimatedDailyBudgetMax": 0.0,
+      "travelTips": [],
+      "emergencyHotlines": [],
+      "heroImageUrl": "",
+      "featuredDestinationIds": []
+    },
+    "maguindanao-del-sur": {
+      "name": "Maguindanao del Sur",
+      "regionId": "barmm",
+      "regionName": "Bangsamoro Autonomous Region in Muslim Mindanao",
+      "islandGroup": "Mindanao",
+      "isPseudoProvince": false,
+      "hasContent": false,
+      "overview": "",
+      "localCulture": "",
+      "bestTimeToVisit": "",
+      "estimatedDailyBudgetMin": 0.0,
+      "estimatedDailyBudgetMax": 0.0,
+      "travelTips": [],
+      "emergencyHotlines": [],
+      "heroImageUrl": "",
+      "featuredDestinationIds": []
+    },
+    "sulu": {
+      "name": "Sulu",
+      "regionId": "barmm",
+      "regionName": "Bangsamoro Autonomous Region in Muslim Mindanao",
+      "islandGroup": "Mindanao",
+      "isPseudoProvince": false,
+      "hasContent": false,
+      "overview": "",
+      "localCulture": "",
+      "bestTimeToVisit": "",
+      "estimatedDailyBudgetMin": 0.0,
+      "estimatedDailyBudgetMax": 0.0,
+      "travelTips": [],
+      "emergencyHotlines": [],
+      "heroImageUrl": "",
+      "featuredDestinationIds": []
+    },
+    "tawi-tawi": {
+      "name": "Tawi-Tawi",
+      "regionId": "barmm",
+      "regionName": "Bangsamoro Autonomous Region in Muslim Mindanao",
+      "islandGroup": "Mindanao",
+      "isPseudoProvince": false,
+      "hasContent": false,
+      "overview": "",
+      "localCulture": "",
+      "bestTimeToVisit": "",
+      "estimatedDailyBudgetMin": 0.0,
+      "estimatedDailyBudgetMax": 0.0,
+      "travelTips": [],
+      "emergencyHotlines": [],
+      "heroImageUrl": "",
+      "featuredDestinationIds": []
+    }
+  }
+}

@@ -5,6 +5,7 @@ import 'package:share_plus/share_plus.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
+import '../../core/utils/maps_launcher.dart';
 import '../models/ai_message.dart';
 
 /// One chat turn. User messages are a solid-primary bubble on the right;
@@ -66,6 +67,9 @@ class ChatBubble extends StatelessWidget {
                 : MarkdownBody(
                     data: message.content,
                     selectable: true,
+                    onTapLink: (text, href, title) {
+                      if (href != null) MapsLauncher.openUrl(href);
+                    },
                     styleSheet: MarkdownStyleSheet.fromTheme(theme).copyWith(
                       p: theme.textTheme.bodyLarge,
                       strong: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w700),

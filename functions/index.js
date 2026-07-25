@@ -70,6 +70,14 @@ exports.syncMyAdminClaims = onCall({ region: 'asia-southeast1' }, async (request
  * router redirects unauthenticated users to Login before they can open the
  * AI Planner or Trip Assistant at all, so this adds no new restriction).
  */
+// The itinerary planner's own request (the biggest legitimate caller, see
+// ItineraryPrompts) tops out well under these — generous enough for real
+// usage, but enough of a ceiling that a scripted client can't run up
+// OpenAI billing by requesting huge completions or huge input payloads.
+const AI_MAX_TOKENS_CEILING = 3000;
+const AI_MAX_MESSAGES = 40;
+const AI_MAX_MESSAGE_CHARS = 6000;
+
 exports.aiComplete = onCall({ region: 'asia-southeast1', secrets: [openaiApiKey], timeoutSeconds: 60 }, async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.');
 
@@ -80,12 +88,21 @@ exports.aiComplete = onCall({ region: 'asia-southeast1', secrets: [openaiApiKey]
   if (!Array.isArray(messages) || messages.length === 0) {
     throw new HttpsError('invalid-argument', 'messages is required.');
   }
+  if (messages.length > AI_MAX_MESSAGES) {
+    throw new HttpsError('invalid-argument', 'Too many messages in this request.');
+  }
+  for (const m of messages) {
+    if (typeof m?.content !== 'string' || m.content.length > AI_MAX_MESSAGE_CHARS) {
+      throw new HttpsError('invalid-argument', 'One of the messages is invalid or too long.');
+    }
+  }
 
+  const boundedMaxTokens = typeof maxTokens === 'number' ? Math.min(Math.max(Math.trunc(maxTokens), 1), AI_MAX_TOKENS_CEILING) : 1200;
   const body = {
     model: 'gpt-4o',
     messages,
     temperature: typeof temperature === 'number' ? temperature : 0.7,
-    max_tokens: typeof maxTokens === 'number' ? maxTokens : 1200,
+    max_tokens: boundedMaxTokens,
   };
   if (jsonMode) body.response_format = { type: 'json_object' };
 
@@ -111,11 +128,14 @@ exports.aiComplete = onCall({ region: 'asia-southeast1', secrets: [openaiApiKey]
 
 // Deliberately narrow — Places API (New) bills by which field tier a
 // request touches, not just call count — matches exactly what
-// PlaceCard/PlaceDetailsSheet render.
+// PlaceCard/PlaceDetailsSheet render, plus googleMapsUri/weekdayDescriptions/
+// editorialSummary for AI grounding (real Maps links + hours + a short
+// description the AI can cite instead of inventing one).
 const PLACES_FIELD_MASK = 'places.id,places.displayName,places.types,places.photos,'
   + 'places.rating,places.userRatingCount,places.formattedAddress,places.location,'
   + 'places.priceLevel,places.currentOpeningHours.openNow,places.nationalPhoneNumber,'
-  + 'places.websiteUri';
+  + 'places.websiteUri,places.googleMapsUri,places.regularOpeningHours.weekdayDescriptions,'
+  + 'places.editorialSummary';
 
 /**
  * Proxies Places API (New) `searchNearby` — same key-exposure reasoning as
@@ -195,17 +215,26 @@ exports.placesSearchText = onCall({ region: 'asia-southeast1', secrets: [googleP
  * is small and bounded, unlike `aiComplete`/`placesSearch*`, and this way
  * the underlying key is still never extractable from the client either way.
  */
+// Google's own Places API (New) photo resource name shape:
+// places/{placeId}/photos/{photoId}. Rejecting anything else stops this
+// public, unauthenticated proxy from being used as a free-form forwarder
+// to arbitrary paths under places.googleapis.com with our billed API key.
+const PLACES_PHOTO_NAME_PATTERN = /^places\/[^/]+\/photos\/[^/]+$/;
+
 exports.placesPhoto = onRequest({ region: 'asia-southeast1', secrets: [googlePlacesApiKey] }, async (req, res) => {
   const apiKey = googlePlacesApiKey.value();
   const photoName = req.query.photoName;
-  const maxWidthPx = req.query.maxWidthPx || '800';
-  if (!apiKey || !photoName || typeof photoName !== 'string') {
+  if (!apiKey || typeof photoName !== 'string' || !PLACES_PHOTO_NAME_PATTERN.test(photoName)) {
     res.status(400).send('Bad request');
     return;
   }
+  // Clamped rather than passed through raw, so this can't be abused to
+  // request absurdly large (expensive) images either.
+  const requestedWidth = Number(req.query.maxWidthPx);
+  const maxWidthPx = Number.isFinite(requestedWidth) ? Math.min(Math.max(Math.trunc(requestedWidth), 1), 1600) : 800;
   try {
     const upstream = await fetch(
-      `https://places.googleapis.com/v1/${photoName}/media?maxWidthPx=${encodeURIComponent(maxWidthPx)}&key=${apiKey}`,
+      `https://places.googleapis.com/v1/${photoName}/media?maxWidthPx=${maxWidthPx}&key=${apiKey}`,
     );
     if (!upstream.ok) {
       res.status(upstream.status).send('Upstream error');

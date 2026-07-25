@@ -16,6 +16,7 @@ import '../../core/services/notification_service.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/utils/app_exception.dart';
+import '../../core/utils/expense_split.dart';
 import '../../core/utils/itinerary_export.dart';
 import '../../core/utils/maps_launcher.dart';
 import '../../core/utils/reminder_picker.dart';
@@ -157,6 +158,7 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
         title: widget.itinerary.destinationName,
         itinerary: widget.itinerary,
         startDate: startDate,
+        ownerName: context.read<AuthProvider>().currentUser?.name ?? '',
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Itinerary saved to your trips.')));
@@ -210,7 +212,12 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
     }
     setState(() => _busy = true);
     try {
-      await _repository.save(userId: uid, title: widget.itinerary.destinationName, itinerary: widget.itinerary);
+      await _repository.save(
+        userId: uid,
+        title: widget.itinerary.destinationName,
+        itinerary: widget.itinerary,
+        ownerName: context.read<AuthProvider>().currentUser?.name ?? '',
+      );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Itinerary saved to your trips.')));
       setState(() => _readyToPop = true);
@@ -328,32 +335,61 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
     final noteController = TextEditingController();
     String? errorText;
 
+    final uid = _uid;
+    final memberIds = _savedItinerary?.memberIds ?? (uid != null ? [uid] : const <String>[]);
+    final memberNames = _savedItinerary?.memberNames ?? const <String, String>{};
+    String nameFor(String id) => id == uid ? 'You' : (memberNames[id] ?? 'Traveler');
+    // Solo trips skip the split picker entirely — nothing to divide. Group
+    // trips default to splitting between everyone, since that matches how
+    // expenses worked before per-companion splitting existed.
+    final splitWith = memberIds.toSet();
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
           title: const Text('Add Expense'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              DropdownButtonFormField<String>(
-                initialValue: selectedCategory,
-                decoration: const InputDecoration(labelText: 'Category'),
-                items: categories.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
-                onChanged: (v) => setDialogState(() => selectedCategory = v ?? selectedCategory),
-              ),
-              const SizedBox(height: AppSpacing.md),
-              TextField(
-                controller: amountController,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                decoration: InputDecoration(labelText: 'Amount (₱)', errorText: errorText),
-              ),
-              const SizedBox(height: AppSpacing.md),
-              TextField(
-                controller: noteController,
-                decoration: const InputDecoration(labelText: 'Note (optional)'),
-              ),
-            ],
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                DropdownButtonFormField<String>(
+                  initialValue: selectedCategory,
+                  decoration: const InputDecoration(labelText: 'Category'),
+                  items: categories.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
+                  onChanged: (v) => setDialogState(() => selectedCategory = v ?? selectedCategory),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                TextField(
+                  controller: amountController,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: InputDecoration(labelText: 'Amount (₱)', errorText: errorText),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                TextField(
+                  controller: noteController,
+                  decoration: const InputDecoration(labelText: 'Note (optional)'),
+                ),
+                if (memberIds.length > 1) ...[
+                  const SizedBox(height: AppSpacing.md),
+                  Align(alignment: Alignment.centerLeft, child: Text('Split between', style: Theme.of(context).textTheme.labelMedium)),
+                  ...memberIds.map((id) => CheckboxListTile(
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        controlAffinity: ListTileControlAffinity.leading,
+                        title: Text(nameFor(id)),
+                        value: splitWith.contains(id),
+                        onChanged: (checked) => setDialogState(() {
+                          if (checked ?? false) {
+                            splitWith.add(id);
+                          } else {
+                            splitWith.remove(id);
+                          }
+                        }),
+                      )),
+                ],
+              ],
+            ),
           ),
           actions: [
             TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancel')),
@@ -364,6 +400,7 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
                   setDialogState(() => errorText = 'Enter a valid amount');
                   return;
                 }
+                if (splitWith.isEmpty) return;
                 Navigator.of(context).pop(true);
               },
               child: const Text('Add'),
@@ -374,13 +411,13 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
     );
 
     if (confirmed != true || !mounted) return;
-    final uid = _uid;
     if (uid == null) return;
     try {
       await _expenseRepository.add(
         itineraryId: widget.savedItineraryId!,
         category: selectedCategory,
         amount: double.parse(amountController.text.trim()),
+        splitBetween: splitWith.length == memberIds.length ? const [] : splitWith.toList(),
         note: noteController.text.trim(),
         loggedBy: uid,
       );
@@ -613,7 +650,7 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
                       scrollDirection: Axis.horizontal,
                       itemCount: itinerary.recommendedAccommodations.length,
                       separatorBuilder: (_, _) => const SizedBox(width: AppSpacing.md),
-                      itemBuilder: (context, i) => _AccommodationCard(place: itinerary.recommendedAccommodations[i]),
+                      itemBuilder: (context, i) => _PlaceRecommendationCard(place: itinerary.recommendedAccommodations[i]),
                     ),
                   ),
                 ],
@@ -637,14 +674,26 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
                     stream: _expenseRepository.streamForItinerary(widget.savedItineraryId!),
                     builder: (context, snapshot) {
                       final expenses = snapshot.data ?? const [];
+                      final memberIds = _savedItinerary?.memberIds ?? (_uid != null ? [_uid!] : const <String>[]);
+                      final memberNames = _savedItinerary?.memberNames ?? const <String, String>{};
                       return Column(
                         children: [
                           _BudgetTrackerCard(
                             itinerary: itinerary,
                             expenses: expenses,
+                            allMemberIds: memberIds,
+                            memberNames: memberNames,
+                            currentUid: _uid,
                             onDelete: _deleteExpense,
                           ),
                           if (expenses.isNotEmpty) _ExpenseBreakdownChart(itinerary: itinerary, expenses: expenses),
+                          if (memberIds.length > 1 && expenses.isNotEmpty)
+                            _SplitSummaryCard(
+                              memberIds: memberIds,
+                              memberNames: memberNames,
+                              currentUid: _uid,
+                              expenses: expenses,
+                            ),
                         ],
                       );
                     },
@@ -675,7 +724,8 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
                   const SizedBox(height: AppSpacing.md),
                   _CompanionsCard(
                     isOwner: _isOwner,
-                    collaboratorCount: _savedItinerary?.collaboratorIds.length ?? 0,
+                    collaboratorIds: _savedItinerary?.collaboratorIds ?? const [],
+                    memberNames: _savedItinerary?.memberNames ?? const {},
                     onInvite: _inviteCompanions,
                     onLeave: _leaveTrip,
                   ),
@@ -717,6 +767,23 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
                       itemBuilder: (context, i) => DestinationCard(
                         destination: attractions[i],
                         onTap: () => context.push(RoutePaths.destinationDetails(attractions[i].id)),
+                      ),
+                    ),
+                  ),
+                ],
+                if (itinerary.recommendedPlaceAttractions.isNotEmpty) ...[
+                  const SizedBox(height: AppSpacing.xl),
+                  const SectionHeader(title: 'More to Explore Nearby', padding: EdgeInsets.zero),
+                  const SizedBox(height: AppSpacing.md),
+                  SizedBox(
+                    height: 210,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: itinerary.recommendedPlaceAttractions.length,
+                      separatorBuilder: (_, _) => const SizedBox(width: AppSpacing.md),
+                      itemBuilder: (context, i) => _PlaceRecommendationCard(
+                        place: itinerary.recommendedPlaceAttractions[i],
+                        fallbackIcon: Symbols.landscape_rounded,
                       ),
                     ),
                   ),
@@ -817,10 +884,15 @@ class _ActionButton extends StatelessWidget {
   }
 }
 
-class _AccommodationCard extends StatelessWidget {
-  const _AccommodationCard({required this.place});
+class _PlaceRecommendationCard extends StatelessWidget {
+  const _PlaceRecommendationCard({required this.place, this.fallbackIcon = Symbols.hotel_rounded});
 
   final PlaceRecommendation place;
+
+  /// Shown in place of a missing photo — lets this same card serve both
+  /// "Recommended Accommodations" (hotel icon) and "More to Explore Nearby"
+  /// (landmark icon) without duplicating the widget.
+  final IconData fallbackIcon;
 
   @override
   Widget build(BuildContext context) {
@@ -828,9 +900,11 @@ class _AccommodationCard extends StatelessWidget {
     return SizedBox(
       width: 200,
       child: InkWell(
-        onTap: place.hasCoordinates
-            ? () => MapsLauncher.openDirections(latitude: place.latitude!, longitude: place.longitude!, label: place.name)
-            : () => MapsLauncher.openPlaceSearch('${place.name}, Philippines'),
+        onTap: place.mapsUri.isNotEmpty
+            ? () => MapsLauncher.openUrl(place.mapsUri)
+            : place.hasCoordinates
+                ? () => MapsLauncher.openDirections(latitude: place.latitude!, longitude: place.longitude!, label: place.name)
+                : () => MapsLauncher.openPlaceSearch('${place.name}, Philippines'),
         borderRadius: BorderRadius.circular(AppRadius.lg),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -844,7 +918,7 @@ class _AccommodationCard extends StatelessWidget {
                       width: double.infinity,
                       color: AppColors.background,
                       alignment: Alignment.center,
-                      child: const Icon(Symbols.hotel_rounded, color: AppColors.textTertiary, size: 32),
+                      child: Icon(fallbackIcon, color: AppColors.textTertiary, size: 32),
                     ),
             ),
             const SizedBox(height: AppSpacing.sm),
@@ -955,11 +1029,23 @@ class _BudgetSummaryCard extends StatelessWidget {
 }
 
 class _BudgetTrackerCard extends StatelessWidget {
-  const _BudgetTrackerCard({required this.itinerary, required this.expenses, required this.onDelete});
+  const _BudgetTrackerCard({
+    required this.itinerary,
+    required this.expenses,
+    required this.allMemberIds,
+    required this.memberNames,
+    required this.currentUid,
+    required this.onDelete,
+  });
 
   final Itinerary itinerary;
   final List<Expense> expenses;
+  final List<String> allMemberIds;
+  final Map<String, String> memberNames;
+  final String? currentUid;
   final ValueChanged<Expense> onDelete;
+
+  String _nameFor(String uid) => uid == currentUid ? 'You' : (memberNames[uid] ?? 'Traveler');
 
   @override
   Widget build(BuildContext context) {
@@ -1020,6 +1106,17 @@ class _BudgetTrackerCard extends StatelessWidget {
                             Text(expense.category, style: theme.textTheme.bodyMedium),
                             if (expense.note.isNotEmpty)
                               Text(expense.note, style: theme.textTheme.bodySmall?.copyWith(color: AppColors.textTertiary)),
+                            if (allMemberIds.length > 1)
+                              Builder(builder: (context) {
+                                final split = effectiveSplit(expense, allMemberIds);
+                                final splitLabel = split.length == allMemberIds.length
+                                    ? 'split equally'
+                                    : 'split with ${split.map(_nameFor).join(', ')}';
+                                return Text(
+                                  'Paid by ${_nameFor(expense.loggedBy)} · $splitLabel',
+                                  style: theme.textTheme.bodySmall?.copyWith(color: AppColors.textTertiary),
+                                );
+                              }),
                           ],
                         ),
                       ),
@@ -1133,6 +1230,66 @@ class _ExpenseBreakdownChart extends StatelessWidget {
   }
 }
 
+class _SplitSummaryCard extends StatelessWidget {
+  const _SplitSummaryCard({
+    required this.memberIds,
+    required this.memberNames,
+    required this.currentUid,
+    required this.expenses,
+  });
+
+  final List<String> memberIds;
+  final Map<String, String> memberNames;
+  final String? currentUid;
+  final List<Expense> expenses;
+
+  String _nameFor(String uid) => uid == currentUid ? 'You' : (memberNames[uid] ?? 'Traveler');
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final balances = netBalances(memberIds, expenses);
+
+    return Container(
+      margin: const EdgeInsets.only(top: AppSpacing.md),
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 14, offset: const Offset(0, 6)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Who Owes What', style: theme.textTheme.bodyMedium),
+          const SizedBox(height: AppSpacing.md),
+          ...memberIds.map((id) {
+            final net = balances[id] ?? 0;
+            final settled = net.abs() < 1;
+            final label = settled
+                ? 'Settled up'
+                : net > 0
+                    ? 'Gets back ₱${net.toStringAsFixed(0)}'
+                    : 'Owes ₱${(-net).toStringAsFixed(0)}';
+            final color = settled ? AppColors.textTertiary : (net > 0 ? AppColors.success : AppColors.error);
+            return Padding(
+              padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+              child: Row(
+                children: [
+                  Expanded(child: Text(_nameFor(id), style: theme.textTheme.bodyMedium)),
+                  Text(label, style: theme.textTheme.labelMedium?.copyWith(color: color)),
+                ],
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+}
+
 class _PackingChecklistCard extends StatelessWidget {
   const _PackingChecklistCard({required this.items, required this.onToggle, required this.onRemove});
 
@@ -1185,19 +1342,22 @@ class _PackingChecklistCard extends StatelessWidget {
 class _CompanionsCard extends StatelessWidget {
   const _CompanionsCard({
     required this.isOwner,
-    required this.collaboratorCount,
+    required this.collaboratorIds,
+    required this.memberNames,
     required this.onInvite,
     required this.onLeave,
   });
 
   final bool isOwner;
-  final int collaboratorCount;
+  final List<String> collaboratorIds;
+  final Map<String, String> memberNames;
   final VoidCallback onInvite;
   final VoidCallback onLeave;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final names = collaboratorIds.map((id) => memberNames[id] ?? 'Traveler').join(', ');
     return Container(
       padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
@@ -1213,10 +1373,9 @@ class _CompanionsCard extends StatelessWidget {
           const SizedBox(width: AppSpacing.sm),
           Expanded(
             child: Text(
-              collaboratorCount == 0
-                  ? 'Just you so far'
-                  : '$collaboratorCount ${collaboratorCount == 1 ? 'companion' : 'companions'} joined',
+              collaboratorIds.isEmpty ? 'Just you so far' : names,
               style: theme.textTheme.bodyMedium,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
           if (isOwner)

@@ -12,6 +12,7 @@ import 'package:tripnest_ph/ai/services/openai_service.dart';
 import 'package:tripnest_ph/core/services/weather_service.dart';
 import 'package:tripnest_ph/core/utils/function_caller.dart';
 import 'package:tripnest_ph/data/repositories/destination_repository.dart';
+import 'package:tripnest_ph/data/repositories/province_repository.dart';
 import 'package:tripnest_ph/data/repositories/restaurant_repository.dart';
 
 /// Fakes the `aiComplete` Cloud Function's `{'content': ...}` response shape
@@ -94,6 +95,7 @@ void main() {
         openAiService: OpenAiService(caller: caller),
         destinationRepository: DestinationRepository(firestore: firestore),
         restaurantRepository: RestaurantRepository(firestore: firestore),
+        provinceRepository: ProvinceRepository(firestore: firestore),
       );
 
       final itinerary = await repository.generateItinerary(
@@ -157,6 +159,7 @@ void main() {
       openAiService: OpenAiService(caller: caller),
       destinationRepository: DestinationRepository(firestore: firestore),
       restaurantRepository: RestaurantRepository(firestore: firestore),
+      provinceRepository: ProvinceRepository(firestore: firestore),
     );
 
     final itinerary = await repository.generateItinerary(
@@ -213,6 +216,7 @@ void main() {
       weatherService: WeatherService(client: weatherClient),
       destinationRepository: DestinationRepository(firestore: firestore),
       restaurantRepository: RestaurantRepository(firestore: firestore),
+      provinceRepository: ProvinceRepository(firestore: firestore),
     );
 
     final itinerary = await repository.generateItinerary(
@@ -263,6 +267,7 @@ void main() {
       weatherService: WeatherService(client: weatherClient),
       destinationRepository: DestinationRepository(firestore: firestore),
       restaurantRepository: RestaurantRepository(firestore: firestore),
+      provinceRepository: ProvinceRepository(firestore: firestore),
     );
 
     final itinerary = await repository.generateItinerary(

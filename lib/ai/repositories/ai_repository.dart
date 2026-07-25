@@ -4,9 +4,11 @@ import '../../core/services/places_service.dart';
 import '../../core/services/weather_service.dart';
 import '../../data/mock/mock_itinerary.dart';
 import '../../data/repositories/destination_repository.dart';
+import '../../data/repositories/province_repository.dart';
 import '../../data/repositories/restaurant_repository.dart';
 import '../../domain/models/destination.dart';
 import '../../domain/models/itinerary.dart';
+import '../../domain/models/province.dart';
 import '../../domain/models/restaurant.dart';
 import '../models/ai_message.dart';
 import '../models/itinerary_request.dart';
@@ -23,6 +25,7 @@ class AiRepository {
     AiCacheService? cacheService,
     DestinationRepository? destinationRepository,
     RestaurantRepository? restaurantRepository,
+    ProvinceRepository? provinceRepository,
     WeatherService? weatherService,
     PlacesService? placesService,
   })  : _openAi = openAiService ?? OpenAiService(),
@@ -30,7 +33,8 @@ class AiRepository {
         _weather = weatherService ?? WeatherService(),
         _places = placesService ?? PlacesService(),
         _destinationRepositoryOverride = destinationRepository,
-        _restaurantRepositoryOverride = restaurantRepository;
+        _restaurantRepositoryOverride = restaurantRepository,
+        _provinceRepositoryOverride = provinceRepository;
 
   final OpenAiService _openAi;
   final AiCacheService _cache;
@@ -44,12 +48,16 @@ class AiRepository {
   // FirebaseFirestore.instance before that actually happens.
   final DestinationRepository? _destinationRepositoryOverride;
   final RestaurantRepository? _restaurantRepositoryOverride;
+  final ProvinceRepository? _provinceRepositoryOverride;
   DestinationRepository? _destinationRepositoryInstance;
   RestaurantRepository? _restaurantRepositoryInstance;
+  ProvinceRepository? _provinceRepositoryInstance;
   DestinationRepository get _destinationRepository =>
       _destinationRepositoryOverride ?? (_destinationRepositoryInstance ??= DestinationRepository());
   RestaurantRepository get _restaurantRepository =>
       _restaurantRepositoryOverride ?? (_restaurantRepositoryInstance ??= RestaurantRepository());
+  ProvinceRepository get _provinceRepository =>
+      _provinceRepositoryOverride ?? (_provinceRepositoryInstance ??= ProvinceRepository());
 
   /// Generates a full itinerary for [request] and maps it into the app's
   /// existing [Itinerary] model, grounding restaurant/attraction picks
@@ -73,18 +81,23 @@ class AiRepository {
 
   Future<Itinerary> _generateItineraryViaAi(AiItineraryRequest request, {required String coverImageUrl}) async {
     // Restaurants/attractions come from the curated Firestore catalog;
-    // accommodations come live from Places API — fetched together so the
-    // (often slower) live hotel lookup doesn't add latency on top of the
-    // Firestore reads.
+    // accommodations and Places-sourced attractions come live from Places
+    // API; province facts (emergency hotlines/travel tips/budget guide) come
+    // from Firestore too — all fetched together so the (often slower) live
+    // Places lookups don't add latency on top of the Firestore reads.
     final candidateResults = await Future.wait([
       _restaurantRepository.filter(provinceId: request.provinceId, limit: 30),
       _destinationRepository.filter(provinceId: request.provinceId, limit: 30),
       _fetchAccommodations(request),
+      _fetchPlaceAttractions(request),
+      _provinceRepository.getById(request.provinceId),
     ]);
     final candidateRestaurants = candidateResults[0] as List<Restaurant>;
     final candidateAttractions =
         (candidateResults[1] as List<Destination>).where((d) => d.id != request.destinationId).toList();
     final accommodations = candidateResults[2] as List<PlaceRecommendation>;
+    final candidatePlaceAttractions = candidateResults[3] as List<PlaceRecommendation>;
+    final province = candidateResults[4] as Province?;
 
     // Runs alongside the (often slower) OpenAI call below rather than
     // after it, so a real forecast never adds extra wait time.
@@ -112,8 +125,15 @@ class AiRepository {
             'content': ItineraryPrompts.user(
               request: request,
               candidateRestaurantNames: candidateRestaurants.map((r) => r.name).toList(),
-              candidateAttractionNames: candidateAttractions.map((d) => d.name).toList(),
+              candidateAttractionNames: [
+                ...candidateAttractions.map((d) => d.name),
+                ...candidatePlaceAttractions.map((p) => p.name),
+              ],
               candidateHotelNames: accommodations.map((a) => a.name).toList(),
+              emergencyHotlines: province?.emergencyHotlines ?? const [],
+              provinceTravelTips: province?.travelTips ?? const [],
+              provinceBudgetMin: province?.estimatedDailyBudgetMin,
+              provinceBudgetMax: province?.estimatedDailyBudgetMax,
             ),
           },
         ],
@@ -131,6 +151,7 @@ class AiRepository {
       coverImageUrl: coverImageUrl,
       candidateRestaurants: candidateRestaurants,
       candidateAttractions: candidateAttractions,
+      candidatePlaceAttractions: candidatePlaceAttractions,
       accommodations: accommodations,
       weather: weather,
     );
@@ -187,6 +208,39 @@ class AiRepository {
             address: p.address,
             latitude: p.latitude,
             longitude: p.longitude,
+            mapsUri: p.googleMapsUri,
+          ),
+        )
+        .toList();
+  }
+
+  /// Live Places API attractions (museums, parks, landmarks) near the
+  /// destination, offered as extra candidates alongside the curated
+  /// Firestore `tourist_spots` list — same rating-ranked top-N pattern as
+  /// [_fetchAccommodations].
+  Future<List<PlaceRecommendation>> _fetchPlaceAttractions(AiItineraryRequest request) async {
+    if (request.latitude == null || request.longitude == null) return const [];
+    final places = await _places.searchNearby(
+      latitude: request.latitude!,
+      longitude: request.longitude!,
+      includedTypes: PlaceCategory.attractions,
+      maxResultCount: 10,
+    );
+    final ranked = [...places]..sort((a, b) => (b.rating ?? 0).compareTo(a.rating ?? 0));
+    return ranked
+        .take(6)
+        .map(
+          (p) => PlaceRecommendation(
+            placeId: p.id,
+            name: p.name,
+            rating: p.rating,
+            userRatingCount: p.userRatingCount,
+            priceLevel: p.priceLevel,
+            photoUrl: p.photoNames.isNotEmpty ? _places.photoUrl(p.photoNames.first) : '',
+            address: p.address,
+            latitude: p.latitude,
+            longitude: p.longitude,
+            mapsUri: p.googleMapsUri,
           ),
         )
         .toList();
@@ -198,6 +252,7 @@ class AiRepository {
     required String coverImageUrl,
     required List<Restaurant> candidateRestaurants,
     required List<Destination> candidateAttractions,
+    required List<PlaceRecommendation> candidatePlaceAttractions,
     required List<PlaceRecommendation> accommodations,
     required List<WeatherForecast> weather,
   }) {
@@ -230,6 +285,17 @@ class AiRepository {
           .where((d) => attractionNames.any((n) => n.toLowerCase() == d.name.toLowerCase()))
           .map((d) => d.id)
           .toList();
+      final matchedFirestoreAttractionNames = candidateAttractions
+          .where((d) => attractionIds.contains(d.id))
+          .map((d) => d.name.toLowerCase())
+          .toSet();
+      final placeAttractionRecs = candidatePlaceAttractions
+          .where(
+            (p) => attractionNames.any(
+              (n) => n.toLowerCase() == p.name.toLowerCase() && !matchedFirestoreAttractionNames.contains(n.toLowerCase()),
+            ),
+          )
+          .toList();
 
       if (days.isEmpty) {
         throw const AiException('The AI returned an incomplete itinerary. Please try again.');
@@ -248,6 +314,7 @@ class AiRepository {
         recommendedRestaurantIds: restaurantIds,
         nearbyAttractionIds: attractionIds,
         recommendedAccommodations: accommodations,
+        recommendedPlaceAttractions: placeAttractionRecs,
       );
     } on AiException {
       rethrow;

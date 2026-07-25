@@ -1,3 +1,4 @@
+import '../../domain/models/province.dart';
 import '../models/itinerary_request.dart';
 
 /// Builds the two-message (system + user) prompt pair that asks the model
@@ -56,9 +57,9 @@ Rules:
 - "iconKey" must be one of: ${iconKeys.join(', ')}.
 - "colorKey" must be one of: ${colorKeys.join(', ')}.
 - Every day must have exactly 3 activities: Morning, Afternoon, Evening.
-- "totalBudget" must roughly equal the sum of "budgetBreakdown" amounts, in Philippine pesos (numbers only, no currency symbol), and must fit the traveler's stated budget tier.
+- "totalBudget" must roughly equal the sum of "budgetBreakdown" amounts, in Philippine pesos (numbers only, no currency symbol), and must fit the traveler's stated budget tier. If a real daily-budget guide for the province is given in the user message, sanity-check your numbers against it — the traveler's chosen budget tier is still primary, but don't wildly exceed or undercut the province's real average without reason.
 - "recommendedRestaurantNames" and "nearbyAttractionNames" must ONLY contain names copied exactly from the lists given to you in the user message — never invent a name that wasn't provided. Leave the array empty if nothing provided fits well.
-- "travelTips" must include, in this order, one entry per category (skip a category only if genuinely not applicable): a suggested local delicacy/dish to try, a hidden gem worth a detour (only if you're not already covering it in the day plan), the best visiting hours/time of day to avoid crowds, a practical travel reminder (e.g. booking ahead, cash vs card), a safety reminder specific to the destination, and an eco-friendly travel tip. Prefix each with a short bold-ish label like "Local delicacy:", "Hidden gem:", "Best time to visit:", "Reminder:", "Safety:", "Eco tip:" followed by the actual tip.
+- "travelTips" must include, in this order, one entry per category (skip a category only if genuinely not applicable): a suggested local delicacy/dish to try, a hidden gem worth a detour (only if you're not already covering it in the day plan), the best visiting hours/time of day to avoid crowds, a practical travel reminder (e.g. booking ahead, cash vs card), a safety reminder specific to the destination, and an eco-friendly travel tip. Prefix each with a short bold-ish label like "Local delicacy:", "Hidden gem:", "Best time to visit:", "Reminder:", "Safety:", "Eco tip:" followed by the actual tip. For the "Safety:" tip: if real emergency hotline data for the province is given in the user message, cite the actual label/number from it verbatim rather than a generic one; only fall back to general Philippines emergency guidance if none is given.
 - Keep every string concise and mobile-friendly — this renders in a scrollable card UI, not a document.
 - Never suggest anything illegal, unsafe, or environmentally destructive.
 ''';
@@ -69,6 +70,10 @@ Rules:
     required List<String> candidateRestaurantNames,
     required List<String> candidateAttractionNames,
     List<String> candidateHotelNames = const [],
+    List<EmergencyHotline> emergencyHotlines = const [],
+    List<String> provinceTravelTips = const [],
+    double? provinceBudgetMin,
+    double? provinceBudgetMax,
   }) {
     return '''
 Plan a trip with these details:
@@ -85,6 +90,11 @@ Restaurants available near this destination (pick from these only, if relevant):
 Other attractions available near this destination (pick from these only, if relevant): ${candidateAttractionNames.isEmpty ? 'none provided' : candidateAttractionNames.join(', ')}
 
 Top-rated hotels near this destination, already chosen and shown to the traveler separately as "Recommended Accommodations" — do not repeat them in "recommendedRestaurantNames"/"nearbyAttractionNames", but feel free to reference one by name in a travel tip if genuinely useful (e.g. proximity to a planned activity): ${candidateHotelNames.isEmpty ? 'none available' : candidateHotelNames.join(', ')}
+
+Real safety/budget facts on file for ${request.provinceName} — use these instead of inventing generic ones:
+- Emergency hotlines: ${emergencyHotlines.isEmpty ? 'none on file — give general Philippines emergency guidance (e.g. 911) and note that the traveler should confirm the local hotline on arrival' : emergencyHotlines.map((h) => '${h.label}: ${h.number}').join(', ')}
+- Typical daily budget guide for this province: ${(provinceBudgetMin != null && provinceBudgetMin > 0 && provinceBudgetMax != null && provinceBudgetMax > 0) ? '₱${provinceBudgetMin.toStringAsFixed(0)}–₱${provinceBudgetMax.toStringAsFixed(0)} per day' : 'not on file'}
+- Official TripNest PH travel tips on file: ${provinceTravelTips.isEmpty ? 'none' : provinceTravelTips.join('; ')}
 
 Respond with the JSON object only.
 ''';

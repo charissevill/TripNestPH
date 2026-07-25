@@ -18,6 +18,7 @@ class Itinerary {
     required this.recommendedRestaurantIds,
     required this.nearbyAttractionIds,
     this.recommendedAccommodations = const [],
+    this.recommendedPlaceAttractions = const [],
   });
 
   final String destinationName;
@@ -38,6 +39,13 @@ class Itinerary {
   /// every view (same reasoning [weather] is stored once, not re-fetched).
   /// Empty for itineraries saved before this field existed.
   final List<PlaceRecommendation> recommendedAccommodations;
+
+  /// Live Places API attractions (museums, parks, landmarks) picked by the
+  /// AI alongside curated `tourist_spots`, snapshotted the same way as
+  /// [recommendedAccommodations] — [nearbyAttractionIds] stays exclusively
+  /// Firestore-sourced ids. Empty for itineraries saved before this field
+  /// existed.
+  final List<PlaceRecommendation> recommendedPlaceAttractions;
 
   factory Itinerary.fromMap(Map<String, dynamic> map) {
     return Itinerary(
@@ -61,6 +69,9 @@ class Itinerary {
       recommendedAccommodations: (map['recommendedAccommodations'] as List? ?? const [])
           .map((e) => PlaceRecommendation.fromMap(Map<String, dynamic>.from(e as Map)))
           .toList(),
+      recommendedPlaceAttractions: (map['recommendedPlaceAttractions'] as List? ?? const [])
+          .map((e) => PlaceRecommendation.fromMap(Map<String, dynamic>.from(e as Map)))
+          .toList(),
     );
   }
 
@@ -78,6 +89,7 @@ class Itinerary {
       'recommendedRestaurantIds': recommendedRestaurantIds,
       'nearbyAttractionIds': nearbyAttractionIds,
       'recommendedAccommodations': recommendedAccommodations.map((p) => p.toMap()).toList(),
+      'recommendedPlaceAttractions': recommendedPlaceAttractions.map((p) => p.toMap()).toList(),
     };
   }
 }
@@ -97,6 +109,7 @@ class PlaceRecommendation {
     this.address = '',
     this.latitude,
     this.longitude,
+    this.mapsUri = '',
   });
 
   final String placeId;
@@ -108,6 +121,11 @@ class PlaceRecommendation {
   final String address;
   final double? latitude;
   final double? longitude;
+
+  /// A real Google-resolved place page — preferred over a lat/lng-built
+  /// search URL when present. Empty for recommendations saved before this
+  /// field existed.
+  final String mapsUri;
 
   bool get hasCoordinates => latitude != null && longitude != null;
 
@@ -122,6 +140,7 @@ class PlaceRecommendation {
       address: map['address'] as String? ?? '',
       latitude: (map['latitude'] as num?)?.toDouble(),
       longitude: (map['longitude'] as num?)?.toDouble(),
+      mapsUri: map['mapsUri'] as String? ?? '',
     );
   }
 
@@ -136,6 +155,7 @@ class PlaceRecommendation {
       'address': address,
       'latitude': latitude,
       'longitude': longitude,
+      'mapsUri': mapsUri,
     };
   }
 }

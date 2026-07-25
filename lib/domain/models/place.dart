@@ -21,6 +21,9 @@ class Place {
     this.latitude,
     this.longitude,
     this.distanceMeters,
+    this.googleMapsUri = '',
+    this.weekdayDescriptions = const [],
+    this.editorialSummary = '',
   });
 
   final String id;
@@ -53,6 +56,17 @@ class Place {
   /// `PlacesService` call produced this result — null for text searches
   /// with no origin point.
   final double? distanceMeters;
+
+  /// A real Google-resolved place page — preferred over building a search
+  /// URL from [latitude]/[longitude] when present (see `MapsLauncher`).
+  final String googleMapsUri;
+
+  /// Pre-formatted weekly hours, one line per day (e.g. "Monday: 9:00 AM –
+  /// 5:00 PM"), distinct from [isOpenNow]'s live right-now boolean.
+  final List<String> weekdayDescriptions;
+
+  /// A short Google-authored description, when available.
+  final String editorialSummary;
 
   bool get hasCoordinates => latitude != null && longitude != null;
 
@@ -88,6 +102,9 @@ class Place {
       latitude: this.latitude,
       longitude: this.longitude,
       distanceMeters: _haversineMeters(latitude, longitude, this.latitude!, this.longitude!),
+      googleMapsUri: googleMapsUri,
+      weekdayDescriptions: weekdayDescriptions,
+      editorialSummary: editorialSummary,
     );
   }
 
@@ -122,6 +139,11 @@ class Place {
       isOpenNow: (json['currentOpeningHours'] as Map<String, dynamic>?)?['openNow'] as bool?,
       latitude: (location?['latitude'] as num?)?.toDouble(),
       longitude: (location?['longitude'] as num?)?.toDouble(),
+      googleMapsUri: json['googleMapsUri'] as String? ?? '',
+      weekdayDescriptions: List<String>.from(
+        (json['regularOpeningHours'] as Map<String, dynamic>?)?['weekdayDescriptions'] as List? ?? const [],
+      ),
+      editorialSummary: (json['editorialSummary'] as Map<String, dynamic>?)?['text'] as String? ?? '',
     );
   }
 
@@ -141,6 +163,9 @@ class Place {
       'latitude': latitude,
       'longitude': longitude,
       'distanceMeters': distanceMeters,
+      'googleMapsUri': googleMapsUri,
+      'weekdayDescriptions': weekdayDescriptions,
+      'editorialSummary': editorialSummary,
     };
   }
 
@@ -160,6 +185,9 @@ class Place {
       latitude: (json['latitude'] as num?)?.toDouble(),
       longitude: (json['longitude'] as num?)?.toDouble(),
       distanceMeters: (json['distanceMeters'] as num?)?.toDouble(),
+      googleMapsUri: json['googleMapsUri'] as String? ?? '',
+      weekdayDescriptions: List<String>.from(json['weekdayDescriptions'] as List? ?? const []),
+      editorialSummary: json['editorialSummary'] as String? ?? '',
     );
   }
 

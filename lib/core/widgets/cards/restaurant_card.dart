@@ -44,7 +44,18 @@ class RestaurantCard extends StatelessWidget {
             TravelImageFrame(
               imageUrl: restaurant.heroImageUrl,
               height: imageHeight,
-              topLeft: restaurant.isPopular ? const TagChip(label: 'Popular', color: AppColors.accentDark) : null,
+              topLeft: (restaurant.businessId.isNotEmpty || restaurant.isPopular)
+                  ? Wrap(
+                      spacing: 4,
+                      runSpacing: 4,
+                      children: [
+                        if (restaurant.businessId.isNotEmpty)
+                          const TagChip(label: 'Verified Partner', color: AppColors.primary),
+                        if (restaurant.isPopular)
+                          const TagChip(label: 'Popular', color: AppColors.accentDark),
+                      ],
+                    )
+                  : null,
               topRight: BookmarkButton(isSaved: isSaved, onTap: () => saved.toggleRestaurant(restaurant.id)),
               bottomLeft: Row(
                 mainAxisSize: MainAxisSize.min,

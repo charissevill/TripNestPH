@@ -14,8 +14,10 @@ import '../../core/theme/app_spacing.dart';
 import '../../core/widgets/branding/app_logo.dart';
 import '../../data/repositories/destination_repository.dart';
 import '../../data/repositories/province_repository.dart';
+import '../../data/repositories/restaurant_repository.dart';
 import '../../domain/models/destination.dart';
 import '../../domain/models/province.dart';
+import '../../domain/models/restaurant.dart';
 
 /// The AI Travel Assistant: a conversational chat surface that also serves
 /// destination recommendations, budget estimates, smart travel tips,
@@ -46,14 +48,23 @@ class _AiChatScreenState extends State<AiChatScreen> {
     _loadRealDataContext();
   }
 
+  /// The same Google Maps search URL shape `MapsLauncher.openDirections`
+  /// builds — inlined here (rather than launching anything) so it can be
+  /// handed to the AI as literal markdown link text.
+  String _mapsSearchUrl({required double latitude, required double longitude, required String label}) {
+    return 'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent('$latitude,$longitude($label)')}';
+  }
+
   Future<void> _loadRealDataContext() async {
     try {
       final results = await Future.wait([
         DestinationRepository().getFeatured(limit: 10),
         ProvinceRepository().getAll(),
+        RestaurantRepository().getPopular(limit: 10),
       ]);
       final destinations = results[0] as List<Destination>;
       final provinces = (results[1] as List<Province>).where((p) => p.hasContent).toList();
+      final restaurants = results[2] as List<Restaurant>;
 
       final parts = <String>[];
       if (destinations.isNotEmpty) {
@@ -63,9 +74,77 @@ class _AiChatScreenState extends State<AiChatScreen> {
           '${destinations.map((d) => '${d.name} (${d.provinceName})').join(', ')}.',
         );
       }
+
+      final destinationsWithLinks = destinations
+          .where((d) => d.websiteUrl.isNotEmpty || (d.latitude != null && d.longitude != null))
+          .toList();
+      if (destinationsWithLinks.isNotEmpty) {
+        parts.add(
+          'Real links on file for some of those destinations — only use these exact URLs, never invent one: '
+          '${destinationsWithLinks.map((d) {
+            final links = <String>[];
+            if (d.websiteUrl.isNotEmpty) links.add('website: ${d.websiteUrl}');
+            if (d.latitude != null && d.longitude != null) {
+              links.add('map: ${_mapsSearchUrl(latitude: d.latitude!, longitude: d.longitude!, label: d.name)}');
+            }
+            return '${d.name} (${links.join(', ')})';
+          }).join('; ')}.',
+        );
+      }
+
+      if (restaurants.isNotEmpty) {
+        parts.add(
+          'Real restaurants in the TripNest PH catalog you can recommend by name '
+          '(never invent a restaurant that isn\'t one of these or generally well-known): '
+          '${restaurants.map((r) => '${r.name} (${r.provinceName})').join(', ')}.',
+        );
+      }
+
+      final restaurantsWithLinks = restaurants
+          .where((r) => r.websiteUrl.isNotEmpty || (r.latitude != null && r.longitude != null))
+          .toList();
+      if (restaurantsWithLinks.isNotEmpty) {
+        parts.add(
+          'Real links on file for some of those restaurants — only use these exact URLs, never invent one: '
+          '${restaurantsWithLinks.map((r) {
+            final links = <String>[];
+            if (r.websiteUrl.isNotEmpty) links.add('website: ${r.websiteUrl}');
+            if (r.latitude != null && r.longitude != null) {
+              links.add('map: ${_mapsSearchUrl(latitude: r.latitude!, longitude: r.longitude!, label: r.name)}');
+            }
+            return '${r.name} (${links.join(', ')})';
+          }).join('; ')}.',
+        );
+      }
+
       if (provinces.isNotEmpty) {
         parts.add('Provinces with a full TripNest PH in-app travel guide: ${provinces.map((p) => p.name).join(', ')}.');
       }
+
+      final withHotlines = provinces.where((p) => p.emergencyHotlines.isNotEmpty).toList();
+      if (withHotlines.isNotEmpty) {
+        parts.add(
+          'Real emergency hotlines on file per province (use these verbatim if the traveler asks about safety/emergencies in one of these provinces, instead of inventing generic numbers): '
+          '${withHotlines.map((p) => '${p.name}: ${p.emergencyHotlines.map((h) => '${h.label} ${h.number}').join(', ')}').join('; ')}.',
+        );
+      }
+
+      final withTips = provinces.where((p) => p.travelTips.isNotEmpty).toList();
+      if (withTips.isNotEmpty) {
+        parts.add(
+          'Official TripNest PH travel tips on file per province: '
+          '${withTips.map((p) => '${p.name}: ${p.travelTips.join('; ')}').join(' | ')}.',
+        );
+      }
+
+      final withBudget = provinces.where((p) => p.estimatedDailyBudgetMin > 0 && p.estimatedDailyBudgetMax > 0).toList();
+      if (withBudget.isNotEmpty) {
+        parts.add(
+          'Real typical daily budget guide on file per province: '
+          '${withBudget.map((p) => '${p.name}: ₱${p.estimatedDailyBudgetMin.toStringAsFixed(0)}–₱${p.estimatedDailyBudgetMax.toStringAsFixed(0)}/day').join(', ')}.',
+        );
+      }
+
       if (mounted && parts.isNotEmpty) setState(() => _realDataContext = parts.join(' '));
     } catch (_) {
       // Best-effort — chat still works fine with just profile-based context.

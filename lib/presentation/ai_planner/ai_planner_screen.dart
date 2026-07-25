@@ -231,7 +231,7 @@ class _AiPlannerScreenState extends State<AiPlannerScreen> {
             Container(
               padding: const EdgeInsets.all(AppSpacing.lg),
               decoration: BoxDecoration(
-                gradient: AppColors.gradient(AppColors.oceanGradient),
+                gradient: AppColors.gradient([theme.colorScheme.primary, theme.colorScheme.primaryFixedDim]),
                 borderRadius: BorderRadius.circular(AppRadius.xl),
               ),
               child: Row(

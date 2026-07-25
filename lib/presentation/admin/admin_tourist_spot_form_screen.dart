@@ -329,7 +329,7 @@ class _AdminTouristSpotFormScreenState extends State<AdminTouristSpotFormScreen>
               children: [
                 Expanded(child: TextField(controller: _newHighlightController, decoration: const InputDecoration(hintText: 'Add a highlight...'))),
                 IconButton(
-                  icon: const Icon(Symbols.add_circle_rounded, color: AppColors.primary),
+                  icon: Icon(Symbols.add_circle_rounded, color: theme.colorScheme.primary),
                   onPressed: () {
                     final text = _newHighlightController.text.trim();
                     if (text.isEmpty) return;
@@ -355,7 +355,7 @@ class _AdminTouristSpotFormScreenState extends State<AdminTouristSpotFormScreen>
               children: [
                 Expanded(child: TextField(controller: _newTipController, decoration: const InputDecoration(hintText: 'Add a travel tip...'))),
                 IconButton(
-                  icon: const Icon(Symbols.add_circle_rounded, color: AppColors.primary),
+                  icon: Icon(Symbols.add_circle_rounded, color: theme.colorScheme.primary),
                   onPressed: () {
                     final text = _newTipController.text.trim();
                     if (text.isEmpty) return;

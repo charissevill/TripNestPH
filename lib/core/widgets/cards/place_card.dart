@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
 import '../../../domain/models/place.dart';
-import '../../theme/app_colors.dart';
 import '../../theme/app_spacing.dart';
 import '../indicators/rating_widget.dart';
 import 'tag_chip.dart';
@@ -44,7 +43,7 @@ class PlaceCard extends StatelessWidget {
             TravelImageFrame(
               imageUrl: imageUrl,
               height: imageHeight,
-              topLeft: TagChip(label: place.categoryLabel, color: AppColors.primary),
+              topLeft: TagChip(label: place.categoryLabel, color: theme.colorScheme.primary),
               bottomLeft: place.distanceMeters != null
                   ? Row(
                       mainAxisSize: MainAxisSize.min,
@@ -68,7 +67,7 @@ class PlaceCard extends StatelessWidget {
                 if (place.userRatingCount != null && place.priceLevelLabel.isNotEmpty)
                   Text(' · ', style: theme.textTheme.bodySmall),
                 if (place.priceLevelLabel.isNotEmpty)
-                  Text(place.priceLevelLabel, style: theme.textTheme.bodySmall?.copyWith(color: AppColors.primary, fontWeight: FontWeight.w700)),
+                  Text(place.priceLevelLabel, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.primary, fontWeight: FontWeight.w700)),
               ],
             ),
           ],

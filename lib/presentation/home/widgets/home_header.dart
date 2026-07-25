@@ -53,7 +53,7 @@ class HomeHeader extends StatelessWidget {
             height: 44,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              border: Border.all(color: AppColors.primary, width: 2),
+              border: Border.all(color: theme.colorScheme.primary, width: 2),
             ),
             padding: const EdgeInsets.all(2),
             child: ClipOval(
@@ -77,9 +77,10 @@ class _AvatarFallback extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final primary = Theme.of(context).colorScheme.primary;
     return Container(
-      color: AppColors.primary.withValues(alpha: 0.1),
-      child: const Icon(Symbols.person_rounded, color: AppColors.primary, size: 22),
+      color: primary.withValues(alpha: 0.1),
+      child: Icon(Symbols.person_rounded, color: primary, size: 22),
     );
   }
 }

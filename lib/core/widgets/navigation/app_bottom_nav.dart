@@ -31,15 +31,15 @@ class AppBottomNav extends StatelessWidget {
         child: GNav(
           selectedIndex: currentIndex,
           onTabChange: onTap,
-          rippleColor: AppColors.primary.withValues(alpha: 0.08),
-          hoverColor: AppColors.primary.withValues(alpha: 0.06),
+          rippleColor: theme.colorScheme.primary.withValues(alpha: 0.08),
+          hoverColor: theme.colorScheme.primary.withValues(alpha: 0.06),
           gap: 4,
           activeColor: Colors.white,
           iconSize: 20,
           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs, vertical: 10),
           duration: const Duration(milliseconds: 320),
           curve: Curves.easeOutCubic,
-          tabBackgroundColor: AppColors.primary,
+          tabBackgroundColor: theme.colorScheme.primary,
           color: AppColors.textSecondary,
           textStyle: theme.textTheme.labelSmall?.copyWith(color: Colors.white, fontWeight: FontWeight.w700),
           tabs: const [

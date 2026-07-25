@@ -83,6 +83,7 @@ class _OpenInMapsButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Material(
       color: Colors.white,
       shape: const StadiumBorder(),
@@ -90,14 +91,14 @@ class _OpenInMapsButton extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         customBorder: const StadiumBorder(),
-        child: const Padding(
-          padding: EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Symbols.open_in_new_rounded, size: 16, color: AppColors.primary),
-              SizedBox(width: 4),
-              Text('Open in Maps', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.primary)),
+              Icon(Symbols.open_in_new_rounded, size: 16, color: theme.colorScheme.primary),
+              const SizedBox(width: 4),
+              Text('Open in Maps', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: theme.colorScheme.primary)),
             ],
           ),
         ),

@@ -86,9 +86,9 @@ class _DocumentHeader extends StatelessWidget {
         Container(
           width: 72,
           height: 72,
-          decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.1), shape: BoxShape.circle),
+          decoration: BoxDecoration(color: theme.colorScheme.primary.withValues(alpha: 0.1), shape: BoxShape.circle),
           alignment: Alignment.center,
-          child: Icon(topic.icon, size: 34, color: AppColors.primary),
+          child: Icon(topic.icon, size: 34, color: theme.colorScheme.primary),
         ),
         const SizedBox(height: AppSpacing.md),
         Text(topic.title, style: theme.textTheme.headlineSmall, textAlign: TextAlign.center),
@@ -142,7 +142,7 @@ class _LegalSectionView extends StatelessWidget {
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(width: 4, height: 18, margin: const EdgeInsets.only(top: 3, right: AppSpacing.sm), decoration: BoxDecoration(color: AppColors.primary, borderRadius: BorderRadius.circular(2))),
+            Container(width: 4, height: 18, margin: const EdgeInsets.only(top: 3, right: AppSpacing.sm), decoration: BoxDecoration(color: theme.colorScheme.primary, borderRadius: BorderRadius.circular(2))),
             Expanded(child: Text(section.heading, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700))),
           ],
         ),
@@ -180,7 +180,7 @@ class _BulletRow extends StatelessWidget {
         children: [
           Padding(
             padding: const EdgeInsets.only(top: 6),
-            child: Container(width: 6, height: 6, decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle)),
+            child: Container(width: 6, height: 6, decoration: BoxDecoration(color: theme.colorScheme.primary, shape: BoxShape.circle)),
           ),
           const SizedBox(width: AppSpacing.sm),
           Expanded(child: Text(text, style: theme.textTheme.bodyMedium?.copyWith(height: 1.6))),
@@ -197,13 +197,14 @@ class _InfoCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
-        color: AppColors.primary.withValues(alpha: 0.05),
+        color: theme.colorScheme.primary.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(AppRadius.lg),
-        border: Border.all(color: AppColors.primary.withValues(alpha: 0.12)),
+        border: Border.all(color: theme.colorScheme.primary.withValues(alpha: 0.12)),
       ),
       child: child,
     );
@@ -255,7 +256,7 @@ class _AboutBody extends StatelessWidget {
         const SizedBox(height: AppSpacing.lg),
         Row(
           children: [
-            Container(width: 4, height: 18, margin: const EdgeInsets.only(right: AppSpacing.sm), decoration: BoxDecoration(color: AppColors.primary, borderRadius: BorderRadius.circular(2))),
+            Container(width: 4, height: 18, margin: const EdgeInsets.only(right: AppSpacing.sm), decoration: BoxDecoration(color: theme.colorScheme.primary, borderRadius: BorderRadius.circular(2))),
             Text('What you can do', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
           ],
         ),

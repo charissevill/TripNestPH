@@ -209,11 +209,11 @@ class _AdminModuleTile extends StatelessWidget {
               width: 48,
               height: 48,
               decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.1),
+                color: theme.colorScheme.primary.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(AppRadius.md),
               ),
               alignment: Alignment.center,
-              child: Icon(icon, color: AppColors.primary),
+              child: Icon(icon, color: theme.colorScheme.primary),
             ),
             const SizedBox(width: AppSpacing.md),
             Expanded(

@@ -46,6 +46,7 @@ class _HeroBannerState extends State<HeroBanner> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Column(
       children: [
         SizedBox(
@@ -64,7 +65,7 @@ class _HeroBannerState extends State<HeroBanner> {
             dotHeight: 6,
             dotWidth: 6,
             spacing: 6,
-            activeDotColor: AppColors.primary,
+            activeDotColor: theme.colorScheme.primary,
             dotColor: AppColors.border,
           ),
           onDotClicked: (index) => _controller.animateToPage(
@@ -85,6 +86,7 @@ class _HeroSlide extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
       child: ClipRRect(
@@ -142,7 +144,7 @@ class _HeroSlide extends StatelessWidget {
                             style: const TextStyle(color: AppColors.textPrimary, fontSize: 13, fontWeight: FontWeight.w700),
                           ),
                           const SizedBox(width: 4),
-                          const Icon(Symbols.arrow_forward_rounded, size: 15, color: AppColors.primary),
+                          Icon(Symbols.arrow_forward_rounded, size: 15, color: theme.colorScheme.primary),
                         ],
                       ),
                     ),

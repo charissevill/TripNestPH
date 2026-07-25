@@ -6,7 +6,6 @@ import 'package:provider/provider.dart';
 
 import '../../core/constants/firestore_paths.dart';
 import '../../core/providers/auth_provider.dart';
-import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/utils/app_exception.dart';
 import '../../core/widgets/buttons/animated_button.dart';
@@ -347,9 +346,9 @@ class _AdminFestivalFormScreenState extends State<AdminFestivalFormScreen> {
                       ),
                     ),
                     IconButton(
-                      icon: const Icon(
+                      icon: Icon(
                         Symbols.add_circle_rounded,
-                        color: AppColors.primary,
+                        color: theme.colorScheme.primary,
                       ),
                       onPressed: () {
                         final text = _newHighlightController.text.trim();

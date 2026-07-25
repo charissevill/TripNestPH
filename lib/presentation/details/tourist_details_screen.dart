@@ -262,7 +262,9 @@ class _TouristDetailsBody extends StatelessWidget {
                   spacing: AppSpacing.sm,
                   runSpacing: AppSpacing.sm,
                   children: destination.highlights
-                      .map((h) => TagChip(label: h, color: AppColors.primary))
+                      .map(
+                        (h) => TagChip(label: h, color: theme.colorScheme.primary),
+                      )
                       .toList(),
                 ),
                 const SizedBox(height: AppSpacing.xxl),

@@ -52,9 +52,9 @@ class _TripCalendarScreenState extends State<TripCalendarScreen> {
           children: trips
               .map(
                 (trip) => ListTile(
-                  leading: const Icon(
+                  leading: Icon(
                     Symbols.map_rounded,
-                    color: AppColors.primary,
+                    color: Theme.of(context).colorScheme.primary,
                   ),
                   title: Text(trip.title),
                   subtitle: Text(trip.itinerary.destinationName),
@@ -171,14 +171,16 @@ class _TripCalendarScreenState extends State<TripCalendarScreen> {
                             child: Container(
                               decoration: BoxDecoration(
                                 color: hasTrip
-                                    ? AppColors.primary.withValues(alpha: 0.15)
+                                    ? theme.colorScheme.primary.withValues(
+                                        alpha: 0.15,
+                                      )
                                     : null,
                                 borderRadius: BorderRadius.circular(
                                   AppRadius.md,
                                 ),
                                 border: isToday
                                     ? Border.all(
-                                        color: AppColors.primary,
+                                        color: theme.colorScheme.primary,
                                         width: 1.5,
                                       )
                                     : null,
@@ -191,7 +193,7 @@ class _TripCalendarScreenState extends State<TripCalendarScreen> {
                                     '${date.day}',
                                     style: theme.textTheme.bodyMedium?.copyWith(
                                       color: hasTrip
-                                          ? AppColors.primary
+                                          ? theme.colorScheme.primary
                                           : AppColors.textPrimary,
                                       fontWeight: hasTrip
                                           ? FontWeight.w700
@@ -203,8 +205,8 @@ class _TripCalendarScreenState extends State<TripCalendarScreen> {
                                       margin: const EdgeInsets.only(top: 2),
                                       width: 5,
                                       height: 5,
-                                      decoration: const BoxDecoration(
-                                        color: AppColors.primary,
+                                      decoration: BoxDecoration(
+                                        color: theme.colorScheme.primary,
                                         shape: BoxShape.circle,
                                       ),
                                     ),

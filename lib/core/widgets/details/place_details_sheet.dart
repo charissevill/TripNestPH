@@ -70,7 +70,7 @@ class PlaceDetailsSheet extends StatelessWidget {
                       if (place.rating != null) RatingWidget(rating: place.rating!, reviewCount: place.userRatingCount, starSize: 18),
                       if (place.priceLevelLabel.isNotEmpty) ...[
                         const SizedBox(width: AppSpacing.md),
-                        Text(place.priceLevelLabel, style: theme.textTheme.titleSmall?.copyWith(color: AppColors.primary)),
+                        Text(place.priceLevelLabel, style: theme.textTheme.titleSmall?.copyWith(color: theme.colorScheme.primary)),
                       ],
                       if (place.isOpenNow != null) ...[
                         const SizedBox(width: AppSpacing.md),

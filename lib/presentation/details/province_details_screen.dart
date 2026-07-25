@@ -444,6 +444,7 @@ class _ProvinceGalleryState extends State<_ProvinceGallery>
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final province = widget.province;
     final images = [
       province.heroImageUrl,
@@ -454,7 +455,7 @@ class _ProvinceGalleryState extends State<_ProvinceGallery>
       fit: StackFit.expand,
       children: [
         if (images.isEmpty)
-          Container(color: AppColors.primary.withValues(alpha: 0.15))
+          Container(color: theme.colorScheme.primary.withValues(alpha: 0.15))
         else
           PageView.builder(
             controller: _pageController,
@@ -505,7 +506,10 @@ class _ProvinceGalleryState extends State<_ProvinceGallery>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                TagChip(label: province.regionName, color: AppColors.primary),
+                TagChip(
+                  label: province.regionName,
+                  color: theme.colorScheme.primary,
+                ),
                 const SizedBox(height: AppSpacing.sm),
                 Text(
                   province.name,
@@ -554,7 +558,7 @@ class _BusinessTile extends StatelessWidget {
               ),
               TagChip(
                 label: BusinessCategory.label(business.category),
-                color: AppColors.primary,
+                color: theme.colorScheme.primary,
               ),
             ],
           ),
@@ -602,8 +606,8 @@ class _BusinessTile extends StatelessWidget {
               ),
               child: Text(
                 business.websiteUrl,
-                style: const TextStyle(
-                  color: AppColors.primary,
+                style: TextStyle(
+                  color: theme.colorScheme.primary,
                   fontSize: 12,
                   decoration: TextDecoration.underline,
                 ),

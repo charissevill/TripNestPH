@@ -68,7 +68,7 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
                 width: 72,
                 height: 72,
                 decoration: BoxDecoration(
-                  gradient: AppColors.gradient(AppColors.skyGradient),
+                  gradient: AppColors.gradient([theme.colorScheme.primary, theme.colorScheme.primaryFixedDim]),
                   borderRadius: BorderRadius.circular(AppRadius.lg),
                 ),
                 child: const Icon(Symbols.mark_email_unread_rounded, color: Colors.white, size: 36),

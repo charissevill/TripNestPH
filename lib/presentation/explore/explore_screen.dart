@@ -629,11 +629,13 @@ class _TabChip extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
         decoration: BoxDecoration(
           color: selected
-              ? AppColors.primary
+              ? Theme.of(context).colorScheme.primary
               : Theme.of(context).colorScheme.surface,
           borderRadius: BorderRadius.circular(AppRadius.pill),
           border: Border.all(
-            color: selected ? AppColors.primary : AppColors.border,
+            color: selected
+                ? Theme.of(context).colorScheme.primary
+                : AppColors.border,
           ),
         ),
         alignment: Alignment.center,

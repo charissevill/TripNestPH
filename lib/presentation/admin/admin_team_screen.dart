@@ -276,7 +276,7 @@ class _AdminTeamScreenState extends State<AdminTeamScreen> {
                             ? Symbols.account_circle_rounded
                             : Symbols.block_rounded,
                         color: admin.isActive
-                            ? AppColors.primary
+                            ? Theme.of(context).colorScheme.primary
                             : AppColors.error,
                       ),
                       title: Text(

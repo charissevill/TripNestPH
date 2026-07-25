@@ -242,9 +242,9 @@ class _AdminProvinceEditScreenState extends State<AdminProvinceEditScreen> {
                       ),
                     ),
                     IconButton(
-                      icon: const Icon(
+                      icon: Icon(
                         Symbols.add_circle_rounded,
-                        color: AppColors.primary,
+                        color: Theme.of(context).colorScheme.primary,
                       ),
                       onPressed: _addTip,
                     ),

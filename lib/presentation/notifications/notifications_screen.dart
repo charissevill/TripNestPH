@@ -109,7 +109,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                         decoration: BoxDecoration(
                           color: notification.isRead
                               ? theme.colorScheme.surface
-                              : AppColors.primary.withValues(alpha: 0.06),
+                              : theme.colorScheme.primary.withValues(
+                                  alpha: 0.06,
+                                ),
                           borderRadius: BorderRadius.circular(AppRadius.lg),
                           boxShadow: [
                             BoxShadow(
@@ -126,7 +128,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                               width: 40,
                               height: 40,
                               decoration: BoxDecoration(
-                                color: AppColors.primary.withValues(
+                                color: theme.colorScheme.primary.withValues(
                                   alpha: 0.12,
                                 ),
                                 shape: BoxShape.circle,
@@ -134,7 +136,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                               alignment: Alignment.center,
                               child: Icon(
                                 _iconFor(notification.category),
-                                color: AppColors.primary,
+                                color: theme.colorScheme.primary,
                                 size: 20,
                               ),
                             ),

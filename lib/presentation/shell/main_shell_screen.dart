@@ -44,14 +44,19 @@ class _AiChatFab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Container(
       width: 56,
       height: 56,
       decoration: BoxDecoration(
-        gradient: AppColors.gradient(AppColors.oceanGradient),
+        gradient: AppColors.gradient([colorScheme.primary, colorScheme.primaryFixedDim]),
         shape: BoxShape.circle,
         boxShadow: [
-          BoxShadow(color: AppColors.primary.withValues(alpha: 0.35), blurRadius: 16, offset: const Offset(0, 6)),
+          BoxShadow(
+            color: colorScheme.primary.withValues(alpha: 0.35),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
         ],
       ),
       child: Material(

@@ -6,7 +6,6 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/routes/route_paths.dart';
 import '../../core/services/local_preferences_service.dart';
-import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/widgets/branding/app_logo.dart';
 
@@ -53,6 +52,7 @@ class _SplashScreenState extends State<SplashScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
@@ -70,7 +70,7 @@ class _SplashScreenState extends State<SplashScreen> {
                   )
                   .fadeIn(duration: 500.ms)
                   .then(delay: 300.ms)
-                  .shimmer(duration: 1100.ms, color: AppColors.primary.withValues(alpha: 0.25)),
+                  .shimmer(duration: 1100.ms, color: theme.colorScheme.primary.withValues(alpha: 0.25)),
               const SizedBox(height: AppSpacing.xxl),
               const _LoadingDots().animate().fadeIn(delay: 900.ms, duration: 400.ms),
             ],
@@ -95,7 +95,10 @@ class _LoadingDots extends StatelessWidget {
           child: Container(
             width: 8,
             height: 8,
-            decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.85), shape: BoxShape.circle),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.85),
+              shape: BoxShape.circle,
+            ),
           )
               .animate(onPlay: (controller) => controller.repeat(reverse: true))
               .fade(begin: 1, end: 0.25, duration: 600.ms, delay: (i * 150).ms),

@@ -59,16 +59,18 @@ class LocationPromptCard extends StatelessWidget {
       margin: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
       padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
-        color: AppColors.primary.withValues(alpha: 0.06),
+        color: theme.colorScheme.primary.withValues(alpha: 0.06),
         borderRadius: BorderRadius.circular(AppRadius.lg),
-        border: Border.all(color: AppColors.primary.withValues(alpha: 0.16)),
+        border: Border.all(
+          color: theme.colorScheme.primary.withValues(alpha: 0.16),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const Icon(Symbols.location_off_rounded, color: AppColors.primary, size: 22),
+              Icon(Symbols.location_off_rounded, color: theme.colorScheme.primary, size: 22),
               const SizedBox(width: AppSpacing.sm),
               Expanded(child: Text('See what\'s nearby', style: theme.textTheme.titleMedium)),
               InkWell(

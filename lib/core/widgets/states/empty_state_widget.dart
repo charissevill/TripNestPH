@@ -36,7 +36,7 @@ class EmptyStateWidget extends StatelessWidget {
             width: 96,
             height: 96,
             decoration: BoxDecoration(
-              gradient: AppColors.gradient(AppColors.skyGradient),
+              gradient: AppColors.gradient([theme.colorScheme.primary, theme.colorScheme.primaryFixedDim]),
               shape: BoxShape.circle,
             ),
             child: Icon(icon, size: 44, color: Colors.white),

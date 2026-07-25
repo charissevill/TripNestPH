@@ -183,9 +183,9 @@ class _RestaurantDetailsBody extends StatelessWidget {
                           ),
                           if (restaurant.businessId.isNotEmpty) ...[
                             const SizedBox(height: 4),
-                            const TagChip(
+                            TagChip(
                               label: 'Verified Partner',
-                              color: AppColors.primary,
+                              color: theme.colorScheme.primary,
                             ),
                           ],
                           const SizedBox(height: 4),
@@ -443,7 +443,7 @@ class _MenuItemTile extends StatelessWidget {
                 Text(
                   item.price,
                   style: theme.textTheme.labelMedium?.copyWith(
-                    color: AppColors.primary,
+                    color: theme.colorScheme.primary,
                   ),
                 ),
               ],

@@ -35,7 +35,7 @@ class CategoryCard extends StatelessWidget {
             height: size,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              border: Border.all(color: isSelected ? AppColors.primary : Colors.transparent, width: 2.4),
+              border: Border.all(color: isSelected ? theme.colorScheme.primary : Colors.transparent, width: 2.4),
               boxShadow: [
                 BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 10, offset: const Offset(0, 4)),
               ],
@@ -56,7 +56,7 @@ class CategoryCard extends StatelessWidget {
           Text(
             category.label,
             style: theme.textTheme.labelMedium?.copyWith(
-              color: isSelected ? AppColors.primary : AppColors.textPrimary,
+              color: isSelected ? theme.colorScheme.primary : AppColors.textPrimary,
             ),
           ),
         ],

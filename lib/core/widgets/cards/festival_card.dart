@@ -47,7 +47,7 @@ class FestivalCard extends StatelessWidget {
               height: imageHeight,
               topLeft: _DateBadge(month: festival.month, day: day),
               topRight: BookmarkButton(isSaved: isSaved, onTap: () => saved.toggleFestival(festival.id)),
-              bottomLeft: festival.isUpcoming ? const TagChip(label: 'Upcoming', color: AppColors.primary) : null,
+              bottomLeft: festival.isUpcoming ? TagChip(label: 'Upcoming', color: theme.colorScheme.primary) : null,
               bottomRight: RatingBadge(rating: festival.rating),
             ),
             const SizedBox(height: AppSpacing.sm),

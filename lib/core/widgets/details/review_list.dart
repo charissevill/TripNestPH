@@ -71,8 +71,8 @@ class _ReviewTile extends StatelessWidget {
       children: [
         CircleAvatar(
           radius: 20,
-          backgroundColor: AppColors.primary.withValues(alpha: 0.15),
-          child: Text(initials, style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w700)),
+          backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.15),
+          child: Text(initials, style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.w700)),
         ),
         const SizedBox(width: AppSpacing.md),
         Expanded(

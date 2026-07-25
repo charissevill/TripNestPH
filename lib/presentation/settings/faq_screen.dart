@@ -123,7 +123,7 @@ class _FaqScreenState extends State<FaqScreen> {
                           padding: const EdgeInsets.only(bottom: AppSpacing.sm, top: AppSpacing.sm),
                           child: Text(
                             entry.key.toUpperCase(),
-                            style: theme.textTheme.labelSmall?.copyWith(color: AppColors.primary, letterSpacing: 0.6, fontWeight: FontWeight.w700),
+                            style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.primary, letterSpacing: 0.6, fontWeight: FontWeight.w700),
                           ),
                         ),
                         for (final item in entry.value)
@@ -162,9 +162,9 @@ class _CategoryChip extends StatelessWidget {
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
         decoration: BoxDecoration(
-          color: selected ? AppColors.primary : Theme.of(context).colorScheme.surface,
+          color: selected ? Theme.of(context).colorScheme.primary : Theme.of(context).colorScheme.surface,
           borderRadius: BorderRadius.circular(AppRadius.pill),
-          border: Border.all(color: selected ? AppColors.primary : AppColors.border),
+          border: Border.all(color: selected ? Theme.of(context).colorScheme.primary : AppColors.border),
         ),
         alignment: Alignment.center,
         child: Text(
@@ -190,7 +190,7 @@ class _FaqTile extends StatelessWidget {
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(AppRadius.lg),
-        border: Border.all(color: expanded ? AppColors.primary.withValues(alpha: 0.3) : AppColors.border),
+        border: Border.all(color: expanded ? theme.colorScheme.primary.withValues(alpha: 0.3) : AppColors.border),
         boxShadow: expanded
             ? [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 12, offset: const Offset(0, 6))]
             : null,
@@ -218,7 +218,7 @@ class _FaqTile extends StatelessWidget {
                     AnimatedRotation(
                       turns: expanded ? 0.5 : 0,
                       duration: const Duration(milliseconds: 200),
-                      child: const Icon(Symbols.expand_more_rounded, color: AppColors.primary),
+                      child: Icon(Symbols.expand_more_rounded, color: theme.colorScheme.primary),
                     ),
                   ],
                 ),

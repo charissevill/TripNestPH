@@ -13,6 +13,7 @@ import '../../core/theme/app_spacing.dart';
 import '../../core/utils/app_exception.dart';
 import '../../core/widgets/cards/destination_card.dart';
 import '../../core/widgets/dialogs/confirmation_dialog.dart';
+import '../../core/widgets/media/avatar_preview.dart';
 import '../../data/repositories/admin_repository.dart';
 import '../../data/repositories/destination_repository.dart';
 import '../../data/repositories/itinerary_repository.dart';
@@ -144,33 +145,39 @@ class _ProfileScreenState extends State<ProfileScreen> {
               Container(
                 padding: const EdgeInsets.all(AppSpacing.lg),
                 decoration: BoxDecoration(
-                  gradient: AppColors.gradient(AppColors.oceanGradient),
+                  gradient: AppColors.gradient([
+                    theme.colorScheme.primary,
+                    theme.colorScheme.primaryFixedDim,
+                  ]),
                   borderRadius: BorderRadius.circular(AppRadius.xl),
                 ),
                 child: Row(
                   children: [
-                    Container(
-                      width: 72,
-                      height: 72,
-                      padding: const EdgeInsets.all(3),
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 2),
-                      ),
-                      child: ClipOval(
-                        child: user?.photoUrl.isNotEmpty == true
-                            ? CachedNetworkImage(
-                                imageUrl: user!.photoUrl,
-                                fit: BoxFit.cover,
-                              )
-                            : Container(
-                                color: Colors.white.withValues(alpha: 0.2),
-                                child: const Icon(
-                                  Symbols.person_rounded,
-                                  color: Colors.white,
-                                  size: 36,
+                    AvatarPreview(
+                      photoUrl: user?.photoUrl,
+                      child: Container(
+                        width: 72,
+                        height: 72,
+                        padding: const EdgeInsets.all(3),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 2),
+                        ),
+                        child: ClipOval(
+                          child: user?.photoUrl.isNotEmpty == true
+                              ? CachedNetworkImage(
+                                  imageUrl: user!.photoUrl,
+                                  fit: BoxFit.cover,
+                                )
+                              : Container(
+                                  color: Colors.white.withValues(alpha: 0.2),
+                                  child: const Icon(
+                                    Symbols.person_rounded,
+                                    color: Colors.white,
+                                    size: 36,
+                                  ),
                                 ),
-                              ),
+                        ),
                       ),
                     ),
                     const SizedBox(width: AppSpacing.md),
@@ -270,11 +277,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       .map(
                         (p) => Chip(
                           label: Text(p),
-                          backgroundColor: AppColors.primary.withValues(
+                          backgroundColor: theme.colorScheme.primary.withValues(
                             alpha: 0.08,
                           ),
                           labelStyle: theme.textTheme.labelMedium?.copyWith(
-                            color: AppColors.primary,
+                            color: theme.colorScheme.primary,
                           ),
                           side: BorderSide.none,
                         ),
@@ -399,7 +406,7 @@ class _StatTile extends StatelessWidget {
         ),
         child: Column(
           children: [
-            Icon(icon, color: AppColors.primary, size: 20),
+            Icon(icon, color: theme.colorScheme.primary, size: 20),
             const SizedBox(height: 6),
             Text(value, style: theme.textTheme.titleLarge),
             Text(label, style: theme.textTheme.bodySmall),
@@ -558,7 +565,9 @@ class _PendingInviteBannerState extends State<_PendingInviteBanner> {
           margin: const EdgeInsets.only(bottom: AppSpacing.xl),
           padding: const EdgeInsets.all(AppSpacing.md),
           decoration: BoxDecoration(
-            color: AppColors.primary.withValues(alpha: 0.08),
+            color: Theme.of(
+              context,
+            ).colorScheme.primary.withValues(alpha: 0.08),
             borderRadius: BorderRadius.circular(AppRadius.lg),
           ),
           child: Column(
@@ -566,9 +575,9 @@ class _PendingInviteBannerState extends State<_PendingInviteBanner> {
             children: [
               Row(
                 children: [
-                  const Icon(
+                  Icon(
                     Symbols.admin_panel_settings_rounded,
-                    color: AppColors.primary,
+                    color: Theme.of(context).colorScheme.primary,
                   ),
                   const SizedBox(width: AppSpacing.sm),
                   Expanded(

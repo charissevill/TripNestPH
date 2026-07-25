@@ -16,6 +16,7 @@ import '../../core/utils/app_exception.dart';
 import '../../core/utils/validators.dart';
 import '../../core/widgets/buttons/animated_button.dart';
 import '../../core/widgets/dialogs/credential_dialog.dart';
+import '../../core/widgets/media/avatar_preview.dart';
 import '../../data/mock/mock_categories.dart';
 
 const List<String> _travelPreferenceOptions = [
@@ -40,6 +41,7 @@ class EditProfileScreen extends StatefulWidget {
 }
 
 class _EditProfileScreenState extends State<EditProfileScreen> {
+  final _formKey = GlobalKey<FormState>();
   final StorageService _storageService = StorageService();
   final ImagePicker _picker = ImagePicker();
   late final TextEditingController _nameController;
@@ -65,7 +67,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   }
 
   Future<void> _pickPhoto() async {
-    final picked = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 85, maxWidth: 800);
+    final picked = await _picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 85,
+      maxWidth: 800,
+    );
     if (picked == null || !mounted) return;
     final auth = context.read<AuthProvider>();
     final uid = auth.firebaseUser?.uid;
@@ -87,6 +93,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   }
 
   Future<void> _save() async {
+    if (!_formKey.currentState!.validate()) return;
     setState(() {
       _saving = true;
       _error = null;
@@ -113,107 +120,166 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(icon: const Icon(Symbols.arrow_back_rounded), onPressed: () => context.pop()),
+        leading: IconButton(
+          icon: const Icon(Symbols.arrow_back_rounded),
+          onPressed: () => context.pop(),
+        ),
         title: const Text('Edit Profile'),
       ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.md, AppSpacing.lg, AppSpacing.huge),
-        children: [
-          Center(
-            child: Stack(
-              children: [
-                Container(
-                  width: 96,
-                  height: 96,
-                  decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: AppColors.primary, width: 2)),
-                  padding: const EdgeInsets.all(3),
-                  child: ClipOval(
-                    child: user?.photoUrl.isNotEmpty == true
-                        ? CachedNetworkImage(imageUrl: user!.photoUrl, fit: BoxFit.cover)
-                        : Container(
-                            color: AppColors.primary.withValues(alpha: 0.12),
-                            child: const Icon(Symbols.person_rounded, size: 48, color: AppColors.primary),
-                          ),
-                  ),
-                ),
-                Positioned(
-                  right: 0,
-                  bottom: 0,
-                  child: InkWell(
-                    onTap: _uploadingPhoto ? null : _pickPhoto,
-                    borderRadius: BorderRadius.circular(AppRadius.pill),
+      body: Form(
+        key: _formKey,
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.lg,
+            AppSpacing.md,
+            AppSpacing.lg,
+            AppSpacing.huge,
+          ),
+          children: [
+            Center(
+              child: Stack(
+                children: [
+                  AvatarPreview(
+                    photoUrl: user?.photoUrl,
                     child: Container(
-                      width: 32,
-                      height: 32,
-                      decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
-                      alignment: Alignment.center,
-                      child: _uploadingPhoto
-                          ? const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                            )
-                          : const Icon(Symbols.photo_camera_rounded, color: Colors.white, size: 16),
+                      width: 96,
+                      height: 96,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: theme.colorScheme.primary,
+                          width: 2,
+                        ),
+                      ),
+                      padding: const EdgeInsets.all(3),
+                      child: ClipOval(
+                        child: user?.photoUrl.isNotEmpty == true
+                            ? CachedNetworkImage(
+                                imageUrl: user!.photoUrl,
+                                fit: BoxFit.cover,
+                              )
+                            : Container(
+                                color: theme.colorScheme.primary.withValues(
+                                  alpha: 0.12,
+                                ),
+                                child: Icon(
+                                  Symbols.person_rounded,
+                                  size: 48,
+                                  color: theme.colorScheme.primary,
+                                ),
+                              ),
+                      ),
                     ),
                   ),
-                ),
-              ],
+                  Positioned(
+                    right: 0,
+                    bottom: 0,
+                    child: InkWell(
+                      onTap: _uploadingPhoto ? null : _pickPhoto,
+                      borderRadius: BorderRadius.circular(AppRadius.pill),
+                      child: Container(
+                        width: 32,
+                        height: 32,
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.primary,
+                          shape: BoxShape.circle,
+                        ),
+                        alignment: Alignment.center,
+                        child: _uploadingPhoto
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Icon(
+                                Symbols.photo_camera_rounded,
+                                color: Colors.white,
+                                size: 16,
+                              ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-          const SizedBox(height: AppSpacing.xxl),
-          TextFormField(
-            controller: _nameController,
-            validator: Validators.name,
-            decoration: const InputDecoration(labelText: 'Full Name', floatingLabelBehavior: FloatingLabelBehavior.auto),
-          ),
-          const SizedBox(height: AppSpacing.xl),
-          Text('Travel Preferences', style: theme.textTheme.titleLarge),
-          const SizedBox(height: AppSpacing.sm),
-          Wrap(
-            spacing: AppSpacing.sm,
-            runSpacing: AppSpacing.sm,
-            children: _travelPreferenceOptions
-                .map(
-                  (p) => _SelectableChip(
-                    label: p,
-                    selected: _preferences.contains(p),
-                    onTap: () => setState(() => _preferences.contains(p) ? _preferences.remove(p) : _preferences.add(p)),
-                  ),
-                )
-                .toList(),
-          ),
-          const SizedBox(height: AppSpacing.xl),
-          Text('Favorite Categories', style: theme.textTheme.titleLarge),
-          const SizedBox(height: AppSpacing.sm),
-          Wrap(
-            spacing: AppSpacing.sm,
-            runSpacing: AppSpacing.sm,
-            children: mockCategories
-                .map(
-                  (c) => _SelectableChip(
-                    label: c.label,
-                    selected: _categories.contains(c.id),
-                    onTap: () => setState(() => _categories.contains(c.id) ? _categories.remove(c.id) : _categories.add(c.id)),
-                  ),
-                )
-                .toList(),
-          ),
-          const SizedBox(height: AppSpacing.xl),
-          Text('Security', style: theme.textTheme.titleLarge),
-          const SizedBox(height: AppSpacing.sm),
-          _SecurityRow(icon: Symbols.mail_rounded, label: 'Update Email', onTap: _showChangeEmailDialog),
-          if (_error != null) ...[
-            const SizedBox(height: AppSpacing.md),
-            Text(_error!, style: const TextStyle(color: AppColors.error)),
+            const SizedBox(height: AppSpacing.xxl),
+            TextFormField(
+              controller: _nameController,
+              validator: Validators.name,
+              decoration: const InputDecoration(
+                labelText: 'Full Name',
+                floatingLabelBehavior: FloatingLabelBehavior.auto,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.xl),
+            Text('Travel Preferences', style: theme.textTheme.titleLarge),
+            const SizedBox(height: AppSpacing.sm),
+            Wrap(
+              spacing: AppSpacing.sm,
+              runSpacing: AppSpacing.sm,
+              children: _travelPreferenceOptions
+                  .map(
+                    (p) => _SelectableChip(
+                      label: p,
+                      selected: _preferences.contains(p),
+                      onTap: () => setState(
+                        () => _preferences.contains(p)
+                            ? _preferences.remove(p)
+                            : _preferences.add(p),
+                      ),
+                    ),
+                  )
+                  .toList(),
+            ),
+            const SizedBox(height: AppSpacing.xl),
+            Text('Favorite Categories', style: theme.textTheme.titleLarge),
+            const SizedBox(height: AppSpacing.sm),
+            Wrap(
+              spacing: AppSpacing.sm,
+              runSpacing: AppSpacing.sm,
+              children: mockCategories
+                  .map(
+                    (c) => _SelectableChip(
+                      label: c.label,
+                      selected: _categories.contains(c.id),
+                      onTap: () => setState(
+                        () => _categories.contains(c.id)
+                            ? _categories.remove(c.id)
+                            : _categories.add(c.id),
+                      ),
+                    ),
+                  )
+                  .toList(),
+            ),
+            const SizedBox(height: AppSpacing.xl),
+            Text('Security', style: theme.textTheme.titleLarge),
+            const SizedBox(height: AppSpacing.sm),
+            _SecurityRow(
+              icon: Symbols.mail_rounded,
+              label: 'Update Email',
+              onTap: _showChangeEmailDialog,
+            ),
+            if (_error != null) ...[
+              const SizedBox(height: AppSpacing.md),
+              Text(_error!, style: const TextStyle(color: AppColors.error)),
+            ],
+            const SizedBox(height: AppSpacing.xxl),
+            AnimatedButton(
+              label: 'Save Changes',
+              isLoading: _saving,
+              onPressed: _saving ? null : _save,
+            ),
           ],
-          const SizedBox(height: AppSpacing.xxl),
-          AnimatedButton(label: 'Save Changes', isLoading: _saving, onPressed: _saving ? null : _save),
-        ],
+        ),
       ),
     );
   }
 
   Future<void> _showChangeEmailDialog() async {
+    final currentEmail = context.read<AuthProvider>().currentUser?.email;
     final newEmailController = TextEditingController();
     final passwordController = TextEditingController();
     final result = await showDialog<bool>(
@@ -221,29 +287,51 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       builder: (dialogContext) => CredentialDialog(
         title: 'Update Email',
         fields: [
-          CredentialField(label: 'New Email', controller: newEmailController, obscure: false, validator: Validators.email),
+          CredentialField(
+            label: 'New Email',
+            controller: newEmailController,
+            obscure: false,
+            validator: (v) {
+              final emailError = Validators.email(v);
+              if (emailError != null) return emailError;
+              if (v!.trim().toLowerCase() == currentEmail?.toLowerCase()) {
+                return 'This is already your current email';
+              }
+              return null;
+            },
+          ),
           CredentialField(
             label: 'Current Password',
             controller: passwordController,
             obscure: true,
-            validator: (v) => (v == null || v.isEmpty) ? 'Current password is required' : null,
+            validator: (v) => (v == null || v.isEmpty)
+                ? 'Current password is required'
+                : null,
           ),
         ],
         onConfirm: () => context.read<AuthProvider>().changeEmail(
-              newEmail: newEmailController.text.trim(),
-              currentPassword: passwordController.text,
-            ),
+          newEmail: newEmailController.text.trim(),
+          currentPassword: passwordController.text,
+        ),
       ),
     );
     if (!mounted) return;
     if (result == true) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Check your new email to confirm the change.')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Check your new email to confirm the change.'),
+        ),
+      );
     }
   }
 }
 
 class _SecurityRow extends StatelessWidget {
-  const _SecurityRow({required this.icon, required this.label, required this.onTap});
+  const _SecurityRow({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
 
   final IconData icon;
   final String label;
@@ -260,8 +348,13 @@ class _SecurityRow extends StatelessWidget {
           children: [
             Icon(icon, color: AppColors.textSecondary, size: 22),
             const SizedBox(width: AppSpacing.md),
-            Expanded(child: Text(label, style: Theme.of(context).textTheme.bodyLarge)),
-            const Icon(Symbols.chevron_right_rounded, color: AppColors.textTertiary),
+            Expanded(
+              child: Text(label, style: Theme.of(context).textTheme.bodyLarge),
+            ),
+            const Icon(
+              Symbols.chevron_right_rounded,
+              color: AppColors.textTertiary,
+            ),
           ],
         ),
       ),
@@ -270,7 +363,11 @@ class _SecurityRow extends StatelessWidget {
 }
 
 class _SelectableChip extends StatelessWidget {
-  const _SelectableChip({required this.label, required this.selected, required this.onTap});
+  const _SelectableChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
 
   final String label;
   final bool selected;
@@ -283,15 +380,26 @@ class _SelectableChip extends StatelessWidget {
       borderRadius: BorderRadius.circular(AppRadius.pill),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: AppSpacing.sm,
+        ),
         decoration: BoxDecoration(
-          color: selected ? AppColors.primary : Theme.of(context).colorScheme.surface,
+          color: selected
+              ? Theme.of(context).colorScheme.primary
+              : Theme.of(context).colorScheme.surface,
           borderRadius: BorderRadius.circular(AppRadius.pill),
-          border: Border.all(color: selected ? AppColors.primary : AppColors.border),
+          border: Border.all(
+            color: selected
+                ? Theme.of(context).colorScheme.primary
+                : AppColors.border,
+          ),
         ),
         child: Text(
           label,
-          style: Theme.of(context).textTheme.labelMedium?.copyWith(color: selected ? Colors.white : AppColors.textPrimary),
+          style: Theme.of(context).textTheme.labelMedium?.copyWith(
+            color: selected ? Colors.white : AppColors.textPrimary,
+          ),
         ),
       ),
     );

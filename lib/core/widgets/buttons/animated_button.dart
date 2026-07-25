@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../theme/app_colors.dart';
 import '../../theme/app_spacing.dart';
 
 /// Premium CTA button with a subtle press-down scale animation and an
@@ -46,9 +45,11 @@ class _AnimatedButtonState extends State<AnimatedButton> with SingleTickerProvid
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final disabled = widget.onPressed == null || widget.isLoading;
-    final gradient = widget.filled
-        ? LinearGradient(colors: widget.gradientColors ?? const [AppColors.primary, AppColors.primaryDark])
-        : null;
+    final defaultGradientColors = [
+      theme.colorScheme.primary,
+      Color.lerp(theme.colorScheme.primary, Colors.black, 0.25)!,
+    ];
+    final gradient = widget.filled ? LinearGradient(colors: widget.gradientColors ?? defaultGradientColors) : null;
 
     Widget content = AnimatedContainer(
       duration: const Duration(milliseconds: 120),
@@ -59,15 +60,15 @@ class _AnimatedButtonState extends State<AnimatedButton> with SingleTickerProvid
       decoration: BoxDecoration(
         gradient: disabled ? null : gradient,
         color: disabled
-            ? AppColors.border
+            ? theme.colorScheme.outline
             : (widget.filled ? null : Colors.transparent),
-        border: widget.filled ? null : Border.all(color: AppColors.border, width: 1.4),
+        border: widget.filled ? null : Border.all(color: theme.colorScheme.outline, width: 1.4),
         borderRadius: BorderRadius.circular(AppRadius.lg),
         boxShadow: (!widget.filled || disabled)
             ? null
             : [
                 BoxShadow(
-                  color: (widget.gradientColors?.first ?? AppColors.primary).withValues(alpha: 0.28),
+                  color: (widget.gradientColors?.first ?? theme.colorScheme.primary).withValues(alpha: 0.28),
                   blurRadius: 16,
                   offset: const Offset(0, 8),
                 ),
@@ -89,7 +90,7 @@ class _AnimatedButtonState extends State<AnimatedButton> with SingleTickerProvid
                   widget.leading!,
                   const SizedBox(width: AppSpacing.xs),
                 ] else if (widget.icon != null) ...[
-                  Icon(widget.icon, size: 20, color: widget.filled ? Colors.white : AppColors.primary),
+                  Icon(widget.icon, size: 20, color: widget.filled ? Colors.white : theme.colorScheme.primary),
                   const SizedBox(width: AppSpacing.xs),
                 ],
                 Flexible(
@@ -98,7 +99,9 @@ class _AnimatedButtonState extends State<AnimatedButton> with SingleTickerProvid
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: theme.textTheme.labelLarge?.copyWith(
-                      color: disabled ? AppColors.textTertiary : (widget.filled ? Colors.white : AppColors.primary),
+                      color: disabled
+                          ? theme.colorScheme.onSurfaceVariant
+                          : (widget.filled ? Colors.white : theme.colorScheme.primary),
                     ),
                   ),
                 ),

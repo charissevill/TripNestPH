@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:tripnest_ph/core/theme/accent_colors.dart';
 import 'package:tripnest_ph/core/theme/app_theme.dart';
 import 'package:tripnest_ph/core/widgets/cards/travel_tip_card.dart';
 import 'package:tripnest_ph/domain/models/travel_tip.dart';
@@ -18,7 +19,7 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
-        theme: AppTheme.light,
+        theme: AppTheme.light(themePresets.first),
         home: Scaffold(
           body: SizedBox(
             height: 196,
@@ -47,7 +48,7 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
-        theme: AppTheme.light,
+        theme: AppTheme.light(themePresets.first),
         home: const Scaffold(
           body: SizedBox(height: 196, child: TravelTipCard(tip: tip)),
         ),

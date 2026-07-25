@@ -1,16 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/constants/app_strings.dart';
+import '../../core/providers/accent_color_provider.dart';
 import '../../core/providers/auth_provider.dart';
 import '../../core/providers/theme_mode_provider.dart';
+import '../../core/providers/typography_provider.dart';
 import '../../core/routes/route_paths.dart';
 import '../../core/services/local_preferences_service.dart';
 import '../../core/services/location_service.dart';
+import '../../core/theme/accent_colors.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
+import '../../core/theme/typography_options.dart';
 import '../../core/utils/validators.dart';
 import '../../core/widgets/dialogs/confirmation_dialog.dart';
 import '../../core/widgets/dialogs/credential_dialog.dart';
@@ -58,6 +63,165 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _locationEnabled = locationEnabled;
       _disabledCategories = disabledCategories;
     });
+  }
+
+  Future<void> _pickThemePreset(BuildContext context, AccentColorProvider provider) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Material(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadius.xxl)),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.lg, AppSpacing.lg, AppSpacing.xl),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 44,
+                  height: 5,
+                  margin: const EdgeInsets.only(bottom: AppSpacing.lg),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.outline,
+                    borderRadius: BorderRadius.circular(AppRadius.pill),
+                  ),
+                ),
+              ),
+              Text('Theme', style: Theme.of(context).textTheme.headlineSmall),
+              const SizedBox(height: AppSpacing.lg),
+              Wrap(
+                spacing: AppSpacing.md,
+                runSpacing: AppSpacing.md,
+                children: themePresets.map((option) {
+                  final selected = option.name == provider.preset.name;
+                  return InkWell(
+                    onTap: () {
+                      provider.setPreset(option);
+                      Navigator.of(context).pop();
+                    },
+                    borderRadius: BorderRadius.circular(AppRadius.pill),
+                    child: Padding(
+                      padding: const EdgeInsets.all(4),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 48,
+                            height: 48,
+                            decoration: BoxDecoration(
+                              color: option.primary,
+                              shape: BoxShape.circle,
+                              border: selected ? Border.all(color: Theme.of(context).colorScheme.outline, width: 2) : null,
+                            ),
+                            alignment: Alignment.center,
+                            child: selected ? const Icon(Symbols.check_rounded, color: Colors.white) : null,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(option.name, style: Theme.of(context).textTheme.labelSmall),
+                        ],
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickFontFamily(BuildContext context, TypographyProvider provider) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Material(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadius.xxl)),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.lg, AppSpacing.lg, AppSpacing.xl),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 44,
+                  height: 5,
+                  margin: const EdgeInsets.only(bottom: AppSpacing.lg),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.outline,
+                    borderRadius: BorderRadius.circular(AppRadius.pill),
+                  ),
+                ),
+              ),
+              Text('Font Style', style: Theme.of(context).textTheme.headlineSmall),
+              const SizedBox(height: AppSpacing.md),
+              ...fontFamilyOptions.map((option) {
+                final selected = option.familyName == provider.fontFamily;
+                return ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  onTap: () {
+                    provider.setFontFamily(option.familyName);
+                    Navigator.of(context).pop();
+                  },
+                  title: Text(option.name, style: GoogleFonts.getFont(option.familyName, fontSize: 16)),
+                  trailing: selected ? Icon(Symbols.check_rounded, color: Theme.of(context).colorScheme.primary) : null,
+                );
+              }),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickFontSize(BuildContext context, TypographyProvider provider) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Material(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadius.xxl)),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.lg, AppSpacing.lg, AppSpacing.xl),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 44,
+                  height: 5,
+                  margin: const EdgeInsets.only(bottom: AppSpacing.lg),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.outline,
+                    borderRadius: BorderRadius.circular(AppRadius.pill),
+                  ),
+                ),
+              ),
+              Text('Text Size', style: Theme.of(context).textTheme.headlineSmall),
+              const SizedBox(height: AppSpacing.md),
+              ...fontSizeOptions.map((option) {
+                final selected = option.scale == provider.fontScale;
+                return ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  onTap: () {
+                    provider.setFontScale(option.scale);
+                    Navigator.of(context).pop();
+                  },
+                  title: Text('The quick brown fox', style: TextStyle(fontSize: 16 * option.scale)),
+                  subtitle: Text(option.name),
+                  trailing: selected ? Icon(Symbols.check_rounded, color: Theme.of(context).colorScheme.primary) : null,
+                );
+              }),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   void _setCategoryEnabled(NotificationCategory category, bool enabled) {
@@ -178,6 +342,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final themeProvider = context.watch<ThemeModeProvider>();
+    final accentColorProvider = context.watch<AccentColorProvider>();
+    final typographyProvider = context.watch<TypographyProvider>();
+    final currentFontFamily = fontFamilyOptions.firstWhere((o) => o.familyName == typographyProvider.fontFamily);
+    final currentFontSize = fontSizeOptions.firstWhere((o) => o.scale == typographyProvider.fontScale);
 
     return Scaffold(
       appBar: AppBar(
@@ -196,6 +364,57 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 subtitle: 'Switch between light and dark theme',
                 value: themeProvider.isDark,
                 onChanged: themeProvider.setDark,
+              ),
+              const Divider(height: 1, color: AppColors.divider),
+              _NavigationRow(
+                icon: Symbols.palette_rounded,
+                label: 'Theme',
+                onTap: () => _pickThemePreset(context, accentColorProvider),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      accentColorProvider.preset.name,
+                      style: theme.textTheme.bodyMedium?.copyWith(color: AppColors.textTertiary),
+                    ),
+                    const SizedBox(width: AppSpacing.xs),
+                    Container(
+                      width: 20,
+                      height: 20,
+                      decoration: BoxDecoration(color: accentColorProvider.preset.primary, shape: BoxShape.circle),
+                    ),
+                    const SizedBox(width: AppSpacing.xs),
+                    const Icon(Symbols.chevron_right_rounded, color: AppColors.textTertiary),
+                  ],
+                ),
+              ),
+              const Divider(height: 1, color: AppColors.divider),
+              _NavigationRow(
+                icon: Symbols.font_download_rounded,
+                label: 'Font Style',
+                onTap: () => _pickFontFamily(context, typographyProvider),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(currentFontFamily.name, style: theme.textTheme.bodyMedium?.copyWith(color: AppColors.textTertiary)),
+                    const SizedBox(width: AppSpacing.xs),
+                    const Icon(Symbols.chevron_right_rounded, color: AppColors.textTertiary),
+                  ],
+                ),
+              ),
+              const Divider(height: 1, color: AppColors.divider),
+              _NavigationRow(
+                icon: Symbols.format_size_rounded,
+                label: 'Text Size',
+                onTap: () => _pickFontSize(context, typographyProvider),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(currentFontSize.name, style: theme.textTheme.bodyMedium?.copyWith(color: AppColors.textTertiary)),
+                    const SizedBox(width: AppSpacing.xs),
+                    const Icon(Symbols.chevron_right_rounded, color: AppColors.textTertiary),
+                  ],
+                ),
               ),
             ],
           ),

@@ -12,13 +12,16 @@ import 'package:provider/provider.dart';
 import 'ai/providers/ai_chat_provider.dart';
 import 'ai/providers/ai_planner_provider.dart';
 import 'core/constants/app_strings.dart';
+import 'core/providers/accent_color_provider.dart';
 import 'core/providers/auth_provider.dart';
 import 'core/providers/connectivity_provider.dart';
 import 'core/providers/favorites_provider.dart';
 import 'core/providers/theme_mode_provider.dart';
+import 'core/providers/typography_provider.dart';
 import 'core/routes/app_router.dart';
 import 'core/services/analytics_service.dart';
 import 'core/services/notification_service.dart';
+import 'core/theme/accent_colors.dart';
 import 'core/theme/app_theme.dart';
 import 'firebase_options.dart';
 
@@ -76,6 +79,8 @@ class _TripNestAppState extends State<TripNestApp> {
   late final AuthProvider _authProvider;
   late final FavoritesProvider _favoritesProvider;
   late final ThemeModeProvider _themeModeProvider;
+  late final AccentColorProvider _accentColorProvider;
+  late final TypographyProvider _typographyProvider;
   late final ConnectivityProvider _connectivityProvider;
   late final AiPlannerProvider _aiPlannerProvider;
   late final AiChatProvider _aiChatProvider;
@@ -89,6 +94,8 @@ class _TripNestAppState extends State<TripNestApp> {
     _authProvider = widget.authProvider ?? AuthProvider();
     _favoritesProvider = widget.favoritesProvider ?? FavoritesProvider();
     _themeModeProvider = ThemeModeProvider();
+    _accentColorProvider = AccentColorProvider();
+    _typographyProvider = TypographyProvider();
     _connectivityProvider = ConnectivityProvider();
     _aiPlannerProvider = AiPlannerProvider();
     _aiChatProvider = AiChatProvider();
@@ -120,6 +127,8 @@ class _TripNestAppState extends State<TripNestApp> {
       _authProvider.dispose();
       _favoritesProvider.dispose();
       _themeModeProvider.dispose();
+      _accentColorProvider.dispose();
+      _typographyProvider.dispose();
       _connectivityProvider.dispose();
       _aiPlannerProvider.dispose();
       _aiChatProvider.dispose();
@@ -132,7 +141,7 @@ class _TripNestAppState extends State<TripNestApp> {
     if (widget.initError != null) {
       return MaterialApp(
         debugShowCheckedModeBanner: false,
-        theme: AppTheme.light,
+        theme: AppTheme.light(themePresets.first),
         home: _FirebaseInitErrorScreen(error: widget.initError!),
       );
     }
@@ -142,18 +151,24 @@ class _TripNestAppState extends State<TripNestApp> {
         ChangeNotifierProvider.value(value: _authProvider),
         ChangeNotifierProvider.value(value: _favoritesProvider),
         ChangeNotifierProvider.value(value: _themeModeProvider),
+        ChangeNotifierProvider.value(value: _accentColorProvider),
+        ChangeNotifierProvider.value(value: _typographyProvider),
         ChangeNotifierProvider.value(value: _connectivityProvider),
         ChangeNotifierProvider.value(value: _aiPlannerProvider),
         ChangeNotifierProvider.value(value: _aiChatProvider),
       ],
-      child: Consumer<ThemeModeProvider>(
-        builder: (context, themeModeProvider, _) {
+      child: Consumer3<ThemeModeProvider, AccentColorProvider, TypographyProvider>(
+        builder: (context, themeModeProvider, accentColorProvider, typographyProvider, _) {
           return MaterialApp.router(
             title: AppStrings.appName,
             debugShowCheckedModeBanner: false,
-            theme: AppTheme.light,
-            darkTheme: AppTheme.dark,
+            theme: AppTheme.light(accentColorProvider.preset, fontFamily: typographyProvider.fontFamily),
+            darkTheme: AppTheme.dark(accentColorProvider.preset, fontFamily: typographyProvider.fontFamily),
             themeMode: themeModeProvider.mode,
+            builder: (context, child) => MediaQuery(
+              data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(typographyProvider.fontScale)),
+              child: child!,
+            ),
             routerConfig: _router,
           );
         },

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:tripnest_ph/core/theme/accent_colors.dart';
 import 'package:tripnest_ph/core/theme/app_theme.dart';
 import 'package:tripnest_ph/core/widgets/dialogs/search_filter_sheet.dart';
 import 'package:tripnest_ph/data/mock/mock_provinces.dart';
@@ -15,7 +16,7 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
-        theme: AppTheme.light,
+        theme: AppTheme.light(themePresets.first),
         home: Scaffold(
           body: Builder(
             builder: (context) => Center(

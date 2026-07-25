@@ -28,6 +28,7 @@ import 'app_colors.dart';
 class ThemePreset {
   const ThemePreset({
     required this.name,
+    required this.description,
     required this.primary,
     this.ctaAccent,
     this.background,
@@ -46,6 +47,11 @@ class ThemePreset {
   });
 
   final String name;
+
+  /// A short, one-line description of the palette's mood — shown under the
+  /// name in the Settings theme picker.
+  final String description;
+
   final Color primary;
   final Color? ctaAccent;
   final Color? background;
@@ -61,6 +67,20 @@ class ThemePreset {
   final Color? darkSurface;
   final Color? darkTextPrimary;
   final Color? darkTextSecondary;
+
+  /// The 4-shade scale (darkest to lightest) for previewing this palette in
+  /// the theme picker. Uses the real hand-designed shades when the preset
+  /// sets them; otherwise falls back to a plain lightened/darkened ramp
+  /// around [primary] — a solid, swatch-friendly approximation distinct
+  /// from `AppTheme`'s own fallback formulas (which lean on alpha
+  /// transparency, fine for compositing over real UI but not for a flat
+  /// preview square).
+  List<Color> get previewShades => [
+    shadeDark ?? Color.lerp(primary, Colors.black, 0.25)!,
+    primary,
+    shadeMid ?? Color.lerp(primary, Colors.white, 0.35)!,
+    shadeLight ?? Color.lerp(primary, Colors.white, 0.75)!,
+  ];
 }
 
 /// First entry is exactly [AppColors.primary] with no overrides, so a
@@ -69,6 +89,7 @@ class ThemePreset {
 const List<ThemePreset> themePresets = [
   ThemePreset(
     name: 'Ocean Blue',
+    description: 'Calm coastal blues, inspired by Palawan\'s waters',
     primary: AppColors.primary,
     // Reuses the app's existing, already-designed blue variants rather
     // than inventing new ones.
@@ -78,21 +99,23 @@ const List<ThemePreset> themePresets = [
   ),
   ThemePreset(
     name: 'Violet',
+    description: 'Bold and modern with a striking violet accent',
     primary: Color(0xFF7C3AED),
     shadeDark: Color(0xFF5B21B6),
     shadeMid: Color(0xFFA78BFA),
     shadeLight: Color(0xFFEDE4FE),
   ),
-  ThemePreset(name: 'Teal', primary: Color(0xFF0D9488)),
+  ThemePreset(name: 'Teal', description: 'Cool and refreshing, like tropical lagoons', primary: Color(0xFF0D9488)),
   ThemePreset(
     name: 'Rose',
+    description: 'Vibrant and warm with a lively rose pink',
     primary: Color(0xFFE11D8F),
     shadeDark: Color(0xFFA3155F),
     shadeMid: Color(0xFFF272C0),
     shadeLight: Color(0xFFFCE3F1),
   ),
-  ThemePreset(name: 'Coral', primary: Color(0xFFEF6351)),
-  ThemePreset(name: 'Indigo', primary: Color(0xFF4F46E5)),
+  ThemePreset(name: 'Coral', description: 'Sunny and energetic with a warm coral glow', primary: Color(0xFFEF6351)),
+  ThemePreset(name: 'Indigo', description: 'Deep and elegant with a rich indigo tone', primary: Color(0xFF4F46E5)),
 
   /// A 4-shade monochromatic green (Pine/Forest/Moss/Sage) paired with a
   /// warm terracotta CTA accent, cream surfaces and charcoal text.
@@ -106,6 +129,7 @@ const List<ThemePreset> themePresets = [
   /// already verified at 11.29:1.
   ThemePreset(
     name: 'Forest',
+    description: 'Earthy greens and warm terracotta, inspired by the Philippine countryside',
     primary: Color(0xFF24563F),
     ctaAccent: Color(0xFFB85C2C),
     background: Color(0xFFFAF6ED),

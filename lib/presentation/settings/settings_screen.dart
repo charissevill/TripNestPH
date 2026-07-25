@@ -69,64 +69,110 @@ class _SettingsScreenState extends State<SettingsScreen> {
     await showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.transparent,
+      // Without this, a modal sheet is pre-capped at 9/16 of the screen
+      // height regardless of content — too tight for 7 rows of swatches +
+      // two-line descriptions, which is what caused the bottom overflow.
+      isScrollControlled: true,
       builder: (context) => Material(
         color: Theme.of(context).colorScheme.surface,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadius.xxl)),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.lg, AppSpacing.lg, AppSpacing.xl),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 44,
-                  height: 5,
-                  margin: const EdgeInsets.only(bottom: AppSpacing.lg),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.outline,
-                    borderRadius: BorderRadius.circular(AppRadius.pill),
-                  ),
-                ),
-              ),
-              Text('Theme', style: Theme.of(context).textTheme.headlineSmall),
-              const SizedBox(height: AppSpacing.lg),
-              Wrap(
-                spacing: AppSpacing.md,
-                runSpacing: AppSpacing.md,
-                children: themePresets.map((option) {
-                  final selected = option.name == provider.preset.name;
-                  return InkWell(
-                    onTap: () {
-                      provider.setPreset(option);
-                      Navigator.of(context).pop();
-                    },
-                    borderRadius: BorderRadius.circular(AppRadius.pill),
-                    child: Padding(
-                      padding: const EdgeInsets.all(4),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            width: 48,
-                            height: 48,
-                            decoration: BoxDecoration(
-                              color: option.primary,
-                              shape: BoxShape.circle,
-                              border: selected ? Border.all(color: Theme.of(context).colorScheme.outline, width: 2) : null,
-                            ),
-                            alignment: Alignment.center,
-                            child: selected ? const Icon(Symbols.check_rounded, color: Colors.white) : null,
-                          ),
-                          const SizedBox(height: 4),
-                          Text(option.name, style: Theme.of(context).textTheme.labelSmall),
-                        ],
+        child: SafeArea(
+          child: ConstrainedBox(
+            // Bounds the whole sheet (header + list together) to a real
+            // max height, so the Column below sizes to content when it
+            // fits and the list scrolls internally when it doesn't —
+            // rather than bounding just the list to a number computed
+            // without accounting for the header or the sheet's own cap.
+            constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.85),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.lg, AppSpacing.lg, AppSpacing.xl),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 44,
+                      height: 5,
+                      margin: const EdgeInsets.only(bottom: AppSpacing.lg),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.outline,
+                        borderRadius: BorderRadius.circular(AppRadius.pill),
                       ),
                     ),
-                  );
-                }).toList(),
+                  ),
+                  Text('Theme', style: Theme.of(context).textTheme.headlineSmall),
+                  const SizedBox(height: AppSpacing.sm),
+                  Flexible(
+                    child: ListView.separated(
+                      shrinkWrap: true,
+                      itemCount: themePresets.length,
+                      separatorBuilder: (_, _) => const Divider(height: 1, color: AppColors.divider),
+                      itemBuilder: (context, i) {
+                        final option = themePresets[i];
+                        final selected = option.name == provider.preset.name;
+                        final theme = Theme.of(context);
+                        return InkWell(
+                          onTap: () {
+                            provider.setPreset(option);
+                            Navigator.of(context).pop();
+                          },
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+                            child: Row(
+                              children: [
+                                // The 4-shade scale (darkest -> lightest),
+                                // shown as a strip so the traveler can
+                                // actually see the palette, not just its
+                                // main accent.
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: option.previewShades
+                                      .map(
+                                        (shade) => Container(
+                                          width: 18,
+                                          height: 36,
+                                          margin: const EdgeInsets.only(right: 2),
+                                          decoration: BoxDecoration(
+                                            color: shade,
+                                            borderRadius: BorderRadius.circular(4),
+                                          ),
+                                        ),
+                                      )
+                                      .toList(),
+                                ),
+                                const SizedBox(width: AppSpacing.md),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        option.name,
+                                        style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w700),
+                                      ),
+                                      Text(
+                                        option.description,
+                                        style: theme.textTheme.bodySmall,
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                if (selected)
+                                  Icon(Symbols.check_circle_rounded, color: theme.colorScheme.primary)
+                                else
+                                  const Icon(Symbols.chevron_right_rounded, color: AppColors.textTertiary),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
       ),
@@ -534,7 +580,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
                 child: Text(
                   '${AppStrings.appName} · v1.0.0 · What\'s New',
-                  style: theme.textTheme.bodySmall?.copyWith(color: AppColors.primary, fontWeight: FontWeight.w600),
+                  style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.primary, fontWeight: FontWeight.w600),
                 ),
               ),
             ),
@@ -604,7 +650,7 @@ class _SwitchRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.xs),
       child: Row(
         children: [
-          Icon(icon, color: AppColors.primary, size: 22),
+          Icon(icon, color: theme.colorScheme.primary, size: 22),
           const SizedBox(width: AppSpacing.md),
           Expanded(
             child: Column(
@@ -615,7 +661,7 @@ class _SwitchRow extends StatelessWidget {
               ],
             ),
           ),
-          Switch(value: value, onChanged: onChanged, activeThumbColor: AppColors.primary),
+          Switch(value: value, onChanged: onChanged, activeThumbColor: theme.colorScheme.primary),
         ],
       ),
     );
@@ -639,7 +685,7 @@ class _CategorySwitchRow extends StatelessWidget {
       child: Row(
         children: [
           Expanded(child: Text(label, style: Theme.of(context).textTheme.bodyMedium)),
-          Switch(value: value, onChanged: onChanged, activeThumbColor: AppColors.primary),
+          Switch(value: value, onChanged: onChanged, activeThumbColor: Theme.of(context).colorScheme.primary),
         ],
       ),
     );
@@ -658,7 +704,7 @@ class _NavigationRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final color = isDestructive ? AppColors.error : AppColors.primary;
+    final color = isDestructive ? AppColors.error : theme.colorScheme.primary;
     return InkWell(
       onTap: onTap,
       child: Padding(

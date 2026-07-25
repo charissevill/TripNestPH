@@ -10,6 +10,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/utils/calendar_grid.dart';
 import '../../core/widgets/states/empty_state_widget.dart';
+import '../../core/widgets/states/loading_widget.dart';
 import '../../data/repositories/itinerary_repository.dart';
 import '../../domain/models/saved_itinerary.dart';
 
@@ -24,10 +25,18 @@ class TripCalendarScreen extends StatefulWidget {
 }
 
 class _TripCalendarScreenState extends State<TripCalendarScreen> {
-  late DateTime _visibleMonth = DateTime(DateTime.now().year, DateTime.now().month);
+  late DateTime _visibleMonth = DateTime(
+    DateTime.now().year,
+    DateTime.now().month,
+  );
 
   void _changeMonth(int delta) {
-    setState(() => _visibleMonth = DateTime(_visibleMonth.year, _visibleMonth.month + delta));
+    setState(
+      () => _visibleMonth = DateTime(
+        _visibleMonth.year,
+        _visibleMonth.month + delta,
+      ),
+    );
   }
 
   void _openDay(BuildContext context, List<SavedItinerary> trips) {
@@ -41,15 +50,20 @@ class _TripCalendarScreenState extends State<TripCalendarScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: trips
-              .map((trip) => ListTile(
-                    leading: const Icon(Symbols.map_rounded, color: AppColors.primary),
-                    title: Text(trip.title),
-                    subtitle: Text(trip.itinerary.destinationName),
-                    onTap: () {
-                      Navigator.of(context).pop();
-                      _openTrip(context, trip);
-                    },
-                  ))
+              .map(
+                (trip) => ListTile(
+                  leading: const Icon(
+                    Symbols.map_rounded,
+                    color: AppColors.primary,
+                  ),
+                  title: Text(trip.title),
+                  subtitle: Text(trip.itinerary.destinationName),
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    _openTrip(context, trip);
+                  },
+                ),
+              )
               .toList(),
         ),
       ),
@@ -57,7 +71,10 @@ class _TripCalendarScreenState extends State<TripCalendarScreen> {
   }
 
   void _openTrip(BuildContext context, SavedItinerary trip) {
-    context.push(RoutePaths.generatedItinerary, extra: {'itinerary': trip.itinerary, 'savedId': trip.id});
+    context.push(
+      RoutePaths.generatedItinerary,
+      extra: {'itinerary': trip.itinerary, 'savedId': trip.id},
+    );
   }
 
   @override
@@ -69,19 +86,30 @@ class _TripCalendarScreenState extends State<TripCalendarScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(icon: const Icon(Symbols.arrow_back_rounded), onPressed: () => context.pop()),
+        leading: IconButton(
+          icon: const Icon(Symbols.arrow_back_rounded),
+          onPressed: () => context.pop(),
+        ),
         title: const Text('Trip Calendar'),
       ),
       body: uid == null
-          ? const EmptyStateWidget(icon: Symbols.calendar_month_rounded, title: 'Sign in required', message: 'Sign in to view your trip calendar.')
+          ? const EmptyStateWidget(
+              icon: Symbols.calendar_month_rounded,
+              title: 'Sign in required',
+              message: 'Sign in to view your trip calendar.',
+            )
           : StreamBuilder<List<SavedItinerary>>(
               stream: repository.streamForUser(uid),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
+                  return LoadingWidget.block();
                 }
                 final trips = snapshot.data ?? const [];
-                final dateMap = CalendarGrid.buildDateMap(trips, (t) => t.startDate, (t) => t.endDate);
+                final dateMap = CalendarGrid.buildDateMap(
+                  trips,
+                  (t) => t.startDate,
+                  (t) => t.endDate,
+                );
                 final cells = CalendarGrid.cellsForMonth(_visibleMonth);
                 final hasAnyDates = trips.any((t) => t.startDate != null);
 
@@ -91,15 +119,36 @@ class _TripCalendarScreenState extends State<TripCalendarScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        IconButton(icon: const Icon(Symbols.chevron_left_rounded), onPressed: () => _changeMonth(-1)),
-                        Text(DateFormat('MMMM y').format(_visibleMonth), style: theme.textTheme.titleLarge),
-                        IconButton(icon: const Icon(Symbols.chevron_right_rounded), onPressed: () => _changeMonth(1)),
+                        IconButton(
+                          icon: const Icon(Symbols.chevron_left_rounded),
+                          onPressed: () => _changeMonth(-1),
+                        ),
+                        Text(
+                          DateFormat('MMMM y').format(_visibleMonth),
+                          style: theme.textTheme.titleLarge,
+                        ),
+                        IconButton(
+                          icon: const Icon(Symbols.chevron_right_rounded),
+                          onPressed: () => _changeMonth(1),
+                        ),
                       ],
                     ),
                     const SizedBox(height: AppSpacing.sm),
                     Row(
                       children: const ['S', 'M', 'T', 'W', 'T', 'F', 'S']
-                          .map((d) => Expanded(child: Center(child: Text(d, style: TextStyle(fontWeight: FontWeight.w600, color: AppColors.textTertiary)))))
+                          .map(
+                            (d) => Expanded(
+                              child: Center(
+                                child: Text(
+                                  d,
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.textTertiary,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          )
                           .toList(),
                     ),
                     const SizedBox(height: AppSpacing.sm),
@@ -115,13 +164,24 @@ class _TripCalendarScreenState extends State<TripCalendarScreen> {
                         return Padding(
                           padding: const EdgeInsets.all(2),
                           child: InkWell(
-                            onTap: hasTrip ? () => _openDay(context, tripsOnDay) : null,
+                            onTap: hasTrip
+                                ? () => _openDay(context, tripsOnDay)
+                                : null,
                             borderRadius: BorderRadius.circular(AppRadius.md),
                             child: Container(
                               decoration: BoxDecoration(
-                                color: hasTrip ? AppColors.primary.withValues(alpha: 0.15) : null,
-                                borderRadius: BorderRadius.circular(AppRadius.md),
-                                border: isToday ? Border.all(color: AppColors.primary, width: 1.5) : null,
+                                color: hasTrip
+                                    ? AppColors.primary.withValues(alpha: 0.15)
+                                    : null,
+                                borderRadius: BorderRadius.circular(
+                                  AppRadius.md,
+                                ),
+                                border: isToday
+                                    ? Border.all(
+                                        color: AppColors.primary,
+                                        width: 1.5,
+                                      )
+                                    : null,
                               ),
                               alignment: Alignment.center,
                               child: Column(
@@ -130,8 +190,12 @@ class _TripCalendarScreenState extends State<TripCalendarScreen> {
                                   Text(
                                     '${date.day}',
                                     style: theme.textTheme.bodyMedium?.copyWith(
-                                      color: hasTrip ? AppColors.primary : AppColors.textPrimary,
-                                      fontWeight: hasTrip ? FontWeight.w700 : FontWeight.w400,
+                                      color: hasTrip
+                                          ? AppColors.primary
+                                          : AppColors.textPrimary,
+                                      fontWeight: hasTrip
+                                          ? FontWeight.w700
+                                          : FontWeight.w400,
                                     ),
                                   ),
                                   if (hasTrip)
@@ -139,7 +203,10 @@ class _TripCalendarScreenState extends State<TripCalendarScreen> {
                                       margin: const EdgeInsets.only(top: 2),
                                       width: 5,
                                       height: 5,
-                                      decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
+                                      decoration: const BoxDecoration(
+                                        color: AppColors.primary,
+                                        shape: BoxShape.circle,
+                                      ),
                                     ),
                                 ],
                               ),
@@ -153,7 +220,11 @@ class _TripCalendarScreenState extends State<TripCalendarScreen> {
                       Center(
                         child: Column(
                           children: [
-                            const Icon(Symbols.calendar_month_rounded, size: 40, color: AppColors.textTertiary),
+                            const Icon(
+                              Symbols.calendar_month_rounded,
+                              size: 40,
+                              color: AppColors.textTertiary,
+                            ),
                             const SizedBox(height: AppSpacing.sm),
                             Text(
                               'No trips with dates yet',
@@ -163,7 +234,9 @@ class _TripCalendarScreenState extends State<TripCalendarScreen> {
                             const SizedBox(height: 4),
                             Text(
                               'Set travel dates from any saved trip to see it here.',
-                              style: theme.textTheme.bodySmall?.copyWith(color: AppColors.textTertiary),
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: AppColors.textTertiary,
+                              ),
                               textAlign: TextAlign.center,
                             ),
                           ],

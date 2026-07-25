@@ -12,35 +12,40 @@ import '../../core/utils/app_exception.dart';
 import '../../core/widgets/buttons/animated_button.dart';
 import '../../core/widgets/inputs/gallery_image_picker.dart';
 import '../../core/widgets/inputs/hero_image_picker.dart';
+import '../../core/widgets/states/loading_widget.dart';
 import '../../data/repositories/festival_repository.dart';
 import '../../data/repositories/province_repository.dart';
 import '../../domain/models/festival.dart';
 import '../../domain/models/province.dart';
 
-/// Create or edit a festival. Reachable from either the admin/lgu
-/// "Festivals" module (full curatorial control, [organizerUid] null) or an
-/// `eventOrganizer` account's "My Events" (writes stamped with their own
-/// uid so `firestore.rules` accepts them and scopes future edits to them).
+/// Create or edit a festival — the admin/lgu "Festivals" module's full
+/// curatorial control.
 class AdminFestivalFormScreen extends StatefulWidget {
-  const AdminFestivalFormScreen({super.key, this.existing, this.organizerUid});
+  const AdminFestivalFormScreen({super.key, this.existing});
 
   final Festival? existing;
-  final String? organizerUid;
 
   @override
-  State<AdminFestivalFormScreen> createState() => _AdminFestivalFormScreenState();
+  State<AdminFestivalFormScreen> createState() =>
+      _AdminFestivalFormScreenState();
 }
 
 class _AdminFestivalFormScreenState extends State<AdminFestivalFormScreen> {
   final FestivalRepository _repository = FestivalRepository();
 
-  late final _nameController = TextEditingController(text: widget.existing?.name ?? '');
+  late final _nameController = TextEditingController(
+    text: widget.existing?.name ?? '',
+  );
   late String _heroImageUrl = widget.existing?.heroImageUrl ?? '';
   // The full `galleryImageUrls` a details screen swipes through is
   // [hero, ...these] (deduped) — kept separate here so the "More Photos"
   // picker below never shows the cover photo a second time.
-  late List<String> _additionalGalleryUrls = [...?widget.existing?.galleryImageUrls]..remove(widget.existing?.heroImageUrl ?? '');
-  late final _descController = TextEditingController(text: widget.existing?.description ?? '');
+  late List<String> _additionalGalleryUrls = [
+    ...?widget.existing?.galleryImageUrls,
+  ]..remove(widget.existing?.heroImageUrl ?? '');
+  late final _descController = TextEditingController(
+    text: widget.existing?.description ?? '',
+  );
   final _newHighlightController = TextEditingController();
 
   /// Picked via [_pickDate] below. Null means "not picked/changed in this
@@ -103,7 +108,8 @@ class _AdminFestivalFormScreenState extends State<AdminFestivalFormScreen> {
     return '${DateFormat('MMMM d').format(start)} – ${DateFormat('MMMM d, yyyy').format(end)}';
   }
 
-  String _formatMonthBadge(DateTime start) => DateFormat('MMM').format(start).toUpperCase();
+  String _formatMonthBadge(DateTime start) =>
+      DateFormat('MMM').format(start).toUpperCase();
 
   /// What the date field shows: the newly-picked range/day, else (for a
   /// festival that hasn't had its date migrated to the picker yet) the
@@ -122,31 +128,46 @@ class _AdminFestivalFormScreenState extends State<AdminFestivalFormScreen> {
       context: context,
       firstDate: DateTime(now.year - 1),
       lastDate: DateTime(now.year + 5),
-      initialDateRange: DateTimeRange(start: initialStart, end: _endDate ?? initialStart),
+      initialDateRange: DateTimeRange(
+        start: initialStart,
+        end: _endDate ?? initialStart,
+      ),
     );
     if (picked == null) return;
     setState(() {
       _startDate = picked.start;
-      _endDate = DateUtils.isSameDay(picked.start, picked.end) ? null : picked.end;
+      _endDate = DateUtils.isSameDay(picked.start, picked.end)
+          ? null
+          : picked.end;
     });
   }
 
   Future<void> _save() async {
     final province = _selectedProvince;
     if (_nameController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Name is required.')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Name is required.')));
       return;
     }
     if (province == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Province is required.')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Province is required.')));
       return;
     }
     final startDate = _startDate ?? widget.existing?.startDate;
     final endDate = _startDate != null ? _endDate : widget.existing?.endDate;
-    final dateLabel = startDate != null ? _formatDateLabel(startDate, endDate) : (widget.existing?.dateLabel ?? '');
-    final month = startDate != null ? _formatMonthBadge(startDate) : (widget.existing?.month ?? '');
+    final dateLabel = startDate != null
+        ? _formatDateLabel(startDate, endDate)
+        : (widget.existing?.dateLabel ?? '');
+    final month = startDate != null
+        ? _formatMonthBadge(startDate)
+        : (widget.existing?.month ?? '');
     if (dateLabel.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Date is required.')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Date is required.')));
       return;
     }
 
@@ -160,7 +181,10 @@ class _AdminFestivalFormScreenState extends State<AdminFestivalFormScreen> {
       heroImageUrl: _heroImageUrl,
       galleryImageUrls: _heroImageUrl.isEmpty
           ? _additionalGalleryUrls
-          : [_heroImageUrl, ..._additionalGalleryUrls.where((u) => u != _heroImageUrl)],
+          : [
+              _heroImageUrl,
+              ..._additionalGalleryUrls.where((u) => u != _heroImageUrl),
+            ],
       dateLabel: dateLabel,
       month: month,
       startDate: startDate,
@@ -176,7 +200,6 @@ class _AdminFestivalFormScreenState extends State<AdminFestivalFormScreen> {
       facebookUrl: widget.existing?.facebookUrl ?? '',
       latitude: widget.existing?.latitude,
       longitude: widget.existing?.longitude,
-      organizerId: widget.organizerUid ?? widget.existing?.organizerId ?? '',
     );
 
     try {
@@ -186,11 +209,20 @@ class _AdminFestivalFormScreenState extends State<AdminFestivalFormScreen> {
         await _repository.create(festival);
       }
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_isEditing ? 'Festival updated.' : 'Festival created.')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              _isEditing ? 'Festival updated.' : 'Festival created.',
+            ),
+          ),
+        );
         context.pop();
       }
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(AppException.from(e).message)));
+      if (mounted)
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(AppException.from(e).message)));
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -201,7 +233,10 @@ class _AdminFestivalFormScreenState extends State<AdminFestivalFormScreen> {
     final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(icon: const Icon(Symbols.arrow_back_rounded), onPressed: () => context.pop()),
+        leading: IconButton(
+          icon: const Icon(Symbols.arrow_back_rounded),
+          onPressed: () => context.pop(),
+        ),
         title: Text(_isEditing ? 'Edit Festival' : 'New Festival'),
       ),
       body: SafeArea(
@@ -209,48 +244,75 @@ class _AdminFestivalFormScreenState extends State<AdminFestivalFormScreen> {
           future: _provincesFuture,
           builder: (context, snapshot) {
             if (snapshot.connectionState != ConnectionState.done) {
-              return const Center(child: CircularProgressIndicator());
+              return LoadingWidget.block(height: 400);
             }
             final provinces = snapshot.data ?? const [];
             return ListView(
-              padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.md, AppSpacing.lg, AppSpacing.huge),
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.lg,
+                AppSpacing.md,
+                AppSpacing.lg,
+                AppSpacing.huge,
+              ),
               children: [
-                TextField(controller: _nameController, decoration: const InputDecoration(labelText: 'Name')),
+                TextField(
+                  controller: _nameController,
+                  decoration: const InputDecoration(labelText: 'Name'),
+                ),
                 const SizedBox(height: AppSpacing.md),
                 DropdownButtonFormField<Province>(
                   initialValue: _selectedProvince,
                   decoration: const InputDecoration(labelText: 'Province'),
                   isExpanded: true,
-                  items: provinces.map((p) => DropdownMenuItem(value: p, child: Text(p.name))).toList(),
-                  onChanged: (value) => setState(() => _selectedProvince = value),
+                  items: provinces
+                      .map(
+                        (p) => DropdownMenuItem(value: p, child: Text(p.name)),
+                      )
+                      .toList(),
+                  onChanged: (value) =>
+                      setState(() => _selectedProvince = value),
                 ),
                 const SizedBox(height: AppSpacing.md),
                 HeroImagePicker(
                   imageUrl: _heroImageUrl,
                   label: 'Cover Photo',
                   folder: FirestorePaths.storageDestinationPhotos,
-                  ownerId: context.read<AuthProvider>().firebaseUser?.uid ?? 'admin',
+                  ownerId:
+                      context.read<AuthProvider>().firebaseUser?.uid ?? 'admin',
                   onChanged: (url) => setState(() => _heroImageUrl = url),
                 ),
                 const SizedBox(height: AppSpacing.md),
                 GalleryImagePicker(
                   imageUrls: _additionalGalleryUrls,
-                  label: 'More Photos (for the swipeable gallery on the details page)',
+                  label:
+                      'More Photos (for the swipeable gallery on the details page)',
                   folder: FirestorePaths.storageDestinationPhotos,
-                  ownerId: context.read<AuthProvider>().firebaseUser?.uid ?? 'admin',
-                  onChanged: (urls) => setState(() => _additionalGalleryUrls = urls),
+                  ownerId:
+                      context.read<AuthProvider>().firebaseUser?.uid ?? 'admin',
+                  onChanged: (urls) =>
+                      setState(() => _additionalGalleryUrls = urls),
                 ),
                 const SizedBox(height: AppSpacing.md),
                 InkWell(
                   borderRadius: BorderRadius.circular(12),
                   onTap: _pickDate,
                   child: InputDecorator(
-                    decoration: const InputDecoration(labelText: 'Date', prefixIcon: Icon(Symbols.calendar_month_rounded)),
+                    decoration: const InputDecoration(
+                      labelText: 'Date',
+                      prefixIcon: Icon(Symbols.calendar_month_rounded),
+                    ),
                     child: Text(_dateDisplayText),
                   ),
                 ),
                 const SizedBox(height: AppSpacing.md),
-                TextField(controller: _descController, maxLines: 4, decoration: const InputDecoration(labelText: 'Description', alignLabelWithHint: true)),
+                TextField(
+                  controller: _descController,
+                  maxLines: 4,
+                  decoration: const InputDecoration(
+                    labelText: 'Description',
+                    alignLabelWithHint: true,
+                  ),
+                ),
                 const SizedBox(height: AppSpacing.md),
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
@@ -262,17 +324,33 @@ class _AdminFestivalFormScreenState extends State<AdminFestivalFormScreen> {
                 Text('Highlights', style: theme.textTheme.titleMedium),
                 const SizedBox(height: AppSpacing.sm),
                 ..._highlights.asMap().entries.map(
-                      (entry) => ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        title: Text(entry.value),
-                        trailing: IconButton(icon: const Icon(Symbols.close_rounded, size: 18), onPressed: () => setState(() => _highlights = [..._highlights]..removeAt(entry.key))),
+                  (entry) => ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(entry.value),
+                    trailing: IconButton(
+                      icon: const Icon(Symbols.close_rounded, size: 18),
+                      onPressed: () => setState(
+                        () =>
+                            _highlights = [..._highlights]..removeAt(entry.key),
                       ),
                     ),
+                  ),
+                ),
                 Row(
                   children: [
-                    Expanded(child: TextField(controller: _newHighlightController, decoration: const InputDecoration(hintText: 'Add a highlight...'))),
+                    Expanded(
+                      child: TextField(
+                        controller: _newHighlightController,
+                        decoration: const InputDecoration(
+                          hintText: 'Add a highlight...',
+                        ),
+                      ),
+                    ),
                     IconButton(
-                      icon: const Icon(Symbols.add_circle_rounded, color: AppColors.primary),
+                      icon: const Icon(
+                        Symbols.add_circle_rounded,
+                        color: AppColors.primary,
+                      ),
                       onPressed: () {
                         final text = _newHighlightController.text.trim();
                         if (text.isEmpty) return;
@@ -285,7 +363,11 @@ class _AdminFestivalFormScreenState extends State<AdminFestivalFormScreen> {
                   ],
                 ),
                 const SizedBox(height: AppSpacing.xxl),
-                AnimatedButton(label: _isEditing ? 'Save Changes' : 'Create', isLoading: _saving, onPressed: _save),
+                AnimatedButton(
+                  label: _isEditing ? 'Save Changes' : 'Create',
+                  isLoading: _saving,
+                  onPressed: _save,
+                ),
               ],
             );
           },

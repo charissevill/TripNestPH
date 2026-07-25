@@ -17,7 +17,11 @@ import '../../domain/models/place.dart';
 enum _SortOption { relevance, distance, rating, reviewCount }
 
 class _CategoryOption {
-  const _CategoryOption({required this.label, required this.searchPhrase, this.includedTypes});
+  const _CategoryOption({
+    required this.label,
+    required this.searchPhrase,
+    this.includedTypes,
+  });
 
   final String label;
 
@@ -31,16 +35,52 @@ class _CategoryOption {
 }
 
 const _categories = [
-  _CategoryOption(label: 'Attractions', searchPhrase: 'tourist attractions', includedTypes: PlaceCategory.attractions),
+  _CategoryOption(
+    label: 'Attractions',
+    searchPhrase: 'tourist attractions',
+    includedTypes: PlaceCategory.attractions,
+  ),
   _CategoryOption(label: 'Beaches', searchPhrase: 'beaches'),
-  _CategoryOption(label: 'Hotels', searchPhrase: 'hotels', includedTypes: PlaceCategory.lodging),
-  _CategoryOption(label: 'Dining', searchPhrase: 'restaurants and cafes', includedTypes: PlaceCategory.dining),
-  _CategoryOption(label: 'Shopping', searchPhrase: 'shopping malls', includedTypes: PlaceCategory.shopping),
-  _CategoryOption(label: 'Gas Stations', searchPhrase: 'gas stations', includedTypes: PlaceCategory.gasStations),
-  _CategoryOption(label: 'Pharmacies', searchPhrase: 'pharmacies', includedTypes: PlaceCategory.pharmacies),
-  _CategoryOption(label: 'Hospitals', searchPhrase: 'hospitals', includedTypes: PlaceCategory.hospitals),
-  _CategoryOption(label: 'ATMs', searchPhrase: 'ATMs', includedTypes: PlaceCategory.atms),
-  _CategoryOption(label: 'Transport', searchPhrase: 'bus and transport terminals', includedTypes: PlaceCategory.transportTerminals),
+  _CategoryOption(
+    label: 'Hotels',
+    searchPhrase: 'hotels',
+    includedTypes: PlaceCategory.lodging,
+  ),
+  _CategoryOption(
+    label: 'Dining',
+    searchPhrase: 'restaurants and cafes',
+    includedTypes: PlaceCategory.dining,
+  ),
+  _CategoryOption(
+    label: 'Shopping',
+    searchPhrase: 'shopping malls',
+    includedTypes: PlaceCategory.shopping,
+  ),
+  _CategoryOption(
+    label: 'Gas Stations',
+    searchPhrase: 'gas stations',
+    includedTypes: PlaceCategory.gasStations,
+  ),
+  _CategoryOption(
+    label: 'Pharmacies',
+    searchPhrase: 'pharmacies',
+    includedTypes: PlaceCategory.pharmacies,
+  ),
+  _CategoryOption(
+    label: 'Hospitals',
+    searchPhrase: 'hospitals',
+    includedTypes: PlaceCategory.hospitals,
+  ),
+  _CategoryOption(
+    label: 'ATMs',
+    searchPhrase: 'ATMs',
+    includedTypes: PlaceCategory.atms,
+  ),
+  _CategoryOption(
+    label: 'Transport',
+    searchPhrase: 'bus and transport terminals',
+    includedTypes: PlaceCategory.transportTerminals,
+  ),
 ];
 
 /// Full browse experience for Places API results: category chips, sort,
@@ -73,7 +113,10 @@ class _NearbyPlacesScreenState extends State<NearbyPlacesScreen> {
   final TextEditingController _searchController = TextEditingController();
 
   late _CategoryOption _category = _categories.firstWhere(
-    (c) => widget.includedTypes != null && c.includedTypes != null && c.includedTypes!.first == widget.includedTypes!.first,
+    (c) =>
+        widget.includedTypes != null &&
+        c.includedTypes != null &&
+        c.includedTypes!.first == widget.includedTypes!.first,
     orElse: () => _categories.first,
   );
   _SortOption _sort = _SortOption.relevance;
@@ -107,7 +150,11 @@ class _NearbyPlacesScreenState extends State<NearbyPlacesScreen> {
       if (_searchOverride != null && _searchOverride!.trim().isNotEmpty) {
         results = await _places.searchText(textQuery: _searchOverride!.trim());
       } else if (widget._isNearbyMode && _category.includedTypes != null) {
-        results = await _places.searchNearby(latitude: widget.latitude!, longitude: widget.longitude!, includedTypes: _category.includedTypes!);
+        results = await _places.searchNearby(
+          latitude: widget.latitude!,
+          longitude: widget.longitude!,
+          includedTypes: _category.includedTypes!,
+        );
       } else if (widget._isNearbyMode) {
         // No dedicated Places type for this category (e.g. beaches) — text
         // search biased toward the known coordinate instead of a plain
@@ -118,7 +165,10 @@ class _NearbyPlacesScreenState extends State<NearbyPlacesScreen> {
           biasLongitude: widget.longitude,
         );
       } else {
-        results = await _places.searchText(textQuery: '${_category.searchPhrase} in ${widget.areaLabel}, Philippines');
+        results = await _places.searchText(
+          textQuery:
+              '${_category.searchPhrase} in ${widget.areaLabel}, Philippines',
+        );
       }
       if (!mounted) return;
       setState(() {
@@ -140,11 +190,17 @@ class _NearbyPlacesScreenState extends State<NearbyPlacesScreen> {
       case _SortOption.relevance:
         break; // already ranked by rankPreference: POPULARITY server-side
       case _SortOption.distance:
-        list.sort((a, b) => (a.distanceMeters ?? double.infinity).compareTo(b.distanceMeters ?? double.infinity));
+        list.sort(
+          (a, b) => (a.distanceMeters ?? double.infinity).compareTo(
+            b.distanceMeters ?? double.infinity,
+          ),
+        );
       case _SortOption.rating:
         list.sort((a, b) => (b.rating ?? 0).compareTo(a.rating ?? 0));
       case _SortOption.reviewCount:
-        list.sort((a, b) => (b.userRatingCount ?? 0).compareTo(a.userRatingCount ?? 0));
+        list.sort(
+          (a, b) => (b.userRatingCount ?? 0).compareTo(a.userRatingCount ?? 0),
+        );
     }
     return list;
   }
@@ -184,16 +240,29 @@ class _NearbyPlacesScreenState extends State<NearbyPlacesScreen> {
         child: Column(
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.sm, AppSpacing.lg, AppSpacing.md),
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.lg,
+                AppSpacing.sm,
+                AppSpacing.lg,
+                AppSpacing.md,
+              ),
               child: Row(
                 children: [
                   InkWell(
                     onTap: () => context.pop(),
                     borderRadius: BorderRadius.circular(AppRadius.pill),
-                    child: const Padding(padding: EdgeInsets.all(AppSpacing.xs), child: Icon(Symbols.arrow_back_rounded)),
+                    child: const Padding(
+                      padding: EdgeInsets.all(AppSpacing.xs),
+                      child: Icon(Symbols.arrow_back_rounded),
+                    ),
                   ),
                   const SizedBox(width: AppSpacing.xs),
-                  Expanded(child: Text(widget.title, style: theme.textTheme.titleLarge)),
+                  Expanded(
+                    child: Text(
+                      widget.title,
+                      style: theme.textTheme.titleLarge,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -213,11 +282,16 @@ class _NearbyPlacesScreenState extends State<NearbyPlacesScreen> {
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
                 itemCount: _selectableCategories.length,
-                separatorBuilder: (_, _) => const SizedBox(width: AppSpacing.sm),
+                separatorBuilder: (_, _) =>
+                    const SizedBox(width: AppSpacing.sm),
                 itemBuilder: (context, i) {
                   final category = _selectableCategories[i];
                   final selected = category == _category;
-                  return ChoiceChip(label: Text(category.label), selected: selected, onSelected: (_) => _selectCategory(category));
+                  return ChoiceChip(
+                    label: Text(category.label),
+                    selected: selected,
+                    onSelected: (_) => _selectCategory(category),
+                  );
                 },
               ),
             ),
@@ -231,20 +305,37 @@ class _NearbyPlacesScreenState extends State<NearbyPlacesScreen> {
                   DropdownButton<_SortOption>(
                     value: _sort,
                     underline: const SizedBox.shrink(),
-                    style: theme.textTheme.bodySmall?.copyWith(color: AppColors.textPrimary),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: AppColors.textPrimary,
+                    ),
                     items: const [
-                      DropdownMenuItem(value: _SortOption.relevance, child: Text('Relevance')),
-                      DropdownMenuItem(value: _SortOption.distance, child: Text('Distance')),
-                      DropdownMenuItem(value: _SortOption.rating, child: Text('Rating')),
-                      DropdownMenuItem(value: _SortOption.reviewCount, child: Text('Popularity')),
+                      DropdownMenuItem(
+                        value: _SortOption.relevance,
+                        child: Text('Relevance'),
+                      ),
+                      DropdownMenuItem(
+                        value: _SortOption.distance,
+                        child: Text('Distance'),
+                      ),
+                      DropdownMenuItem(
+                        value: _SortOption.rating,
+                        child: Text('Rating'),
+                      ),
+                      DropdownMenuItem(
+                        value: _SortOption.reviewCount,
+                        child: Text('Popularity'),
+                      ),
                     ],
-                    onChanged: (value) => value != null ? _selectSort(value) : null,
+                    onChanged: (value) =>
+                        value != null ? _selectSort(value) : null,
                   ),
                 ],
               ),
             ),
             const SizedBox(height: AppSpacing.sm),
-            Expanded(child: _buildResults()),
+            Expanded(
+              child: RefreshIndicator(onRefresh: _load, child: _buildResults()),
+            ),
           ],
         ),
       ),
@@ -258,12 +349,13 @@ class _NearbyPlacesScreenState extends State<NearbyPlacesScreen> {
   List<_CategoryOption> get _selectableCategories => _categories;
 
   Widget _buildResults() {
-    if (_loading) return LoadingWidget.carousel();
+    if (_loading) return LoadingWidget.grid();
     if (_error != null) {
       return EmptyStateWidget(
         icon: Symbols.error_outline_rounded,
         title: 'Couldn\'t load places',
-        message: 'Something went wrong reaching Google Places — pull to refresh or try again shortly.',
+        message:
+            'Something went wrong reaching Google Places — pull to refresh or try again shortly.',
         actionLabel: 'Retry',
         onActionTap: _load,
       );
@@ -278,9 +370,15 @@ class _NearbyPlacesScreenState extends State<NearbyPlacesScreen> {
     }
     return LayoutBuilder(
       builder: (context, constraints) {
-        final cardWidth = (constraints.maxWidth - AppSpacing.lg * 2 - AppSpacing.md) / 2;
+        final cardWidth =
+            (constraints.maxWidth - AppSpacing.lg * 2 - AppSpacing.md) / 2;
         return GridView.builder(
-          padding: const EdgeInsets.fromLTRB(AppSpacing.lg, 0, AppSpacing.lg, AppSpacing.huge),
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.lg,
+            0,
+            AppSpacing.lg,
+            AppSpacing.huge,
+          ),
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: 2,
             crossAxisSpacing: AppSpacing.md,
@@ -290,13 +388,19 @@ class _NearbyPlacesScreenState extends State<NearbyPlacesScreen> {
           itemCount: places.length,
           itemBuilder: (context, i) {
             final place = places[i];
-            final imageUrl = place.photoNames.isNotEmpty ? _places.photoUrl(place.photoNames.first) : '';
+            final imageUrl = place.photoNames.isNotEmpty
+                ? _places.photoUrl(place.photoNames.first)
+                : '';
             return PlaceCard(
               place: place,
               imageUrl: imageUrl,
               width: cardWidth,
               imageHeight: 140,
-              onTap: () => showPlaceDetailsSheet(context, place: place, placesService: _places),
+              onTap: () => showPlaceDetailsSheet(
+                context,
+                place: place,
+                placesService: _places,
+              ),
             );
           },
         );

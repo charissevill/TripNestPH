@@ -8,6 +8,7 @@ import '../../core/routes/route_paths.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/widgets/states/empty_state_widget.dart';
+import '../../core/widgets/states/loading_widget.dart';
 import '../../data/repositories/admin_repository.dart';
 import '../../domain/models/admin_user.dart';
 
@@ -25,19 +26,30 @@ class AdminHomeScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final uid = context.watch<AuthProvider>().firebaseUser?.uid;
     if (uid == null) {
-      return const Scaffold(body: SafeArea(child: EmptyStateWidget(icon: Symbols.lock_rounded, title: 'Sign in required', message: 'Sign in to continue.')));
+      return const Scaffold(
+        body: SafeArea(
+          child: EmptyStateWidget(
+            icon: Symbols.lock_rounded,
+            title: 'Sign in required',
+            message: 'Sign in to continue.',
+          ),
+        ),
+      );
     }
 
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(icon: const Icon(Symbols.arrow_back_rounded), onPressed: () => context.pop()),
+        leading: IconButton(
+          icon: const Icon(Symbols.arrow_back_rounded),
+          onPressed: () => context.pop(),
+        ),
         title: const Text('Admin Portal'),
       ),
       body: StreamBuilder<AdminUser?>(
         stream: AdminRepository().streamSelf(uid),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return LoadingWidget.block(height: 300);
           }
           final admin = snapshot.data;
           if (admin == null || !admin.isActive) {
@@ -45,19 +57,22 @@ class AdminHomeScreen extends StatelessWidget {
               child: EmptyStateWidget(
                 icon: Symbols.block_rounded,
                 title: 'No access',
-                message: 'This account doesn\'t have an active Admin Portal role.',
+                message:
+                    'This account doesn\'t have an active Admin Portal role.',
               ),
             );
           }
 
-          final canManageContent = admin.role == AdminRole.admin || admin.role == AdminRole.lgu;
+          final canManageContent =
+              admin.role == AdminRole.admin || admin.role == AdminRole.lgu;
           final isAdmin = admin.role == AdminRole.admin;
           final tiles = <Widget>[
             if (canManageContent) ...[
               _AdminModuleTile(
                 icon: Symbols.public_rounded,
                 label: 'Provinces',
-                subtitle: 'Write overview, culture, tips, hotlines and budget guidance',
+                subtitle:
+                    'Write overview, culture, tips, hotlines and budget guidance',
                 onTap: () => context.push(RoutePaths.adminProvinces),
               ),
               _AdminModuleTile(
@@ -73,25 +88,20 @@ class AdminHomeScreen extends StatelessWidget {
                 onTap: () => context.push(RoutePaths.adminFestivals),
               ),
             ],
-            if (admin.role == AdminRole.eventOrganizer)
-              _AdminModuleTile(
-                icon: Symbols.celebration_rounded,
-                label: 'My Events',
-                subtitle: 'Create and manage the festivals you organize',
-                onTap: () => context.push(RoutePaths.adminFestivals, extra: {'organizerUid': uid}),
-              ),
             if (admin.role == AdminRole.businessOwner)
               _AdminModuleTile(
                 icon: Symbols.storefront_rounded,
                 label: 'My Business',
-                subtitle: 'Submit or edit your business listing for admin approval',
+                subtitle:
+                    'Submit or edit your business listing for admin approval',
                 onTap: () => context.push(RoutePaths.myBusiness),
               ),
             if (isAdmin)
               _AdminModuleTile(
                 icon: Symbols.storefront_rounded,
                 label: 'Businesses',
-                subtitle: 'Approve, reject or suspend business owner submissions',
+                subtitle:
+                    'Approve, reject or suspend business owner submissions',
                 onTap: () => context.push(RoutePaths.adminBusinesses),
               ),
             if (isAdmin)
@@ -101,7 +111,7 @@ class AdminHomeScreen extends StatelessWidget {
                 subtitle: 'Moderate reviews travelers have flagged',
                 onTap: () => context.push(RoutePaths.adminReportedReviews),
               ),
-            if (canManageContent || admin.role == AdminRole.eventOrganizer)
+            if (canManageContent)
               _AdminModuleTile(
                 icon: Symbols.campaign_rounded,
                 label: 'Send Announcement',
@@ -113,7 +123,13 @@ class AdminHomeScreen extends StatelessWidget {
                 icon: Symbols.group_rounded,
                 label: 'Team',
                 subtitle: 'Invite or manage Admin Portal accounts',
-                onTap: () => context.push(RoutePaths.adminTeam, extra: {'uid': uid, 'name': admin.name.isNotEmpty ? admin.name : admin.email}),
+                onTap: () => context.push(
+                  RoutePaths.adminTeam,
+                  extra: {
+                    'uid': uid,
+                    'name': admin.name.isNotEmpty ? admin.name : admin.email,
+                  },
+                ),
               ),
           ];
 
@@ -121,20 +137,30 @@ class AdminHomeScreen extends StatelessWidget {
             child: ListView(
               padding: const EdgeInsets.all(AppSpacing.lg),
               children: [
-                Text('Signed in as ${admin.name.isNotEmpty ? admin.name : admin.email}', style: Theme.of(context).textTheme.bodyMedium),
+                Text(
+                  'Signed in as ${admin.name.isNotEmpty ? admin.name : admin.email}',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
                 const SizedBox(height: 2),
-                Text('Role: ${admin.role}', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textTertiary)),
+                Text(
+                  'Role: ${admin.role}',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppColors.textTertiary,
+                  ),
+                ),
                 const SizedBox(height: AppSpacing.xl),
                 if (tiles.isEmpty)
                   EmptyStateWidget(
                     icon: Symbols.construction_rounded,
                     title: 'Nothing here yet',
-                    message: 'The ${admin.role} workflow hasn\'t been built in this Admin Portal yet.',
+                    message:
+                        'The ${admin.role} workflow hasn\'t been built in this Admin Portal yet.',
                   )
                 else
                   for (var i = 0; i < tiles.length; i++) ...[
                     tiles[i],
-                    if (i != tiles.length - 1) const SizedBox(height: AppSpacing.sm),
+                    if (i != tiles.length - 1)
+                      const SizedBox(height: AppSpacing.sm),
                   ],
               ],
             ),
@@ -146,7 +172,12 @@ class AdminHomeScreen extends StatelessWidget {
 }
 
 class _AdminModuleTile extends StatelessWidget {
-  const _AdminModuleTile({required this.icon, required this.label, required this.subtitle, required this.onTap});
+  const _AdminModuleTile({
+    required this.icon,
+    required this.label,
+    required this.subtitle,
+    required this.onTap,
+  });
 
   final IconData icon;
   final String label;
@@ -165,7 +196,11 @@ class _AdminModuleTile extends StatelessWidget {
           color: theme.colorScheme.surface,
           borderRadius: BorderRadius.circular(AppRadius.lg),
           boxShadow: [
-            BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 12, offset: const Offset(0, 6)),
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 12,
+              offset: const Offset(0, 6),
+            ),
           ],
         ),
         child: Row(
@@ -173,7 +208,10 @@ class _AdminModuleTile extends StatelessWidget {
             Container(
               width: 48,
               height: 48,
-              decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(AppRadius.md)),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(AppRadius.md),
+              ),
               alignment: Alignment.center,
               child: Icon(icon, color: AppColors.primary),
             ),
@@ -188,7 +226,10 @@ class _AdminModuleTile extends StatelessWidget {
                 ],
               ),
             ),
-            const Icon(Symbols.chevron_right_rounded, color: AppColors.textTertiary),
+            const Icon(
+              Symbols.chevron_right_rounded,
+              color: AppColors.textTertiary,
+            ),
           ],
         ),
       ),

@@ -6,7 +6,9 @@ import '../../core/theme/app_spacing.dart';
 import '../../core/utils/app_exception.dart';
 import '../../core/widgets/dialogs/confirmation_dialog.dart';
 import '../../core/widgets/states/empty_state_widget.dart';
+import '../../core/widgets/states/loading_widget.dart';
 import '../../data/repositories/business_repository.dart';
+import '../../data/repositories/restaurant_repository.dart';
 import '../../domain/models/business.dart';
 
 /// Admin-only approval queue for `businessOwner` self-service listings —
@@ -16,21 +18,45 @@ class AdminBusinessListScreen extends StatefulWidget {
   const AdminBusinessListScreen({super.key});
 
   @override
-  State<AdminBusinessListScreen> createState() => _AdminBusinessListScreenState();
+  State<AdminBusinessListScreen> createState() =>
+      _AdminBusinessListScreenState();
 }
 
 class _AdminBusinessListScreenState extends State<AdminBusinessListScreen> {
   final BusinessRepository _repository = BusinessRepository();
+  final RestaurantRepository _restaurantRepository = RestaurantRepository();
+
+  /// For a [Business.isFoodAndDining] listing, materializes (or
+  /// re-publishes) its mirrored `restaurants` doc *before* the business
+  /// itself is marked approved — so if this step fails, nothing gets
+  /// marked approved either, and the admin can just retry the whole
+  /// "Approve" action cleanly instead of being stuck with an approved
+  /// business that never got its public listing.
+  Future<void> _syncRestaurantBeforeApproval(Business business) async {
+    if (!business.isFoodAndDining) return;
+    if (business.restaurantId.isEmpty) {
+      final restaurantId = await _restaurantRepository.createFromBusiness(
+        business,
+      );
+      await _repository.setRestaurantId(business.id, restaurantId);
+    } else {
+      await _restaurantRepository.setPublished(business.restaurantId, true);
+    }
+  }
 
   Future<void> _approve(Business business) async {
     final confirmed = await showConfirmationDialog(
       context,
       title: 'Approve this listing?',
-      message: '"${business.name}" will become visible to travelers on its province page.',
+      message:
+          '"${business.name}" will become visible to travelers on its province page.',
       confirmLabel: 'Approve',
     );
     if (!confirmed || !mounted) return;
-    await _run(() => _repository.setStatus(business.id, status: 'approved'));
+    await _run(() async {
+      await _syncRestaurantBeforeApproval(business);
+      await _repository.setStatus(business.id, status: 'approved');
+    });
   }
 
   Future<void> _reject(Business business) async {
@@ -43,10 +69,16 @@ class _AdminBusinessListScreenState extends State<AdminBusinessListScreen> {
           controller: reasonController,
           maxLines: 3,
           autofocus: true,
-          decoration: const InputDecoration(hintText: 'Tell the owner what to fix...', alignLabelWithHint: true),
+          decoration: const InputDecoration(
+            hintText: 'Tell the owner what to fix...',
+            alignLabelWithHint: true,
+          ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: AppColors.error),
             onPressed: () {
@@ -60,23 +92,38 @@ class _AdminBusinessListScreenState extends State<AdminBusinessListScreen> {
       ),
     );
     if (reason == null || reason.isEmpty || !mounted) return;
-    await _run(() => _repository.setStatus(business.id, status: 'rejected', rejectionReason: reason));
+    await _run(
+      () => _repository.setStatus(
+        business.id,
+        status: 'rejected',
+        rejectionReason: reason,
+      ),
+    );
   }
 
   Future<void> _suspend(Business business) async {
     final confirmed = await showConfirmationDialog(
       context,
       title: 'Suspend this listing?',
-      message: '"${business.name}" will be hidden from travelers until reactivated.',
+      message:
+          '"${business.name}" will be hidden from travelers until reactivated.',
       confirmLabel: 'Suspend',
       isDestructive: true,
     );
     if (!confirmed || !mounted) return;
-    await _run(() => _repository.setStatus(business.id, status: 'suspended'));
+    await _run(() async {
+      if (business.isFoodAndDining && business.restaurantId.isNotEmpty) {
+        await _restaurantRepository.setPublished(business.restaurantId, false);
+      }
+      await _repository.setStatus(business.id, status: 'suspended');
+    });
   }
 
   Future<void> _reactivate(Business business) async {
-    await _run(() => _repository.setStatus(business.id, status: 'approved'));
+    await _run(() async {
+      await _syncRestaurantBeforeApproval(business);
+      await _repository.setStatus(business.id, status: 'approved');
+    });
   }
 
   Future<void> _delete(Business business) async {
@@ -88,14 +135,22 @@ class _AdminBusinessListScreenState extends State<AdminBusinessListScreen> {
       isDestructive: true,
     );
     if (!confirmed || !mounted) return;
-    await _run(() => _repository.delete(business.id));
+    await _run(() async {
+      await _repository.delete(business.id);
+      if (business.restaurantId.isNotEmpty) {
+        await _restaurantRepository.delete(business.restaurantId);
+      }
+    });
   }
 
   Future<void> _run(Future<void> Function() action) async {
     try {
       await action();
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(AppException.from(e).message)));
+      if (mounted)
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(AppException.from(e).message)));
     }
   }
 
@@ -120,14 +175,26 @@ class _AdminBusinessListScreenState extends State<AdminBusinessListScreen> {
           stream: _repository.streamAllForAdmin(),
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
+              return ListView(
+                children: List.generate(4, (_) => LoadingWidget.cardBlock()),
+              );
             }
             final businesses = snapshot.data ?? const [];
             if (businesses.isEmpty) {
-              return const EmptyStateWidget(icon: Symbols.storefront_rounded, title: 'No business listings yet', message: 'Submissions from business owner accounts will show up here.');
+              return const EmptyStateWidget(
+                icon: Symbols.storefront_rounded,
+                title: 'No business listings yet',
+                message:
+                    'Submissions from business owner accounts will show up here.',
+              );
             }
             return ListView.builder(
-              padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.sm, AppSpacing.lg, AppSpacing.huge),
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.lg,
+                AppSpacing.sm,
+                AppSpacing.lg,
+                AppSpacing.huge,
+              ),
               itemCount: businesses.length,
               itemBuilder: (context, i) {
                 final business = businesses[i];
@@ -140,34 +207,89 @@ class _AdminBusinessListScreenState extends State<AdminBusinessListScreen> {
                       children: [
                         Row(
                           children: [
-                            Expanded(child: Text(business.name, style: Theme.of(context).textTheme.titleMedium)),
+                            Expanded(
+                              child: Text(
+                                business.name,
+                                style: Theme.of(context).textTheme.titleMedium,
+                              ),
+                            ),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                              decoration: BoxDecoration(color: _statusColor(business.status).withValues(alpha: 0.12), borderRadius: BorderRadius.circular(AppRadius.sm)),
-                              child: Text(business.status, style: TextStyle(color: _statusColor(business.status), fontSize: 12, fontWeight: FontWeight.w700)),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: _statusColor(
+                                  business.status,
+                                ).withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(
+                                  AppRadius.sm,
+                                ),
+                              ),
+                              child: Text(
+                                business.status,
+                                style: TextStyle(
+                                  color: _statusColor(business.status),
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
                             ),
                           ],
                         ),
-                        Text('${BusinessCategory.label(business.category)} · ${business.provinceName}', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textTertiary)),
+                        Text(
+                          '${BusinessCategory.label(business.category)} · ${business.provinceName}',
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(color: AppColors.textTertiary),
+                        ),
                         const SizedBox(height: 4),
-                        Text(business.description, maxLines: 2, overflow: TextOverflow.ellipsis),
-                        if (business.isRejected && business.rejectionReason.isNotEmpty) ...[
+                        Text(
+                          business.description,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        if (business.isRejected &&
+                            business.rejectionReason.isNotEmpty) ...[
                           const SizedBox(height: 4),
-                          Text('Reason: ${business.rejectionReason}', style: const TextStyle(color: AppColors.error, fontSize: 12)),
+                          Text(
+                            'Reason: ${business.rejectionReason}',
+                            style: const TextStyle(
+                              color: AppColors.error,
+                              fontSize: 12,
+                            ),
+                          ),
                         ],
                         const SizedBox(height: AppSpacing.sm),
                         Wrap(
                           spacing: AppSpacing.sm,
                           children: [
                             if (business.isPending) ...[
-                              FilledButton(onPressed: () => _approve(business), child: const Text('Approve')),
-                              OutlinedButton(onPressed: () => _reject(business), child: const Text('Reject')),
+                              FilledButton(
+                                onPressed: () => _approve(business),
+                                child: const Text('Approve'),
+                              ),
+                              OutlinedButton(
+                                onPressed: () => _reject(business),
+                                child: const Text('Reject'),
+                              ),
                             ],
                             if (business.isApproved)
-                              OutlinedButton(onPressed: () => _suspend(business), child: const Text('Suspend')),
+                              OutlinedButton(
+                                onPressed: () => _suspend(business),
+                                child: const Text('Suspend'),
+                              ),
                             if (business.isSuspended)
-                              FilledButton(onPressed: () => _reactivate(business), child: const Text('Reactivate')),
-                            IconButton(icon: const Icon(Symbols.delete_outline_rounded, color: AppColors.error), onPressed: () => _delete(business)),
+                              FilledButton(
+                                onPressed: () => _reactivate(business),
+                                child: const Text('Reactivate'),
+                              ),
+                            IconButton(
+                              icon: const Icon(
+                                Symbols.delete_outline_rounded,
+                                color: AppColors.error,
+                              ),
+                              onPressed: () => _delete(business),
+                            ),
                           ],
                         ),
                       ],

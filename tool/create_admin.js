@@ -9,8 +9,8 @@
 // Usage:
 //   node tool/create_admin.js someone@example.com [role] [name]
 //
-// [role] defaults to 'admin' (admin, lgu, businessOwner or eventOrganizer —
-// see AdminRole in lib/domain/models/admin_user.dart). 'admin' also covers
+// [role] defaults to 'admin' (admin, lgu or businessOwner — see AdminRole
+// in lib/domain/models/admin_user.dart). 'admin' also covers
 // every lgu-only permission, so it's the right default for a solo owner
 // account.
 const fs = require('fs');

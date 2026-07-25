@@ -26,6 +26,7 @@ class Review {
     required this.createdAt,
     this.photoUrls = const [],
     this.isHidden = false,
+    this.verified = false,
   });
 
   final String id;
@@ -43,6 +44,14 @@ class Review {
   /// Firestore (so they can be reviewed/restored) but never show to
   /// travelers and never count toward the target's aggregate rating.
   final bool isHidden;
+
+  /// Whether the reviewer had opened this listing's Details screen at least
+  /// once before writing this review (see [UserRepository.hasVisited]).
+  /// Stamped once at creation time and never rechecked — clearing "Recently
+  /// Viewed" history afterward doesn't retroactively unverify a review.
+  /// Badge-only: an unverified review is exactly as valid and visible as a
+  /// verified one, just without the "Verified Visit" label.
+  final bool verified;
 
   /// Human-readable relative-ish date, e.g. "March 2026", matching the copy
   /// style used throughout the rest of the app.
@@ -62,6 +71,7 @@ class Review {
       createdAt: timestamp is Timestamp ? timestamp.toDate() : DateTime.now(),
       photoUrls: List<String>.from(map['photoUrls'] as List? ?? const []),
       isHidden: map['isHidden'] as bool? ?? false,
+      verified: map['verified'] as bool? ?? false,
     );
   }
 
@@ -80,6 +90,7 @@ class Review {
       // `isHidden == false` display query — which can't match a document
       // where the field is simply absent — always finds new reviews.
       'isHidden': isHidden,
+      'verified': verified,
     };
   }
 }

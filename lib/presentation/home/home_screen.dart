@@ -69,7 +69,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   final RestaurantRepository _restaurantRepository = RestaurantRepository();
   final FestivalRepository _festivalRepository = FestivalRepository();
   final TravelTipRepository _travelTipRepository = TravelTipRepository();
-  final NotificationRepository _notificationRepository = NotificationRepository();
+  final NotificationRepository _notificationRepository =
+      NotificationRepository();
   final LocationService _locationService = LocationService();
   final LocalPreferencesService _preferences = LocalPreferencesService();
 
@@ -103,7 +104,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   /// to enable it, came back" flow without a manual retry tap.
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed && _nearbyStatus != LocationAccessStatus.granted && _lastData != null) {
+    if (state == AppLifecycleState.resumed &&
+        _nearbyStatus != LocationAccessStatus.granted &&
+        _lastData != null) {
       _refreshNearby();
     }
   }
@@ -139,8 +142,18 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }) {
     final sorted = [...items]
       ..sort((a, b) {
-        final distanceA = _locationService.distanceKm(lat1: travelerLat, lng1: travelerLng, lat2: lat(a), lng2: lng(a));
-        final distanceB = _locationService.distanceKm(lat1: travelerLat, lng1: travelerLng, lat2: lat(b), lng2: lng(b));
+        final distanceA = _locationService.distanceKm(
+          lat1: travelerLat,
+          lng1: travelerLng,
+          lat2: lat(a),
+          lng2: lng(a),
+        );
+        final distanceB = _locationService.distanceKm(
+          lat1: travelerLat,
+          lng1: travelerLng,
+          lat2: lat(b),
+          lng2: lng(b),
+        );
         return distanceA.compareTo(distanceB);
       });
     return sorted.take(8).toList();
@@ -167,12 +180,25 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     for (final radiusKm in _nearbyRadiusStepsKm) {
       final band = await fetchLatitudeBand(radiusKm);
       final withinCircle = band
-          .where((item) =>
-              _locationService.distanceKm(lat1: travelerLat, lng1: travelerLng, lat2: lat(item), lng2: lng(item)) <=
-              radiusKm)
+          .where(
+            (item) =>
+                _locationService.distanceKm(
+                  lat1: travelerLat,
+                  lng1: travelerLng,
+                  lat2: lat(item),
+                  lng2: lng(item),
+                ) <=
+                radiusKm,
+          )
           .toList();
       if (withinCircle.length >= 3 || radiusKm == _nearbyRadiusStepsKm.last) {
-        return _sortByDistance(withinCircle, travelerLat, travelerLng, lat: lat, lng: lng);
+        return _sortByDistance(
+          withinCircle,
+          travelerLat,
+          travelerLng,
+          lat: lat,
+          lng: lng,
+        );
       }
     }
     return [];
@@ -208,14 +234,20 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final position = result.position!;
     try {
       final nearby = await _fetchNearbyWithFallback<Destination>(
-        (radiusKm) => _destinationRepository.getNearbyLatitudeBand(latitude: position.latitude, radiusKm: radiusKm),
+        (radiusKm) => _destinationRepository.getNearbyLatitudeBand(
+          latitude: position.latitude,
+          radiusKm: radiusKm,
+        ),
         position.latitude,
         position.longitude,
         lat: (d) => d.latitude!,
         lng: (d) => d.longitude!,
       );
       final nearbyRestaurants = await _fetchNearbyWithFallback<Restaurant>(
-        (radiusKm) => _restaurantRepository.getNearbyLatitudeBand(latitude: position.latitude, radiusKm: radiusKm),
+        (radiusKm) => _restaurantRepository.getNearbyLatitudeBand(
+          latitude: position.latitude,
+          radiusKm: radiusKm,
+        ),
         position.latitude,
         position.longitude,
         lat: (r) => r.latitude!,
@@ -263,6 +295,18 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     });
   }
 
+  Future<void> _refresh() async {
+    final future = _load();
+    setState(() => _future = future);
+    if (_lastData != null) await _refreshNearby();
+    try {
+      await future;
+    } catch (_) {
+      // Surfaced by the FutureBuilder's error state below; RefreshIndicator
+      // just needs this Future to complete either way.
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = context.watch<AuthProvider>().currentUser;
@@ -271,69 +315,86 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     return Scaffold(
       body: SafeArea(
         bottom: false,
-        child: CustomScrollView(
-          slivers: [
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.sm, AppSpacing.lg, AppSpacing.md),
-              sliver: SliverToBoxAdapter(
-                child: Column(
-                  children: [
-                    StreamBuilder<List<AppNotification>>(
-                      stream: uid == null ? const Stream.empty() : _notificationRepository.streamForUser(uid),
-                      builder: (context, snapshot) {
-                        final hasUnread = (snapshot.data ?? const []).any((n) => !n.isRead);
-                        return HomeHeader(
-                          userName: user?.name.isNotEmpty == true ? user!.name.split(' ').first : 'Traveler',
-                          avatarUrl: user?.photoUrl ?? '',
-                          onAvatarTap: () => context.go(RoutePaths.profile),
-                          onBellTap: () => context.push(RoutePaths.notifications),
-                          hasUnreadNotifications: hasUnread,
-                        );
-                      },
-                    ),
-                    const SizedBox(height: AppSpacing.lg),
-                    SearchBarWidget(
-                      readOnly: true,
-                      onTap: () => context.push(RoutePaths.search),
-                      onFilterTap: () => context.push(RoutePaths.search, extra: true),
-                    ),
-                  ],
+        child: RefreshIndicator(
+          onRefresh: _refresh,
+          child: CustomScrollView(
+            slivers: [
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.lg,
+                  AppSpacing.sm,
+                  AppSpacing.lg,
+                  AppSpacing.md,
+                ),
+                sliver: SliverToBoxAdapter(
+                  child: Column(
+                    children: [
+                      StreamBuilder<List<AppNotification>>(
+                        stream: uid == null
+                            ? const Stream.empty()
+                            : _notificationRepository.streamForUser(uid),
+                        builder: (context, snapshot) {
+                          final hasUnread = (snapshot.data ?? const []).any(
+                            (n) => !n.isRead,
+                          );
+                          return HomeHeader(
+                            userName: user?.name.isNotEmpty == true
+                                ? user!.name.split(' ').first
+                                : 'Traveler',
+                            avatarUrl: user?.photoUrl ?? '',
+                            onAvatarTap: () => context.go(RoutePaths.profile),
+                            onBellTap: () =>
+                                context.push(RoutePaths.notifications),
+                            hasUnreadNotifications: hasUnread,
+                          );
+                        },
+                      ),
+                      const SizedBox(height: AppSpacing.lg),
+                      SearchBarWidget(
+                        readOnly: true,
+                        onTap: () => context.push(RoutePaths.search),
+                        onFilterTap: () =>
+                            context.push(RoutePaths.search, extra: true),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
-            FutureBuilder<_HomeData>(
-              future: _future,
-              builder: (context, snapshot) {
-                if (snapshot.connectionState != ConnectionState.done) {
-                  return SliverToBoxAdapter(child: _HomeLoadingSkeleton());
-                }
-                if (snapshot.hasError) {
-                  return SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.only(top: AppSpacing.huge),
-                      child: EmptyStateWidget(
-                        icon: Symbols.error_outline_rounded,
-                        title: 'Couldn\'t load your feed',
-                        message: AppException.from(snapshot.error!).message,
-                        actionLabel: 'Retry',
-                        onActionTap: _retry,
+              FutureBuilder<_HomeData>(
+                future: _future,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState != ConnectionState.done) {
+                    return SliverToBoxAdapter(child: _HomeLoadingSkeleton());
+                  }
+                  if (snapshot.hasError) {
+                    return SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.only(top: AppSpacing.huge),
+                        child: EmptyStateWidget(
+                          icon: Symbols.error_outline_rounded,
+                          title: 'Couldn\'t load your feed',
+                          message: AppException.from(snapshot.error!).message,
+                          actionLabel: 'Retry',
+                          onActionTap: _retry,
+                        ),
                       ),
-                    ),
+                    );
+                  }
+                  return _HomeContent(
+                    data: snapshot.data!,
+                    nearby: _nearby,
+                    nearbyRestaurants: _nearbyRestaurants,
+                    nearbyStatus: _nearbyStatus,
+                    locationPromptDismissed:
+                        _locationPromptDismissed || !_locationFeatureEnabled,
+                    locationBusy: _locationBusy,
+                    onLocationAction: _handleLocationAction,
+                    onDismissLocationPrompt: _dismissLocationPrompt,
                   );
-                }
-                return _HomeContent(
-                  data: snapshot.data!,
-                  nearby: _nearby,
-                  nearbyRestaurants: _nearbyRestaurants,
-                  nearbyStatus: _nearbyStatus,
-                  locationPromptDismissed: _locationPromptDismissed || !_locationFeatureEnabled,
-                  locationBusy: _locationBusy,
-                  onLocationAction: _handleLocationAction,
-                  onDismissLocationPrompt: _dismissLocationPrompt,
-                );
-              },
-            ),
-          ],
+                },
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -390,7 +451,8 @@ class _HomeContent extends StatelessWidget {
                   title: d.name,
                   subtitle: '${d.provinceName} · ★ ${d.rating}',
                   ctaLabel: 'Explore now',
-                  onTap: () => context.push(RoutePaths.destinationDetails(d.id)),
+                  onTap: () =>
+                      context.push(RoutePaths.destinationDetails(d.id)),
                 ),
               )
               .toList(),
@@ -407,7 +469,8 @@ class _HomeContent extends StatelessWidget {
               final category = mockCategories[i];
               return CategoryCard(
                 category: category,
-                onTap: () => context.go('${RoutePaths.explore}?category=${category.id}'),
+                onTap: () =>
+                    context.go('${RoutePaths.explore}?category=${category.id}'),
               );
             },
           ),
@@ -422,10 +485,12 @@ class _HomeContent extends StatelessWidget {
             itemCount: nearby.length,
             itemBuilder: (context, i) => DestinationCard(
               destination: nearby[i],
-              onTap: () => context.push(RoutePaths.destinationDetails(nearby[i].id)),
+              onTap: () =>
+                  context.push(RoutePaths.destinationDetails(nearby[i].id)),
             ),
           )
-        else if (!locationPromptDismissed && nearbyStatus != LocationAccessStatus.granted) ...[
+        else if (!locationPromptDismissed &&
+            nearbyStatus != LocationAccessStatus.granted) ...[
           LocationPromptCard(
             status: nearbyStatus,
             isBusy: locationBusy,
@@ -442,7 +507,9 @@ class _HomeContent extends StatelessWidget {
           itemCount: nearbyRestaurants.length,
           itemBuilder: (context, i) => RestaurantCard(
             restaurant: nearbyRestaurants[i],
-            onTap: () => context.push(RoutePaths.restaurantDetails(nearbyRestaurants[i].id)),
+            onTap: () => context.push(
+              RoutePaths.restaurantDetails(nearbyRestaurants[i].id),
+            ),
           ),
         ),
         ..._carouselSection(
@@ -453,7 +520,9 @@ class _HomeContent extends StatelessWidget {
           itemCount: data.featured.length,
           itemBuilder: (context, i) => DestinationCard(
             destination: data.featured[i],
-            onTap: () => context.push(RoutePaths.destinationDetails(data.featured[i].id)),
+            onTap: () => context.push(
+              RoutePaths.destinationDetails(data.featured[i].id),
+            ),
           ),
         ),
         ..._carouselSection(
@@ -464,7 +533,8 @@ class _HomeContent extends StatelessWidget {
           itemCount: data.popular.length,
           itemBuilder: (context, i) => DestinationCard(
             destination: data.popular[i],
-            onTap: () => context.push(RoutePaths.destinationDetails(data.popular[i].id)),
+            onTap: () =>
+                context.push(RoutePaths.destinationDetails(data.popular[i].id)),
           ),
         ),
         ..._carouselSection(
@@ -475,7 +545,9 @@ class _HomeContent extends StatelessWidget {
           itemCount: data.hiddenGems.length,
           itemBuilder: (context, i) => DestinationCard(
             destination: data.hiddenGems[i],
-            onTap: () => context.push(RoutePaths.destinationDetails(data.hiddenGems[i].id)),
+            onTap: () => context.push(
+              RoutePaths.destinationDetails(data.hiddenGems[i].id),
+            ),
           ),
         ),
         ..._carouselSection(
@@ -486,7 +558,9 @@ class _HomeContent extends StatelessWidget {
           itemCount: data.popularRestaurants.length,
           itemBuilder: (context, i) => RestaurantCard(
             restaurant: data.popularRestaurants[i],
-            onTap: () => context.push(RoutePaths.restaurantDetails(data.popularRestaurants[i].id)),
+            onTap: () => context.push(
+              RoutePaths.restaurantDetails(data.popularRestaurants[i].id),
+            ),
           ),
         ),
         ..._carouselSection(
@@ -497,14 +571,19 @@ class _HomeContent extends StatelessWidget {
           itemCount: data.upcomingFestivals.length,
           itemBuilder: (context, i) => FestivalCard(
             festival: data.upcomingFestivals[i],
-            onTap: () => context.push(RoutePaths.festivalDetails(data.upcomingFestivals[i].id)),
+            onTap: () => context.push(
+              RoutePaths.festivalDetails(data.upcomingFestivals[i].id),
+            ),
           ),
         ),
         if (data.travelTips.isNotEmpty)
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const SectionHeader(title: 'Travel Tips', subtitle: 'Good to know before you go'),
+              const SectionHeader(
+                title: 'Travel Tips',
+                subtitle: 'Good to know before you go',
+              ),
               const SizedBox(height: AppSpacing.md),
               SizedBox(
                 // Tall enough for icon + a 2-line title + a 3-line
@@ -514,10 +593,14 @@ class _HomeContent extends StatelessWidget {
                 height: 196,
                 child: ListView.separated(
                   scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.lg,
+                  ),
                   itemCount: data.travelTips.length,
-                  separatorBuilder: (_, _) => const SizedBox(width: AppSpacing.md),
-                  itemBuilder: (context, i) => TravelTipCard(tip: data.travelTips[i]),
+                  separatorBuilder: (_, _) =>
+                      const SizedBox(width: AppSpacing.md),
+                  itemBuilder: (context, i) =>
+                      TravelTipCard(tip: data.travelTips[i]),
                 ),
               ),
             ],
@@ -540,7 +623,12 @@ class _HomeContent extends StatelessWidget {
       Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SectionHeader(title: title, subtitle: subtitle, actionLabel: 'See all', onActionTap: onSeeAll),
+          SectionHeader(
+            title: title,
+            subtitle: subtitle,
+            actionLabel: 'See all',
+            onActionTap: onSeeAll,
+          ),
           const SizedBox(height: AppSpacing.md),
           SizedBox(
             height: 250,
@@ -549,7 +637,8 @@ class _HomeContent extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
               itemCount: itemCount,
               separatorBuilder: (_, _) => const SizedBox(width: AppSpacing.md),
-              itemBuilder: (context, i) => _CarouselItemEntrance(child: itemBuilder(context, i)),
+              itemBuilder: (context, i) =>
+                  _CarouselItemEntrance(child: itemBuilder(context, i)),
             ),
           ),
           const SizedBox(height: AppSpacing.xxl),
@@ -573,7 +662,8 @@ class _CarouselItemEntrance extends StatefulWidget {
   State<_CarouselItemEntrance> createState() => _CarouselItemEntranceState();
 }
 
-class _CarouselItemEntranceState extends State<_CarouselItemEntrance> with SingleTickerProviderStateMixin {
+class _CarouselItemEntranceState extends State<_CarouselItemEntrance>
+    with SingleTickerProviderStateMixin {
   late final AnimationController _controller = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 320),
@@ -591,7 +681,9 @@ class _CarouselItemEntranceState extends State<_CarouselItemEntrance> with Singl
       opacity: CurvedAnimation(parent: _controller, curve: Curves.easeOut),
       child: SlideTransition(
         position: Tween<Offset>(begin: const Offset(0.08, 0), end: Offset.zero)
-            .animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic)),
+            .animate(
+              CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic),
+            ),
         child: widget.child,
       ),
     );

@@ -8,11 +8,13 @@ import '../../domain/models/app_notification.dart';
 /// an empty `userId` is a broadcast (festival announcements, travel tips,
 /// featured destinations) shown to every signed-in user.
 class NotificationRepository {
-  NotificationRepository({FirebaseFirestore? firestore}) : _db = firestore ?? FirebaseFirestore.instance;
+  NotificationRepository({FirebaseFirestore? firestore})
+    : _db = firestore ?? FirebaseFirestore.instance;
 
   final FirebaseFirestore _db;
 
-  CollectionReference<Map<String, dynamic>> get _collection => _db.collection(FirestorePaths.notifications);
+  CollectionReference<Map<String, dynamic>> get _collection =>
+      _db.collection(FirestorePaths.notifications);
 
   /// Personal notifications for [userId] plus every broadcast notification,
   /// merged and sorted newest-first.
@@ -22,10 +24,12 @@ class NotificationRepository {
 
     return personal.asyncMap((personalSnapshot) async {
       final broadcastSnapshot = await broadcast.first;
-      final all = [...personalSnapshot.docs, ...broadcastSnapshot.docs]
-          .map((d) => AppNotification.fromMap(d.id, d.data()))
-          .toList()
-        ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      final all =
+          [
+              ...personalSnapshot.docs,
+              ...broadcastSnapshot.docs,
+            ].map((d) => AppNotification.fromMap(d.id, d.data())).toList()
+            ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
       return all;
     });
   }
@@ -38,7 +42,7 @@ class NotificationRepository {
     }
   }
 
-  /// Admin/LGU/eventOrganizer "Compose Announcement" — an empty [userId]
+  /// Admin/LGU "Compose Announcement" — an empty [userId]
   /// makes this a broadcast every traveler's `streamForUser` picks up
   /// immediately. This only ever populates the in-app notification bell;
   /// it does not by itself deliver an OS-level push to a closed/backgrounded
@@ -52,7 +56,14 @@ class NotificationRepository {
   }) async {
     try {
       await _collection.add(
-        AppNotification(id: '', userId: '', title: title, body: body, category: category, createdAt: DateTime.now()).toMap(),
+        AppNotification(
+          id: '',
+          userId: '',
+          title: title,
+          body: body,
+          category: category,
+          createdAt: DateTime.now(),
+        ).toMap(),
       );
     } catch (e) {
       throw AppException.from(e);

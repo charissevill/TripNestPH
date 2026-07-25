@@ -14,6 +14,7 @@ import '../../core/theme/app_spacing.dart';
 import '../../core/utils/app_exception.dart';
 import '../../core/widgets/buttons/animated_button.dart';
 import '../../core/widgets/inputs/search_bar_widget.dart';
+import '../../core/widgets/states/loading_widget.dart';
 import '../../data/repositories/destination_repository.dart';
 import '../../data/repositories/province_repository.dart';
 import '../../domain/models/destination.dart';
@@ -29,7 +30,11 @@ class _BudgetTier {
 
 const List<_BudgetTier> _budgetTiers = [
   _BudgetTier('Budget', '₱5k – ₱15k', Symbols.savings_rounded),
-  _BudgetTier('Mid-range', '₱15k – ₱40k', Symbols.account_balance_wallet_rounded),
+  _BudgetTier(
+    'Mid-range',
+    '₱15k – ₱40k',
+    Symbols.account_balance_wallet_rounded,
+  ),
   _BudgetTier('Luxury', '₱40k+', Symbols.diamond_rounded),
 ];
 
@@ -109,13 +114,25 @@ class _AiPlannerScreenState extends State<AiPlannerScreen> {
   }
 
   Future<void> _editDays() async {
-    final value = await _promptForNumber(context, title: 'How many days?', initial: _days, min: 1, max: 14);
+    final value = await _promptForNumber(
+      context,
+      title: 'How many days?',
+      initial: _days,
+      min: 1,
+      max: 14,
+    );
     if (value != null) setState(() => _days = value);
   }
 
   Future<void> _editTravelers() async {
     final (min, max) = _travelerRangeFor(_travelerType);
-    final value = await _promptForNumber(context, title: 'How many travelers?', initial: _travelers, min: min, max: max);
+    final value = await _promptForNumber(
+      context,
+      title: 'How many travelers?',
+      initial: _travelers,
+      min: min,
+      max: max,
+    );
     if (value != null) setState(() => _travelers = value);
   }
 
@@ -124,7 +141,10 @@ class _AiPlannerScreenState extends State<AiPlannerScreen> {
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (context) => _DestinationPickerSheet(currentDestination: _destination, currentProvince: _province),
+      builder: (context) => _DestinationPickerSheet(
+        currentDestination: _destination,
+        currentProvince: _province,
+      ),
     );
     if (selected is Destination) {
       setState(() {
@@ -171,10 +191,18 @@ class _AiPlannerScreenState extends State<AiPlannerScreen> {
 
     if (!mounted) return;
     if (itinerary != null) {
-      context.push(RoutePaths.generatedItinerary, extra: {'itinerary': itinerary});
+      context.push(
+        RoutePaths.generatedItinerary,
+        extra: {'itinerary': itinerary},
+      );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(planner.errorMessage ?? 'Couldn\'t generate your itinerary. Please try again.')),
+        SnackBar(
+          content: Text(
+            planner.errorMessage ??
+                'Couldn\'t generate your itinerary. Please try again.',
+          ),
+        ),
       );
     }
   }
@@ -186,11 +214,19 @@ class _AiPlannerScreenState extends State<AiPlannerScreen> {
     return Scaffold(
       body: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.sm, AppSpacing.lg, AppSpacing.huge),
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.lg,
+            AppSpacing.sm,
+            AppSpacing.lg,
+            AppSpacing.huge,
+          ),
           children: [
             Text('Planner', style: theme.textTheme.displayMedium),
             const SizedBox(height: 2),
-            Text('Plan your next Philippine adventure with AI', style: theme.textTheme.bodyMedium),
+            Text(
+              'Plan your next Philippine adventure with AI',
+              style: theme.textTheme.bodyMedium,
+            ),
             const SizedBox(height: AppSpacing.lg),
             Container(
               padding: const EdgeInsets.all(AppSpacing.lg),
@@ -206,29 +242,45 @@ class _AiPlannerScreenState extends State<AiPlannerScreen> {
                       children: [
                         Text(
                           'AI Trip Planner',
-                          style: theme.textTheme.headlineMedium?.copyWith(color: Colors.white),
+                          style: theme.textTheme.headlineMedium?.copyWith(
+                            color: Colors.white,
+                          ),
                         ),
                         const SizedBox(height: 4),
                         Text(
                           'Answer a few questions and get a personalized day-by-day itinerary.',
-                          style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 13, height: 1.4),
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.9),
+                            fontSize: 13,
+                            height: 1.4,
+                          ),
                         ),
                       ],
                     ),
                   ),
                   const SizedBox(width: AppSpacing.sm),
-                  const Icon(Symbols.auto_awesome_rounded, color: Colors.white, size: 40),
+                  const Icon(
+                    Symbols.auto_awesome_rounded,
+                    color: Colors.white,
+                    size: 40,
+                  ),
                 ],
               ),
             ).animate().fadeIn(duration: 380.ms).moveY(begin: 12, end: 0),
             const SizedBox(height: AppSpacing.xxl),
-            const _FieldLabel(icon: Symbols.location_on_rounded, label: 'Where do you want to go?'),
+            const _FieldLabel(
+              icon: Symbols.location_on_rounded,
+              label: 'Where do you want to go?',
+            ),
             const SizedBox(height: AppSpacing.sm),
             InkWell(
               onTap: _pickDestination,
               borderRadius: BorderRadius.circular(AppRadius.lg),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.md),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.md,
+                  vertical: AppSpacing.md,
+                ),
                 decoration: BoxDecoration(
                   color: theme.colorScheme.surface,
                   borderRadius: BorderRadius.circular(AppRadius.lg),
@@ -241,20 +293,28 @@ class _AiPlannerScreenState extends State<AiPlannerScreen> {
                         _destination != null
                             ? '${_destination!.name}, ${_destination!.provinceName}'
                             : _province != null
-                                ? '${_province!.name} (whole province)'
-                                : 'Select a destination',
+                            ? '${_province!.name} (whole province)'
+                            : 'Select a destination',
                         style: theme.textTheme.bodyLarge?.copyWith(
-                          color: _destination == null && _province == null ? AppColors.textTertiary : AppColors.textPrimary,
+                          color: _destination == null && _province == null
+                              ? AppColors.textTertiary
+                              : AppColors.textPrimary,
                         ),
                       ),
                     ),
-                    const Icon(Symbols.expand_more_rounded, color: AppColors.textSecondary),
+                    const Icon(
+                      Symbols.expand_more_rounded,
+                      color: AppColors.textSecondary,
+                    ),
                   ],
                 ),
               ),
             ),
             const SizedBox(height: AppSpacing.xxl),
-            const _FieldLabel(icon: Symbols.account_balance_wallet_rounded, label: 'What\'s your budget?'),
+            const _FieldLabel(
+              icon: Symbols.account_balance_wallet_rounded,
+              label: 'What\'s your budget?',
+            ),
             const SizedBox(height: AppSpacing.sm),
             Row(
               children: List.generate(_budgetTiers.length, (i) {
@@ -262,7 +322,9 @@ class _AiPlannerScreenState extends State<AiPlannerScreen> {
                 final selected = _budgetTierIndex == i;
                 return Expanded(
                   child: Padding(
-                    padding: EdgeInsets.only(right: i == _budgetTiers.length - 1 ? 0 : AppSpacing.sm),
+                    padding: EdgeInsets.only(
+                      right: i == _budgetTiers.length - 1 ? 0 : AppSpacing.sm,
+                    ),
                     child: _SelectableCard(
                       icon: tier.icon,
                       title: tier.label,
@@ -275,10 +337,16 @@ class _AiPlannerScreenState extends State<AiPlannerScreen> {
               }),
             ),
             const SizedBox(height: AppSpacing.xxl),
-            const _FieldLabel(icon: Symbols.date_range_rounded, label: 'How many days?'),
+            const _FieldLabel(
+              icon: Symbols.date_range_rounded,
+              label: 'How many days?',
+            ),
             const SizedBox(height: AppSpacing.sm),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.sm),
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.lg,
+                vertical: AppSpacing.sm,
+              ),
               decoration: BoxDecoration(
                 color: theme.colorScheme.surface,
                 borderRadius: BorderRadius.circular(AppRadius.lg),
@@ -291,78 +359,127 @@ class _AiPlannerScreenState extends State<AiPlannerScreen> {
                     onTap: _editDays,
                     borderRadius: BorderRadius.circular(AppRadius.sm),
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
+                      padding: const EdgeInsets.symmetric(
+                        vertical: AppSpacing.xs,
+                      ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Text('$_days ${_days == 1 ? 'day' : 'days'}', style: theme.textTheme.titleLarge),
+                          Text(
+                            '$_days ${_days == 1 ? 'day' : 'days'}',
+                            style: theme.textTheme.titleLarge,
+                          ),
                           const SizedBox(width: 4),
-                          const Icon(Symbols.edit_rounded, size: 15, color: AppColors.textTertiary),
+                          const Icon(
+                            Symbols.edit_rounded,
+                            size: 15,
+                            color: AppColors.textTertiary,
+                          ),
                         ],
                       ),
                     ),
                   ),
                   Row(
                     children: [
-                      _StepperButton(icon: Symbols.remove_rounded, onTap: _days > 1 ? () => setState(() => _days--) : null),
+                      _StepperButton(
+                        icon: Symbols.remove_rounded,
+                        onTap: _days > 1 ? () => setState(() => _days--) : null,
+                      ),
                       const SizedBox(width: AppSpacing.sm),
-                      _StepperButton(icon: Symbols.add_rounded, onTap: _days < 14 ? () => setState(() => _days++) : null),
+                      _StepperButton(
+                        icon: Symbols.add_rounded,
+                        onTap: _days < 14
+                            ? () => setState(() => _days++)
+                            : null,
+                      ),
                     ],
                   ),
                 ],
               ),
             ),
             const SizedBox(height: AppSpacing.xxl),
-            const _FieldLabel(icon: Symbols.groups_2_rounded, label: 'How many travelers?'),
+            const _FieldLabel(
+              icon: Symbols.groups_2_rounded,
+              label: 'How many travelers?',
+            ),
             const SizedBox(height: AppSpacing.sm),
-            Builder(builder: (context) {
-              final (min, max) = _travelerRangeFor(_travelerType);
-              final locked = min == max;
-              return Container(
-                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.sm),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.surface,
-                  borderRadius: BorderRadius.circular(AppRadius.lg),
-                  border: Border.all(color: AppColors.border),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    InkWell(
-                      onTap: locked ? null : _editTravelers,
-                      borderRadius: BorderRadius.circular(AppRadius.sm),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text('$_travelers ${_travelers == 1 ? 'traveler' : 'travelers'}', style: theme.textTheme.titleLarge),
-                            if (!locked) ...[
-                              const SizedBox(width: 4),
-                              const Icon(Symbols.edit_rounded, size: 15, color: AppColors.textTertiary),
+            Builder(
+              builder: (context) {
+                final (min, max) = _travelerRangeFor(_travelerType);
+                final locked = min == max;
+                return Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.lg,
+                    vertical: AppSpacing.sm,
+                  ),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surface,
+                    borderRadius: BorderRadius.circular(AppRadius.lg),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      InkWell(
+                        onTap: locked ? null : _editTravelers,
+                        borderRadius: BorderRadius.circular(AppRadius.sm),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            vertical: AppSpacing.xs,
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                '$_travelers ${_travelers == 1 ? 'traveler' : 'travelers'}',
+                                style: theme.textTheme.titleLarge,
+                              ),
+                              if (!locked) ...[
+                                const SizedBox(width: 4),
+                                const Icon(
+                                  Symbols.edit_rounded,
+                                  size: 15,
+                                  color: AppColors.textTertiary,
+                                ),
+                              ],
                             ],
-                          ],
+                          ),
                         ),
                       ),
-                    ),
-                    Row(
-                      children: [
-                        _StepperButton(icon: Symbols.remove_rounded, onTap: _travelers > min ? () => setState(() => _travelers--) : null),
-                        const SizedBox(width: AppSpacing.sm),
-                        _StepperButton(icon: Symbols.add_rounded, onTap: _travelers < max ? () => setState(() => _travelers++) : null),
-                      ],
-                    ),
-                  ],
-                ),
-              );
-            }),
+                      Row(
+                        children: [
+                          _StepperButton(
+                            icon: Symbols.remove_rounded,
+                            onTap: _travelers > min
+                                ? () => setState(() => _travelers--)
+                                : null,
+                          ),
+                          const SizedBox(width: AppSpacing.sm),
+                          _StepperButton(
+                            icon: Symbols.add_rounded,
+                            onTap: _travelers < max
+                                ? () => setState(() => _travelers++)
+                                : null,
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
             const SizedBox(height: AppSpacing.xs),
             Text(
               _travelerRangeHint(_travelerType),
-              style: theme.textTheme.bodySmall?.copyWith(color: AppColors.textTertiary),
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: AppColors.textTertiary,
+              ),
             ),
             const SizedBox(height: AppSpacing.xxl),
-            const _FieldLabel(icon: Symbols.diversity_3_rounded, label: 'Who\'s traveling?'),
+            const _FieldLabel(
+              icon: Symbols.diversity_3_rounded,
+              label: 'Who\'s traveling?',
+            ),
             const SizedBox(height: AppSpacing.sm),
             Wrap(
               spacing: AppSpacing.sm,
@@ -383,7 +500,10 @@ class _AiPlannerScreenState extends State<AiPlannerScreen> {
               }).toList(),
             ),
             const SizedBox(height: AppSpacing.xxl),
-            const _FieldLabel(icon: Symbols.commute_rounded, label: 'Preferred transportation'),
+            const _FieldLabel(
+              icon: Symbols.commute_rounded,
+              label: 'Preferred transportation',
+            ),
             const SizedBox(height: AppSpacing.sm),
             Wrap(
               spacing: AppSpacing.sm,
@@ -396,13 +516,17 @@ class _AiPlannerScreenState extends State<AiPlannerScreen> {
                   icon: icon,
                   selected: selected,
                   onTap: () => setState(() {
-                    if (!_transportation.remove(label)) _transportation.add(label);
+                    if (!_transportation.remove(label))
+                      _transportation.add(label);
                   }),
                 );
               }).toList(),
             ),
             const SizedBox(height: AppSpacing.xxl),
-            const _FieldLabel(icon: Symbols.interests_rounded, label: 'What are you interested in?'),
+            const _FieldLabel(
+              icon: Symbols.interests_rounded,
+              label: 'What are you interested in?',
+            ),
             const SizedBox(height: AppSpacing.sm),
             Wrap(
               spacing: AppSpacing.sm,
@@ -428,7 +552,12 @@ class _AiPlannerScreenState extends State<AiPlannerScreen> {
       // the bottom where it's easy to miss entirely.
       bottomNavigationBar: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.sm, AppSpacing.lg, AppSpacing.sm),
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.lg,
+            AppSpacing.sm,
+            AppSpacing.lg,
+            AppSpacing.sm,
+          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -442,10 +571,18 @@ class _AiPlannerScreenState extends State<AiPlannerScreen> {
                   ),
                 ),
               AnimatedButton(
-                label: planner.isGenerating ? 'Crafting your itinerary...' : 'Generate Itinerary',
-                icon: planner.isGenerating ? null : Symbols.auto_awesome_rounded,
+                label: planner.isGenerating
+                    ? 'Crafting your itinerary...'
+                    : 'Generate Itinerary',
+                icon: planner.isGenerating
+                    ? null
+                    : Symbols.auto_awesome_rounded,
                 isLoading: planner.isGenerating,
-                onPressed: (_destination == null && _province == null) || planner.isGenerating ? null : _generate,
+                onPressed:
+                    (_destination == null && _province == null) ||
+                        planner.isGenerating
+                    ? null
+                    : _generate,
                 height: 60,
               ),
             ],
@@ -483,19 +620,25 @@ Future<int?> _promptForNumber(
           validator: (v) {
             final n = int.tryParse((v ?? '').trim());
             if (n == null) return 'Enter a whole number';
-            if (n < min || n > max) return 'Enter a number between $min and $max';
+            if (n < min || n > max)
+              return 'Enter a number between $min and $max';
             return null;
           },
           onFieldSubmitted: (_) {
-            if (formKey.currentState!.validate()) Navigator.of(context).pop(int.parse(controller.text.trim()));
+            if (formKey.currentState!.validate())
+              Navigator.of(context).pop(int.parse(controller.text.trim()));
           },
         ),
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cancel')),
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
         FilledButton(
           onPressed: () {
-            if (formKey.currentState!.validate()) Navigator.of(context).pop(int.parse(controller.text.trim()));
+            if (formKey.currentState!.validate())
+              Navigator.of(context).pop(int.parse(controller.text.trim()));
           },
           child: const Text('Save'),
         ),
@@ -552,19 +695,40 @@ class _SelectableCard extends StatelessWidget {
       borderRadius: BorderRadius.circular(AppRadius.lg),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(vertical: AppSpacing.md, horizontal: AppSpacing.xs),
+        padding: const EdgeInsets.symmetric(
+          vertical: AppSpacing.md,
+          horizontal: AppSpacing.xs,
+        ),
         decoration: BoxDecoration(
-          color: selected ? AppColors.primary.withValues(alpha: 0.1) : theme.colorScheme.surface,
+          color: selected
+              ? AppColors.primary.withValues(alpha: 0.1)
+              : theme.colorScheme.surface,
           borderRadius: BorderRadius.circular(AppRadius.lg),
-          border: Border.all(color: selected ? AppColors.primary : AppColors.border, width: selected ? 1.6 : 1),
+          border: Border.all(
+            color: selected ? AppColors.primary : AppColors.border,
+            width: selected ? 1.6 : 1,
+          ),
         ),
         child: Column(
           children: [
-            Icon(icon, color: selected ? AppColors.primary : AppColors.textSecondary, size: 26),
+            Icon(
+              icon,
+              color: selected ? AppColors.primary : AppColors.textSecondary,
+              size: 26,
+            ),
             const SizedBox(height: 6),
-            Text(title, style: theme.textTheme.titleSmall?.copyWith(color: selected ? AppColors.primary : AppColors.textPrimary)),
+            Text(
+              title,
+              style: theme.textTheme.titleSmall?.copyWith(
+                color: selected ? AppColors.primary : AppColors.textPrimary,
+              ),
+            ),
             const SizedBox(height: 2),
-            Text(subtitle, style: theme.textTheme.bodySmall, textAlign: TextAlign.center),
+            Text(
+              subtitle,
+              style: theme.textTheme.bodySmall,
+              textAlign: TextAlign.center,
+            ),
           ],
         ),
       ),
@@ -573,7 +737,12 @@ class _SelectableCard extends StatelessWidget {
 }
 
 class _SelectableChip extends StatelessWidget {
-  const _SelectableChip({required this.label, required this.icon, required this.selected, required this.onTap});
+  const _SelectableChip({
+    required this.label,
+    required this.icon,
+    required this.selected,
+    required this.onTap,
+  });
 
   final String label;
   final IconData icon;
@@ -587,20 +756,33 @@ class _SelectableChip extends StatelessWidget {
       borderRadius: BorderRadius.circular(AppRadius.pill),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: AppSpacing.sm,
+        ),
         decoration: BoxDecoration(
-          color: selected ? AppColors.primary : Theme.of(context).colorScheme.surface,
+          color: selected
+              ? AppColors.primary
+              : Theme.of(context).colorScheme.surface,
           borderRadius: BorderRadius.circular(AppRadius.pill),
-          border: Border.all(color: selected ? AppColors.primary : AppColors.border),
+          border: Border.all(
+            color: selected ? AppColors.primary : AppColors.border,
+          ),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 16, color: selected ? Colors.white : AppColors.textSecondary),
+            Icon(
+              icon,
+              size: 16,
+              color: selected ? Colors.white : AppColors.textSecondary,
+            ),
             const SizedBox(width: AppSpacing.xs),
             Text(
               label,
-              style: Theme.of(context).textTheme.labelMedium?.copyWith(color: selected ? Colors.white : AppColors.textPrimary),
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                color: selected ? Colors.white : AppColors.textPrimary,
+              ),
             ),
           ],
         ),
@@ -625,10 +807,16 @@ class _StepperButton extends StatelessWidget {
         width: 34,
         height: 34,
         decoration: BoxDecoration(
-          color: enabled ? AppColors.primary.withValues(alpha: 0.1) : AppColors.border,
+          color: enabled
+              ? AppColors.primary.withValues(alpha: 0.1)
+              : AppColors.border,
           shape: BoxShape.circle,
         ),
-        child: Icon(icon, size: 18, color: enabled ? AppColors.primary : AppColors.textTertiary),
+        child: Icon(
+          icon,
+          size: 18,
+          color: enabled ? AppColors.primary : AppColors.textTertiary,
+        ),
       ),
     );
   }
@@ -637,13 +825,17 @@ class _StepperButton extends StatelessWidget {
 enum _PickerMode { destination, province }
 
 class _DestinationPickerSheet extends StatefulWidget {
-  const _DestinationPickerSheet({required this.currentDestination, required this.currentProvince});
+  const _DestinationPickerSheet({
+    required this.currentDestination,
+    required this.currentProvince,
+  });
 
   final Destination? currentDestination;
   final Province? currentProvince;
 
   @override
-  State<_DestinationPickerSheet> createState() => _DestinationPickerSheetState();
+  State<_DestinationPickerSheet> createState() =>
+      _DestinationPickerSheetState();
 }
 
 class _DestinationPickerSheetState extends State<_DestinationPickerSheet> {
@@ -651,7 +843,9 @@ class _DestinationPickerSheetState extends State<_DestinationPickerSheet> {
   final ProvinceRepository _provinceRepository = ProvinceRepository();
   final TextEditingController _searchController = TextEditingController();
   Timer? _debounce;
-  late _PickerMode _mode = widget.currentProvince != null ? _PickerMode.province : _PickerMode.destination;
+  late _PickerMode _mode = widget.currentProvince != null
+      ? _PickerMode.province
+      : _PickerMode.destination;
 
   List<Destination>? _destinations;
   Object? _destinationsError;
@@ -677,7 +871,9 @@ class _DestinationPickerSheetState extends State<_DestinationPickerSheet> {
   Future<void> _loadDestinations({String query = ''}) async {
     setState(() => _destinationsError = null);
     try {
-      final results = query.trim().isEmpty ? await _destinationRepository.getPopular(limit: 50) : await _destinationRepository.searchByName(query.trim());
+      final results = query.trim().isEmpty
+          ? await _destinationRepository.getPopular(limit: 50)
+          : await _destinationRepository.searchByName(query.trim());
       if (mounted) setState(() => _destinations = results);
     } catch (e) {
       if (mounted) setState(() => _destinationsError = e);
@@ -687,7 +883,8 @@ class _DestinationPickerSheetState extends State<_DestinationPickerSheet> {
   Future<void> _loadProvinces() async {
     setState(() => _provincesError = null);
     try {
-      final results = (await _provinceRepository.getAll())..sort((a, b) => a.name.compareTo(b.name));
+      final results = (await _provinceRepository.getAll())
+        ..sort((a, b) => a.name.compareTo(b.name));
       if (mounted) setState(() => _allProvinces = results);
     } catch (e) {
       if (mounted) setState(() => _provincesError = e);
@@ -700,7 +897,10 @@ class _DestinationPickerSheetState extends State<_DestinationPickerSheet> {
       return;
     }
     _debounce?.cancel();
-    _debounce = Timer(const Duration(milliseconds: 350), () => _loadDestinations(query: value));
+    _debounce = Timer(
+      const Duration(milliseconds: 350),
+      () => _loadDestinations(query: value),
+    );
   }
 
   void _switchMode(_PickerMode mode) {
@@ -716,7 +916,11 @@ class _DestinationPickerSheetState extends State<_DestinationPickerSheet> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final provinces = _allProvinces?.where((p) => p.name.toLowerCase().contains(_provinceQuery.toLowerCase())).toList();
+    final provinces = _allProvinces
+        ?.where(
+          (p) => p.name.toLowerCase().contains(_provinceQuery.toLowerCase()),
+        )
+        .toList();
     return DraggableScrollableSheet(
       initialChildSize: 0.7,
       minChildSize: 0.4,
@@ -725,19 +929,38 @@ class _DestinationPickerSheetState extends State<_DestinationPickerSheet> {
       builder: (context, scrollController) {
         return Material(
           color: theme.colorScheme.surface,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadius.xxl)),
+          borderRadius: const BorderRadius.vertical(
+            top: Radius.circular(AppRadius.xxl),
+          ),
           child: Column(
             children: [
               const SizedBox(height: AppSpacing.sm),
-              Container(width: 44, height: 5, decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(AppRadius.pill))),
+              Container(
+                width: 44,
+                height: 5,
+                decoration: BoxDecoration(
+                  color: AppColors.border,
+                  borderRadius: BorderRadius.circular(AppRadius.pill),
+                ),
+              ),
               Padding(
-                padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.lg, AppSpacing.lg, AppSpacing.md),
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.lg,
+                  AppSpacing.lg,
+                  AppSpacing.lg,
+                  AppSpacing.md,
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Align(
                       alignment: Alignment.centerLeft,
-                      child: Text(_mode == _PickerMode.destination ? 'Choose a destination' : 'Choose a province', style: theme.textTheme.headlineSmall),
+                      child: Text(
+                        _mode == _PickerMode.destination
+                            ? 'Choose a destination'
+                            : 'Choose a province',
+                        style: theme.textTheme.headlineSmall,
+                      ),
                     ),
                     const SizedBox(height: AppSpacing.md),
                     Row(
@@ -760,7 +983,9 @@ class _DestinationPickerSheetState extends State<_DestinationPickerSheet> {
                     const SizedBox(height: AppSpacing.md),
                     SearchBarWidget(
                       controller: _searchController,
-                      hintText: _mode == _PickerMode.destination ? 'Search destinations...' : 'Search provinces...',
+                      hintText: _mode == _PickerMode.destination
+                          ? 'Search destinations...'
+                          : 'Search provinces...',
                       onChanged: _onSearchChanged,
                     ),
                   ],
@@ -769,67 +994,113 @@ class _DestinationPickerSheetState extends State<_DestinationPickerSheet> {
               Expanded(
                 child: _mode == _PickerMode.destination
                     ? _destinationsError != null
-                        ? Center(
-                            child: Padding(
-                              padding: const EdgeInsets.all(AppSpacing.lg),
-                              child: Text(AppException.from(_destinationsError!).message, textAlign: TextAlign.center),
-                            ),
-                          )
-                        : _destinations == null
-                            ? const Center(child: CircularProgressIndicator())
-                            : _destinations!.isEmpty
-                                ? const Center(child: Text('No destinations found'))
-                                : ListView.builder(
-                                    controller: scrollController,
-                                    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-                                    itemCount: _destinations!.length,
-                                    itemBuilder: (context, i) {
-                                      final destination = _destinations![i];
-                                      final selected = widget.currentDestination?.id == destination.id;
-                                      return ListTile(
-                                        onTap: () => Navigator.of(context).pop(destination),
-                                        contentPadding: EdgeInsets.zero,
-                                        leading: CircleAvatar(
-                                          backgroundColor: AppColors.primary.withValues(alpha: 0.12),
-                                          child: const Icon(Symbols.place_rounded, color: AppColors.primary),
-                                        ),
-                                        title: Text(destination.name),
-                                        subtitle: Text(destination.provinceName),
-                                        trailing: selected ? const Icon(Symbols.check_circle_rounded, color: AppColors.primary) : null,
-                                      );
-                                    },
-                                  )
-                    : _provincesError != null
-                        ? Center(
-                            child: Padding(
-                              padding: const EdgeInsets.all(AppSpacing.lg),
-                              child: Text(AppException.from(_provincesError!).message, textAlign: TextAlign.center),
-                            ),
-                          )
-                        : provinces == null
-                            ? const Center(child: CircularProgressIndicator())
-                            : provinces.isEmpty
-                                ? const Center(child: Text('No provinces found'))
-                                : ListView.builder(
-                                    controller: scrollController,
-                                    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-                                    itemCount: provinces.length,
-                                    itemBuilder: (context, i) {
-                                      final province = provinces[i];
-                                      final selected = widget.currentProvince?.id == province.id;
-                                      return ListTile(
-                                        onTap: () => Navigator.of(context).pop(province),
-                                        contentPadding: EdgeInsets.zero,
-                                        leading: CircleAvatar(
-                                          backgroundColor: AppColors.primary.withValues(alpha: 0.12),
-                                          child: const Icon(Symbols.public_rounded, color: AppColors.primary),
-                                        ),
-                                        title: Text(province.name),
-                                        subtitle: Text(province.regionName),
-                                        trailing: selected ? const Icon(Symbols.check_circle_rounded, color: AppColors.primary) : null,
-                                      );
-                                    },
+                          ? Center(
+                              child: Padding(
+                                padding: const EdgeInsets.all(AppSpacing.lg),
+                                child: Text(
+                                  AppException.from(
+                                    _destinationsError!,
+                                  ).message,
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                            )
+                          : _destinations == null
+                          ? ListView(
+                              children: List.generate(
+                                6,
+                                (_) =>
+                                    LoadingWidget.textTile(leadingCircle: true),
+                              ),
+                            )
+                          : _destinations!.isEmpty
+                          ? const Center(child: Text('No destinations found'))
+                          : ListView.builder(
+                              controller: scrollController,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: AppSpacing.lg,
+                              ),
+                              itemCount: _destinations!.length,
+                              itemBuilder: (context, i) {
+                                final destination = _destinations![i];
+                                final selected =
+                                    widget.currentDestination?.id ==
+                                    destination.id;
+                                return ListTile(
+                                  onTap: () =>
+                                      Navigator.of(context).pop(destination),
+                                  contentPadding: EdgeInsets.zero,
+                                  leading: CircleAvatar(
+                                    backgroundColor: AppColors.primary
+                                        .withValues(alpha: 0.12),
+                                    child: const Icon(
+                                      Symbols.place_rounded,
+                                      color: AppColors.primary,
+                                    ),
                                   ),
+                                  title: Text(destination.name),
+                                  subtitle: Text(destination.provinceName),
+                                  trailing: selected
+                                      ? const Icon(
+                                          Symbols.check_circle_rounded,
+                                          color: AppColors.primary,
+                                        )
+                                      : null,
+                                );
+                              },
+                            )
+                    : _provincesError != null
+                    ? Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(AppSpacing.lg),
+                          child: Text(
+                            AppException.from(_provincesError!).message,
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      )
+                    : provinces == null
+                    ? ListView(
+                        children: List.generate(
+                          6,
+                          (_) => LoadingWidget.textTile(leadingCircle: true),
+                        ),
+                      )
+                    : provinces.isEmpty
+                    ? const Center(child: Text('No provinces found'))
+                    : ListView.builder(
+                        controller: scrollController,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.lg,
+                        ),
+                        itemCount: provinces.length,
+                        itemBuilder: (context, i) {
+                          final province = provinces[i];
+                          final selected =
+                              widget.currentProvince?.id == province.id;
+                          return ListTile(
+                            onTap: () => Navigator.of(context).pop(province),
+                            contentPadding: EdgeInsets.zero,
+                            leading: CircleAvatar(
+                              backgroundColor: AppColors.primary.withValues(
+                                alpha: 0.12,
+                              ),
+                              child: const Icon(
+                                Symbols.public_rounded,
+                                color: AppColors.primary,
+                              ),
+                            ),
+                            title: Text(province.name),
+                            subtitle: Text(province.regionName),
+                            trailing: selected
+                                ? const Icon(
+                                    Symbols.check_circle_rounded,
+                                    color: AppColors.primary,
+                                  )
+                                : null,
+                          );
+                        },
+                      ),
               ),
             ],
           ),

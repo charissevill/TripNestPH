@@ -6,24 +6,32 @@ import '../../domain/models/festival.dart';
 
 /// Firestore access for the `festivals` collection.
 class FestivalRepository {
-  FestivalRepository({FirebaseFirestore? firestore}) : _db = firestore ?? FirebaseFirestore.instance;
+  FestivalRepository({FirebaseFirestore? firestore})
+    : _db = firestore ?? FirebaseFirestore.instance;
 
   final FirebaseFirestore _db;
 
-  CollectionReference<Map<String, dynamic>> get _collection => _db.collection(FirestorePaths.festivals);
+  CollectionReference<Map<String, dynamic>> get _collection =>
+      _db.collection(FirestorePaths.festivals);
 
-  Festival _fromDoc(QueryDocumentSnapshot<Map<String, dynamic>> doc) => Festival.fromMap(doc.id, doc.data());
+  Festival _fromDoc(QueryDocumentSnapshot<Map<String, dynamic>> doc) =>
+      Festival.fromMap(doc.id, doc.data());
 
   /// Every traveler-facing query filters to `status == 'published'` so
-  /// content drafted in the Admin Portal never surfaces here — direct
-  /// lookups (getById/getByIds) intentionally skip this filter.
-  Query<Map<String, dynamic>> get _publishedOnly => _collection.where('status', isEqualTo: 'published');
+  /// content drafted in the Admin Portal never surfaces here — `getById`
+  /// intentionally skips this filter (an already-linked festival shouldn't
+  /// 404 if it's since gone back to draft), but `getByIds` can't:
+  /// firestore.rules requires a `list` query to be provably published-only.
+  Query<Map<String, dynamic>> get _publishedOnly =>
+      _collection.where('status', isEqualTo: 'published');
 
-  Future<List<Festival>> getUpcoming({int limit = 10}) => _query(
-        _publishedOnly.where('isUpcoming', isEqualTo: true).limit(limit),
-      );
+  Future<List<Festival>> getUpcoming({int limit = 10}) =>
+      _query(_publishedOnly.where('isUpcoming', isEqualTo: true).limit(limit));
 
-  Future<({List<Festival> items, DocumentSnapshot<Map<String, dynamic>>? lastDoc})> getPage({
+  Future<
+    ({List<Festival> items, DocumentSnapshot<Map<String, dynamic>>? lastDoc})
+  >
+  getPage({
     int pageSize = 20,
     DocumentSnapshot<Map<String, dynamic>>? startAfter,
   }) async {
@@ -53,7 +61,10 @@ class FestivalRepository {
   Future<List<Festival>> getByIds(List<String> ids) async {
     if (ids.isEmpty) return [];
     try {
-      final snapshot = await _collection.where(FieldPath.documentId, whereIn: ids.take(30).toList()).get();
+      final snapshot = await _collection
+          .where(FieldPath.documentId, whereIn: ids.take(30).toList())
+          .where('status', isEqualTo: 'published')
+          .get();
       return snapshot.docs.map(_fromDoc).toList();
     } catch (e) {
       throw AppException.from(e);
@@ -81,7 +92,11 @@ class FestivalRepository {
     }
   }
 
-  Future<List<Festival>> filter({String? provinceId, double? minRating, int limit = 30}) async {
+  Future<List<Festival>> filter({
+    String? provinceId,
+    double? minRating,
+    int limit = 30,
+  }) async {
     try {
       Query<Map<String, dynamic>> query = _publishedOnly;
       if (provinceId != null && provinceId.isNotEmpty) {
@@ -97,20 +112,16 @@ class FestivalRepository {
     }
   }
 
-  Future<void> updateAggregateRating(String id, {required double rating, required int reviewCount}) async {
+  Future<void> updateAggregateRating(
+    String id, {
+    required double rating,
+    required int reviewCount,
+  }) async {
     try {
-      await _collection.doc(id).update({'rating': rating, 'reviewCount': reviewCount});
-    } catch (e) {
-      throw AppException.from(e);
-    }
-  }
-
-  /// Every festival created by [uid] regardless of status — an
-  /// `eventOrganizer` account's own "My Events" list.
-  Future<List<Festival>> getAllForOwner(String uid) async {
-    try {
-      final snapshot = await _collection.where('organizerId', isEqualTo: uid).orderBy('name').get();
-      return snapshot.docs.map(_fromDoc).toList();
+      await _collection.doc(id).update({
+        'rating': rating,
+        'reviewCount': reviewCount,
+      });
     } catch (e) {
       throw AppException.from(e);
     }
@@ -127,10 +138,10 @@ class FestivalRepository {
     }
   }
 
-  /// Admin/LGU/eventOrganizer write — matches `firestore.rules`'s
-  /// `hasAdminRole(['admin','lgu'])` (unscoped) or eventOrganizer
-  /// (organizerId-scoped) create permission. Published immediately, same
-  /// no-draft-workflow precedent as `DestinationRepository.create`.
+  /// Admin/LGU write — matches `firestore.rules`'s
+  /// `hasAdminRole(['admin','lgu'])` create permission. Published
+  /// immediately, same no-draft-workflow precedent as
+  /// `DestinationRepository.create`.
   Future<String> create(Festival festival) async {
     try {
       final doc = await _collection.add({

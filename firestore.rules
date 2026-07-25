@@ -27,6 +27,19 @@ service cloud.firestore {
         && request.resource.data.comment is string && request.resource.data.comment.size() <= 2000;
     }
 
+    // A traveler's client-side aggregate-recalculation write (see
+    // ReviewRepository._recalculateAggregate) is trusted to have computed
+    // the right numbers, but the rule itself still has to stop a client
+    // from writing garbage straight to a public listing's rating —
+    // wrong type, a negative count, or a rating outside the 0–5 review
+    // scale would otherwise pass silently.
+    function isValidAggregateUpdate() {
+      return request.resource.data.rating is number
+        && request.resource.data.rating >= 0 && request.resource.data.rating <= 5
+        && request.resource.data.reviewCount is int
+        && request.resource.data.reviewCount >= 0;
+    }
+
     // ---- Admin Portal role helpers ---------------------------------------
     // admin_users/{uid} is the Admin Portal's own account directory
     // (Phase 4), entirely separate from the mobile app's traveler `users`
@@ -121,44 +134,66 @@ service cloud.firestore {
       match /recently_viewed/{destinationId} {
         allow read, write: if isOwner(userId);
       }
+
+      // Backs a review's Verified Visit badge (ReviewRepository checks this
+      // before stamping `verified` at creation) — same owner-only shape as
+      // recently_viewed above.
+      match /visited/{visitId} {
+        allow read, write: if isOwner(userId);
+      }
     }
 
-    // ---- Public content: tourist_spots / restaurants / festivals -------
-    // Read is open to any signed-in traveler. tourist_spots and restaurants
-    // are curated catalog content — only Admin/LGU accounts write them, the
-    // same stewardship model as provinces. (businessOwner accounts get
-    // their own properly owner-scoped self-service lane via `businesses`
-    // below, rather than broad unscoped write access to every restaurant.)
-    // Travelers can still only touch the aggregate rating/reviewCount
-    // fields, which ReviewRepository recalculates after a review is added,
-    // edited or deleted.
+    // ---- Public content: tourist_spots / festivals ----------------------
+    // A single doc `get` (an already-known id, e.g. a favorited or
+    // itinerary-linked spot) stays open to any signed-in traveler even if
+    // that spot has since gone back to draft — matches
+    // DestinationRepository/FestivalRepository's getById. A `list`/query —
+    // including a batch `getByIds` — must be provably published-only,
+    // closing off "browse every draft directly" via a raw Firestore query
+    // that skips the app's own `_publishedOnly` filter; admin/lgu roles are
+    // exempt since they curate drafts here. tourist_spots is curated
+    // catalog content — only Admin/LGU accounts write it, the same
+    // stewardship model as provinces. Travelers can still only touch the
+    // aggregate rating/reviewCount fields, which ReviewRepository
+    // recalculates after a review is added, edited or deleted.
     match /tourist_spots/{spotId} {
-      allow read: if isSignedIn();
-      allow update: if (isSignedIn() && onlyChangedFields(['rating', 'reviewCount'])) || hasAdminRole(['admin', 'lgu']);
+      allow get: if isSignedIn();
+      allow list: if isSignedIn() && (resource.data.status == 'published' || hasAdminRole(['admin', 'lgu']));
+      allow update: if (isSignedIn() && onlyChangedFields(['rating', 'reviewCount']) && isValidAggregateUpdate()) || hasAdminRole(['admin', 'lgu']);
       allow create, delete: if hasAdminRole(['admin', 'lgu']);
     }
 
+    // ---- restaurants/{id} — mirrored from an approved foodAndDining ------
+    // businessOwner listing (see the class doc on Business), never authored
+    // directly. `create`/`delete` happen only as a side effect of an admin
+    // approving/deleting that business (never a direct traveler or
+    // business-owner create) — LGU is deliberately excluded here, unlike
+    // tourist_spots/festivals, since restaurant sourcing is fully owner-
+    // driven now. The linked owner can keep their own listing's info in
+    // sync post-approval, but can never flip `status` themselves (that
+    // follows their business's approval state) or touch the aggregate
+    // rating/reviewCount.
     match /restaurants/{restaurantId} {
-      allow read: if isSignedIn();
-      allow update: if (isSignedIn() && onlyChangedFields(['rating', 'reviewCount'])) || hasAdminRole(['admin', 'lgu']);
-      allow create, delete: if hasAdminRole(['admin', 'lgu']);
+      allow get: if isSignedIn();
+      allow list: if isSignedIn() && (resource.data.status == 'published' || hasAdminRole(['admin']));
+      allow create, delete: if hasAdminRole(['admin']);
+      allow update: if (isSignedIn() && onlyChangedFields(['rating', 'reviewCount']) && isValidAggregateUpdate())
+                    || hasAdminRole(['admin'])
+                    || (hasAdminRole(['businessOwner']) && resource.data.ownerId == request.auth.uid
+                        && request.resource.data.ownerId == request.auth.uid
+                        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['status', 'rating', 'reviewCount', 'ownerId', 'businessId']));
     }
 
     // Festivals: admin/lgu keep full curatorial control (official,
-    // province-run festivals). eventOrganizer accounts can create their own
-    // festivals and may only ever update/delete the ones they created —
-    // `organizerId` must equal their own uid on both the existing document
-    // and the write, so they can't adopt or edit someone else's listing.
+    // province-run festivals) — same stewardship model as tourist_spots
+    // and restaurants above.
     match /festivals/{festivalId} {
-      allow read: if isSignedIn();
-      allow create: if hasAdminRole(['admin', 'lgu'])
-                    || (hasAdminRole(['eventOrganizer']) && request.resource.data.organizerId == request.auth.uid);
-      allow update: if (isSignedIn() && onlyChangedFields(['rating', 'reviewCount']))
-                    || hasAdminRole(['admin', 'lgu'])
-                    || (hasAdminRole(['eventOrganizer']) && resource.data.organizerId == request.auth.uid
-                        && request.resource.data.organizerId == request.auth.uid);
-      allow delete: if hasAdminRole(['admin', 'lgu'])
-                    || (hasAdminRole(['eventOrganizer']) && resource.data.organizerId == request.auth.uid);
+      allow get: if isSignedIn();
+      allow list: if isSignedIn() && (resource.data.status == 'published' || hasAdminRole(['admin', 'lgu']));
+      allow create: if hasAdminRole(['admin', 'lgu']);
+      allow update: if (isSignedIn() && onlyChangedFields(['rating', 'reviewCount']) && isValidAggregateUpdate())
+                    || hasAdminRole(['admin', 'lgu']);
+      allow delete: if hasAdminRole(['admin', 'lgu']);
     }
 
     match /travel_tips/{tipId} {
@@ -208,6 +243,22 @@ service cloud.firestore {
       return ('collaboratorIds' in resource.data) && request.auth.uid in resource.data.collaboratorIds;
     }
 
+    function oldCollaboratorIds() {
+      return 'collaboratorIds' in resource.data ? resource.data.collaboratorIds : [];
+    }
+
+    function oldMemberNames() {
+      return 'memberNames' in resource.data ? resource.data.memberNames : {};
+    }
+
+    // A self-join/self-leave write may only ever touch the caller's own
+    // key in memberNames — otherwise a joiner could deface the display
+    // name stored for every other member of the trip.
+    function onlyOwnMemberNameChanged() {
+      return !('memberNames' in request.resource.data)
+        || oldMemberNames().diff(request.resource.data.memberNames).affectedKeys().hasOnly([request.auth.uid]);
+    }
+
     match /saved_itineraries/{itineraryId} {
       allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isCollaborator() || hasAdminRole(['admin']));
       allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
@@ -215,18 +266,24 @@ service cloud.firestore {
       allow update: if isSignedIn() && (
         // Owner: full control.
         resource.data.userId == request.auth.uid
-        // Self-join: add only yourself to collaboratorIds, nothing else changes.
+        // Self-join: add only yourself to collaboratorIds — every existing
+        // collaborator must still be present (a joiner can't evict anyone)
+        // — and touch only your own memberNames entry, nothing else.
         || (
-          onlyChangedFields(['collaboratorIds'])
-          && request.resource.data.collaboratorIds.hasOnly(
-               ('collaboratorIds' in resource.data ? resource.data.collaboratorIds : []).concat([request.auth.uid])
-             )
+          onlyChangedFields(['collaboratorIds', 'memberNames'])
+          && request.resource.data.collaboratorIds.hasOnly(oldCollaboratorIds().concat([request.auth.uid]))
+          && oldCollaboratorIds().hasOnly(request.resource.data.collaboratorIds)
+          && onlyOwnMemberNameChanged()
         )
-        // Self-leave: remove only yourself from collaboratorIds, nothing else changes.
+        // Self-leave: remove only yourself from collaboratorIds — nobody
+        // else's membership may change — and touch only your own
+        // memberNames entry (its removal), nothing else.
         || (
-          onlyChangedFields(['collaboratorIds'])
-          && ('collaboratorIds' in resource.data)
-          && resource.data.collaboratorIds.hasOnly(request.resource.data.collaboratorIds.concat([request.auth.uid]))
+          onlyChangedFields(['collaboratorIds', 'memberNames'])
+          && isCollaborator()
+          && oldCollaboratorIds().hasOnly(request.resource.data.collaboratorIds.concat([request.auth.uid]))
+          && request.resource.data.collaboratorIds.hasOnly(oldCollaboratorIds())
+          && onlyOwnMemberNameChanged()
         )
         // Existing collaborator: may check off / edit the shared packing list only.
         || (isCollaborator() && onlyChangedFields(['packingItems']))
@@ -262,12 +319,18 @@ service cloud.firestore {
       // The owner can edit their info freely, and additionally — only as
       // part of the same write — move their own listing from rejected
       // back to pending (fix-and-resubmit). They can never set 'approved'
-      // or 'suspended' themselves, and never touch ownerId.
-      allow update: if (hasAdminRole(['businessOwner']) && resource.data.ownerId == request.auth.uid && (
-                        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['status', 'rejectionReason', 'ownerId'])
+      // or 'suspended' themselves, never touch ownerId, and never link
+      // themselves to a restaurant doc (that's admin/system-managed —
+      // see RestaurantRepository.createFromBusiness).
+      allow update: if (hasAdminRole(['businessOwner']) && resource.data.ownerId == request.auth.uid
+                      && request.resource.data.ownerId == request.auth.uid && (
+                        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['status', 'rejectionReason', 'ownerId', 'restaurantId'])
                         || (resource.data.status == 'rejected' && request.resource.data.status == 'pending' && request.resource.data.rejectionReason == '')
                       ))
-                    || (hasAdminRole(['admin']) && onlyChangedFields(['status', 'rejectionReason']));
+                    // Admin: status/rejectionReason for approve/reject/suspend, and
+                    // restaurantId the one time a foodAndDining listing is first
+                    // approved (see AdminBusinessListScreen._syncRestaurantBeforeApproval).
+                    || (hasAdminRole(['admin']) && onlyChangedFields(['status', 'rejectionReason', 'restaurantId']));
       allow delete: if hasAdminRole(['admin']);
     }
 
@@ -310,9 +373,13 @@ service cloud.firestore {
     // flip `isRead` on any notification — nothing else is writable here.
     match /notifications/{notificationId} {
       allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || resource.data.userId == '');
-      allow update: if (isSignedIn() && onlyChangedFields(['isRead'])) || hasAdminRole(['admin', 'lgu', 'eventOrganizer']);
-      allow create: if hasAdminRole(['admin', 'lgu', 'eventOrganizer']) && request.resource.data.userId == '';
-      allow delete: if hasAdminRole(['admin', 'lgu', 'eventOrganizer']);
+      // A personal notification's isRead can only be flipped by the
+      // traveler it belongs to; a broadcast (userId == '') has no single
+      // owner, so any signed-in traveler marking it read is expected.
+      allow update: if (isSignedIn() && onlyChangedFields(['isRead']) && (resource.data.userId == request.auth.uid || resource.data.userId == ''))
+                    || hasAdminRole(['admin', 'lgu']);
+      allow create: if hasAdminRole(['admin', 'lgu']) && request.resource.data.userId == '';
+      allow delete: if hasAdminRole(['admin', 'lgu']);
     }
   }
 }

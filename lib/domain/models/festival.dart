@@ -25,7 +25,6 @@ class Festival {
     this.facebookUrl = '',
     this.latitude,
     this.longitude,
-    this.organizerId = '',
     this.startDate,
     this.endDate,
   });
@@ -68,11 +67,6 @@ class Festival {
   final double? latitude;
   final double? longitude;
 
-  /// Uid of the `eventOrganizer` account that created this festival — empty
-  /// for admin/LGU-curated official festivals. `firestore.rules` uses this
-  /// to scope an event organizer's writes to only their own listings.
-  final String organizerId;
-
   /// Structured backing for [dateLabel]/[month], set via the admin form's
   /// date picker. Nullable/additive — festivals created before this field
   /// existed only have the formatted [dateLabel] string, not a real date.
@@ -93,7 +87,9 @@ class Festival {
       regionId: map['regionId'] as String? ?? '',
       cityId: map['cityId'] as String? ?? '',
       heroImageUrl: map['heroImageUrl'] as String? ?? '',
-      galleryImageUrls: List<String>.from(map['galleryImageUrls'] as List? ?? const []),
+      galleryImageUrls: List<String>.from(
+        map['galleryImageUrls'] as List? ?? const [],
+      ),
       dateLabel: map['dateLabel'] as String? ?? '',
       month: map['month'] as String? ?? '',
       description: map['description'] as String? ?? '',
@@ -107,7 +103,6 @@ class Festival {
       facebookUrl: map['facebookUrl'] as String? ?? '',
       latitude: (map['latitude'] as num?)?.toDouble(),
       longitude: (map['longitude'] as num?)?.toDouble(),
-      organizerId: map['organizerId'] as String? ?? '',
       startDate: (map['startDate'] as Timestamp?)?.toDate(),
       endDate: (map['endDate'] as Timestamp?)?.toDate(),
     );
@@ -135,7 +130,6 @@ class Festival {
       'facebookUrl': facebookUrl,
       'latitude': latitude,
       'longitude': longitude,
-      'organizerId': organizerId,
       'startDate': startDate != null ? Timestamp.fromDate(startDate!) : null,
       'endDate': endDate != null ? Timestamp.fromDate(endDate!) : null,
     };
@@ -164,7 +158,6 @@ class Festival {
       facebookUrl: facebookUrl,
       latitude: latitude,
       longitude: longitude,
-      organizerId: organizerId,
       startDate: startDate,
       endDate: endDate,
     );

@@ -47,6 +47,7 @@ import '../../presentation/shell/main_shell_screen.dart';
 import '../../presentation/splash/splash_screen.dart';
 import '../../domain/models/itinerary.dart';
 import '../providers/auth_provider.dart';
+import '../services/analytics_service.dart';
 import '../utils/view_status.dart';
 import 'route_paths.dart';
 
@@ -65,6 +66,7 @@ GoRouter buildAppRouter(AuthProvider authProvider) {
   return GoRouter(
     initialLocation: RoutePaths.splash,
     refreshListenable: authProvider,
+    observers: [AnalyticsService.instance.observer],
     redirect: (context, state) {
       final location = state.matchedLocation;
       if (location == RoutePaths.splash) return null;
@@ -77,31 +79,87 @@ GoRouter buildAppRouter(AuthProvider authProvider) {
         return _authOnlyRoutes.contains(location) ? null : RoutePaths.login;
       }
       if (!verified) {
-        return location == RoutePaths.verifyEmail ? null : RoutePaths.verifyEmail;
+        return location == RoutePaths.verifyEmail
+            ? null
+            : RoutePaths.verifyEmail;
       }
-      if (_authOnlyRoutes.contains(location) || location == RoutePaths.verifyEmail) {
+      if (_authOnlyRoutes.contains(location) ||
+          location == RoutePaths.verifyEmail) {
         return RoutePaths.home;
       }
       return null;
     },
     routes: [
-      GoRoute(path: RoutePaths.splash, builder: (context, state) => const SplashScreen()),
-      GoRoute(path: RoutePaths.onboarding, builder: (context, state) => const OnboardingScreen()),
-      GoRoute(path: RoutePaths.login, builder: (context, state) => const LoginScreen()),
-      GoRoute(path: RoutePaths.register, builder: (context, state) => const RegisterScreen()),
-      GoRoute(path: RoutePaths.forgotPassword, builder: (context, state) => const ForgotPasswordScreen()),
-      GoRoute(path: RoutePaths.verifyEmail, builder: (context, state) => const VerifyEmailScreen()),
-      GoRoute(path: RoutePaths.search, builder: (context, state) => SearchScreen(autoOpenFilter: state.extra == true)),
-      GoRoute(path: RoutePaths.settings, builder: (context, state) => const SettingsScreen()),
-      GoRoute(path: RoutePaths.legalInfoPattern, builder: (context, state) => LegalInfoScreen(topicKey: state.pathParameters['topicKey']!)),
-      GoRoute(path: RoutePaths.faq, builder: (context, state) => FaqScreen(items: LegalContent.faq)),
-      GoRoute(path: RoutePaths.whatsNew, builder: (context, state) => const WhatsNewScreen()),
-      GoRoute(path: RoutePaths.editProfile, builder: (context, state) => const EditProfileScreen()),
-      GoRoute(path: RoutePaths.recentlyViewed, builder: (context, state) => const RecentlyViewedScreen()),
-      GoRoute(path: RoutePaths.savedItineraries, builder: (context, state) => const SavedItinerariesScreen()),
-      GoRoute(path: RoutePaths.tripCalendar, builder: (context, state) => const TripCalendarScreen()),
-      GoRoute(path: RoutePaths.notifications, builder: (context, state) => const NotificationsScreen()),
-      GoRoute(path: RoutePaths.aiChat, builder: (context, state) => const AiChatScreen()),
+      GoRoute(
+        path: RoutePaths.splash,
+        builder: (context, state) => const SplashScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.onboarding,
+        builder: (context, state) => const OnboardingScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.login,
+        builder: (context, state) => const LoginScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.register,
+        builder: (context, state) => const RegisterScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.forgotPassword,
+        builder: (context, state) => const ForgotPasswordScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.verifyEmail,
+        builder: (context, state) => const VerifyEmailScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.search,
+        builder: (context, state) =>
+            SearchScreen(autoOpenFilter: state.extra == true),
+      ),
+      GoRoute(
+        path: RoutePaths.settings,
+        builder: (context, state) => const SettingsScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.legalInfoPattern,
+        builder: (context, state) =>
+            LegalInfoScreen(topicKey: state.pathParameters['topicKey']!),
+      ),
+      GoRoute(
+        path: RoutePaths.faq,
+        builder: (context, state) => FaqScreen(items: LegalContent.faq),
+      ),
+      GoRoute(
+        path: RoutePaths.whatsNew,
+        builder: (context, state) => const WhatsNewScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.editProfile,
+        builder: (context, state) => const EditProfileScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.recentlyViewed,
+        builder: (context, state) => const RecentlyViewedScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.savedItineraries,
+        builder: (context, state) => const SavedItinerariesScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.tripCalendar,
+        builder: (context, state) => const TripCalendarScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.notifications,
+        builder: (context, state) => const NotificationsScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.aiChat,
+        builder: (context, state) => const AiChatScreen(),
+      ),
       GoRoute(
         path: RoutePaths.generatedItinerary,
         builder: (context, state) {
@@ -114,19 +172,23 @@ GoRouter buildAppRouter(AuthProvider authProvider) {
       ),
       GoRoute(
         path: RoutePaths.destinationDetailsPattern,
-        builder: (context, state) => TouristDetailsScreen(destinationId: state.pathParameters['id']!),
+        builder: (context, state) =>
+            TouristDetailsScreen(destinationId: state.pathParameters['id']!),
       ),
       GoRoute(
         path: RoutePaths.restaurantDetailsPattern,
-        builder: (context, state) => RestaurantDetailsScreen(restaurantId: state.pathParameters['id']!),
+        builder: (context, state) =>
+            RestaurantDetailsScreen(restaurantId: state.pathParameters['id']!),
       ),
       GoRoute(
         path: RoutePaths.festivalDetailsPattern,
-        builder: (context, state) => FestivalDetailsScreen(festivalId: state.pathParameters['id']!),
+        builder: (context, state) =>
+            FestivalDetailsScreen(festivalId: state.pathParameters['id']!),
       ),
       GoRoute(
         path: RoutePaths.provinceDetailsPattern,
-        builder: (context, state) => ProvinceDetailsScreen(provinceId: state.pathParameters['id']!),
+        builder: (context, state) =>
+            ProvinceDetailsScreen(provinceId: state.pathParameters['id']!),
       ),
       GoRoute(
         path: RoutePaths.nearbyPlaces,
@@ -141,13 +203,23 @@ GoRouter buildAppRouter(AuthProvider authProvider) {
           );
         },
       ),
-      GoRoute(path: RoutePaths.adminHome, builder: (context, state) => const AdminHomeScreen()),
-      GoRoute(path: RoutePaths.adminProvinces, builder: (context, state) => const AdminProvinceListScreen()),
+      GoRoute(
+        path: RoutePaths.adminHome,
+        builder: (context, state) => const AdminHomeScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.adminProvinces,
+        builder: (context, state) => const AdminProvinceListScreen(),
+      ),
       GoRoute(
         path: RoutePaths.adminProvinceEditPattern,
-        builder: (context, state) => AdminProvinceEditScreen(provinceId: state.pathParameters['id']!),
+        builder: (context, state) =>
+            AdminProvinceEditScreen(provinceId: state.pathParameters['id']!),
       ),
-      GoRoute(path: RoutePaths.adminTouristSpots, builder: (context, state) => const AdminTouristSpotListScreen()),
+      GoRoute(
+        path: RoutePaths.adminTouristSpots,
+        builder: (context, state) => const AdminTouristSpotListScreen(),
+      ),
       GoRoute(
         path: RoutePaths.adminTouristSpotForm,
         builder: (context, state) {
@@ -160,10 +232,7 @@ GoRouter buildAppRouter(AuthProvider authProvider) {
       ),
       GoRoute(
         path: RoutePaths.adminFestivals,
-        builder: (context, state) {
-          final extra = state.extra as Map<String, dynamic>?;
-          return AdminFestivalListScreen(organizerUid: extra?['organizerUid'] as String?);
-        },
+        builder: (context, state) => const AdminFestivalListScreen(),
       ),
       GoRoute(
         path: RoutePaths.adminFestivalForm,
@@ -171,13 +240,21 @@ GoRouter buildAppRouter(AuthProvider authProvider) {
           final extra = state.extra as Map<String, dynamic>?;
           return AdminFestivalFormScreen(
             existing: extra?['existing'] as Festival?,
-            organizerUid: extra?['organizerUid'] as String?,
           );
         },
       ),
-      GoRoute(path: RoutePaths.adminBusinesses, builder: (context, state) => const AdminBusinessListScreen()),
-      GoRoute(path: RoutePaths.adminReportedReviews, builder: (context, state) => const AdminReportedReviewsScreen()),
-      GoRoute(path: RoutePaths.adminBroadcast, builder: (context, state) => const AdminBroadcastScreen()),
+      GoRoute(
+        path: RoutePaths.adminBusinesses,
+        builder: (context, state) => const AdminBusinessListScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.adminReportedReviews,
+        builder: (context, state) => const AdminReportedReviewsScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.adminBroadcast,
+        builder: (context, state) => const AdminBroadcastScreen(),
+      ),
       GoRoute(
         path: RoutePaths.adminTeam,
         builder: (context, state) {
@@ -190,29 +267,55 @@ GoRouter buildAppRouter(AuthProvider authProvider) {
       ),
       GoRoute(
         path: RoutePaths.myBusiness,
-        builder: (context, state) => MyBusinessScreen(uid: authProvider.firebaseUser?.uid ?? ''),
+        builder: (context, state) =>
+            MyBusinessScreen(uid: authProvider.firebaseUser?.uid ?? ''),
       ),
       StatefulShellRoute.indexedStack(
-        builder: (context, state, navigationShell) => MainShellScreen(navigationShell: navigationShell),
+        builder: (context, state, navigationShell) =>
+            MainShellScreen(navigationShell: navigationShell),
         branches: [
-          StatefulShellBranch(routes: [
-            GoRoute(path: RoutePaths.home, builder: (context, state) => const HomeScreen()),
-          ]),
-          StatefulShellBranch(routes: [
-            GoRoute(
-              path: RoutePaths.explore,
-              builder: (context, state) => ExploreScreen(initialCategoryId: state.uri.queryParameters['category']),
-            ),
-          ]),
-          StatefulShellBranch(routes: [
-            GoRoute(path: RoutePaths.planner, builder: (context, state) => const AiPlannerScreen()),
-          ]),
-          StatefulShellBranch(routes: [
-            GoRoute(path: RoutePaths.saved, builder: (context, state) => const SavedScreen()),
-          ]),
-          StatefulShellBranch(routes: [
-            GoRoute(path: RoutePaths.profile, builder: (context, state) => const ProfileScreen()),
-          ]),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: RoutePaths.home,
+                builder: (context, state) => const HomeScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: RoutePaths.explore,
+                builder: (context, state) => ExploreScreen(
+                  initialCategoryId: state.uri.queryParameters['category'],
+                ),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: RoutePaths.planner,
+                builder: (context, state) => const AiPlannerScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: RoutePaths.saved,
+                builder: (context, state) => const SavedScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: RoutePaths.profile,
+                builder: (context, state) => const ProfileScreen(),
+              ),
+            ],
+          ),
         ],
       ),
     ],

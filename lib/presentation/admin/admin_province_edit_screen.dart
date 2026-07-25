@@ -12,6 +12,7 @@ import '../../core/widgets/buttons/animated_button.dart';
 import '../../core/widgets/inputs/gallery_image_picker.dart';
 import '../../core/widgets/inputs/hero_image_picker.dart';
 import '../../core/widgets/states/empty_state_widget.dart';
+import '../../core/widgets/states/loading_widget.dart';
 import '../../data/repositories/province_repository.dart';
 import '../../domain/models/province.dart';
 
@@ -24,7 +25,8 @@ class AdminProvinceEditScreen extends StatefulWidget {
   final String provinceId;
 
   @override
-  State<AdminProvinceEditScreen> createState() => _AdminProvinceEditScreenState();
+  State<AdminProvinceEditScreen> createState() =>
+      _AdminProvinceEditScreenState();
 }
 
 class _AdminProvinceEditScreenState extends State<AdminProvinceEditScreen> {
@@ -107,11 +109,16 @@ class _AdminProvinceEditScreenState extends State<AdminProvinceEditScreen> {
         galleryImageUrls: _galleryImageUrls,
       );
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Province content saved.')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Province content saved.')),
+        );
         context.pop();
       }
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(AppException.from(e).message)));
+      if (mounted)
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(AppException.from(e).message)));
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -121,7 +128,10 @@ class _AdminProvinceEditScreenState extends State<AdminProvinceEditScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(icon: const Icon(Symbols.arrow_back_rounded), onPressed: () => context.pop()),
+        leading: IconButton(
+          icon: const Icon(Symbols.arrow_back_rounded),
+          onPressed: () => context.pop(),
+        ),
         title: const Text('Edit Province'),
       ),
       body: SafeArea(
@@ -129,74 +139,123 @@ class _AdminProvinceEditScreenState extends State<AdminProvinceEditScreen> {
           future: _future,
           builder: (context, snapshot) {
             if (snapshot.connectionState != ConnectionState.done) {
-              return const Center(child: CircularProgressIndicator());
+              return LoadingWidget.block(height: 400);
             }
             final province = snapshot.data;
             if (province == null) {
-              return const EmptyStateWidget(icon: Symbols.error_outline_rounded, title: 'Province not found', message: 'This province no longer exists.');
+              return const EmptyStateWidget(
+                icon: Symbols.error_outline_rounded,
+                title: 'Province not found',
+                message: 'This province no longer exists.',
+              );
             }
 
             return ListView(
-              padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.md, AppSpacing.lg, AppSpacing.huge),
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.lg,
+                AppSpacing.md,
+                AppSpacing.lg,
+                AppSpacing.huge,
+              ),
               children: [
-                Text(province.name, style: Theme.of(context).textTheme.headlineSmall),
-                Text(province.regionName, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textTertiary)),
+                Text(
+                  province.name,
+                  style: Theme.of(context).textTheme.headlineSmall,
+                ),
+                Text(
+                  province.regionName,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppColors.textTertiary,
+                  ),
+                ),
                 const SizedBox(height: AppSpacing.lg),
                 TextField(
                   controller: _overviewController,
                   maxLines: 4,
-                  decoration: const InputDecoration(labelText: 'Overview', alignLabelWithHint: true),
+                  decoration: const InputDecoration(
+                    labelText: 'Overview',
+                    alignLabelWithHint: true,
+                  ),
                 ),
                 const SizedBox(height: AppSpacing.md),
                 TextField(
                   controller: _cultureController,
                   maxLines: 4,
-                  decoration: const InputDecoration(labelText: 'Local Culture', alignLabelWithHint: true),
+                  decoration: const InputDecoration(
+                    labelText: 'Local Culture',
+                    alignLabelWithHint: true,
+                  ),
                 ),
                 const SizedBox(height: AppSpacing.md),
                 TextField(
                   controller: _bestTimeController,
-                  decoration: const InputDecoration(labelText: 'Best Time to Visit'),
+                  decoration: const InputDecoration(
+                    labelText: 'Best Time to Visit',
+                  ),
                 ),
                 const SizedBox(height: AppSpacing.md),
                 HeroImagePicker(
                   imageUrl: _heroImageUrl,
                   label: 'Cover Photo',
                   folder: FirestorePaths.storageDestinationPhotos,
-                  ownerId: context.read<AuthProvider>().firebaseUser?.uid ?? 'admin',
+                  ownerId:
+                      context.read<AuthProvider>().firebaseUser?.uid ?? 'admin',
                   onChanged: (url) => setState(() => _heroImageUrl = url),
                 ),
                 const SizedBox(height: AppSpacing.md),
                 GalleryImagePicker(
                   imageUrls: _galleryImageUrls,
-                  label: 'More Photos (for the swipeable gallery on the province page)',
+                  label:
+                      'More Photos (for the swipeable gallery on the province page)',
                   folder: FirestorePaths.storageDestinationPhotos,
-                  ownerId: context.read<AuthProvider>().firebaseUser?.uid ?? 'admin',
+                  ownerId:
+                      context.read<AuthProvider>().firebaseUser?.uid ?? 'admin',
                   onChanged: (urls) => setState(() => _galleryImageUrls = urls),
                 ),
                 const SizedBox(height: AppSpacing.xl),
-                Text('Travel Tips', style: Theme.of(context).textTheme.titleMedium),
+                Text(
+                  'Travel Tips',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
                 const SizedBox(height: AppSpacing.sm),
                 ..._travelTips.asMap().entries.map(
-                      (entry) => ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        title: Text(entry.value),
-                        trailing: IconButton(
-                          icon: const Icon(Symbols.close_rounded, size: 18),
-                          onPressed: () => setState(() => _travelTips = [..._travelTips]..removeAt(entry.key)),
-                        ),
+                  (entry) => ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(entry.value),
+                    trailing: IconButton(
+                      icon: const Icon(Symbols.close_rounded, size: 18),
+                      onPressed: () => setState(
+                        () =>
+                            _travelTips = [..._travelTips]..removeAt(entry.key),
                       ),
                     ),
+                  ),
+                ),
                 Row(
                   children: [
                     Expanded(
-                      child: TextField(controller: _newTipController, decoration: const InputDecoration(hintText: 'Add a travel tip...')),
+                      child: TextField(
+                        controller: _newTipController,
+                        decoration: const InputDecoration(
+                          hintText: 'Add a travel tip...',
+                        ),
+                      ),
                     ),
-                    IconButton(icon: const Icon(Symbols.add_circle_rounded, color: AppColors.primary), onPressed: _addTip),
+                    IconButton(
+                      icon: const Icon(
+                        Symbols.add_circle_rounded,
+                        color: AppColors.primary,
+                      ),
+                      onPressed: _addTip,
+                    ),
                   ],
                 ),
                 const SizedBox(height: AppSpacing.xxl),
-                AnimatedButton(label: 'Save', isLoading: _saving, onPressed: _save),
+                AnimatedButton(
+                  label: 'Save',
+                  isLoading: _saving,
+                  onPressed: _save,
+                ),
               ],
             );
           },

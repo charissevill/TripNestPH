@@ -50,6 +50,34 @@ void main() {
     expect(trip!.collaboratorIds, ['friend-2']);
   });
 
+  test('save() with an ownerName seeds memberNames for the owner', () async {
+    final id = await repository.save(userId: 'owner-1', title: 'Palawan Trip', itinerary: mockItinerary, ownerName: 'Juan');
+
+    final trip = await repository.getById(id);
+    expect(trip!.memberNames, {'owner-1': 'Juan'});
+    expect(trip.memberIds, ['owner-1']);
+  });
+
+  test('joinAsCollaborator() with a userName adds only the joiner\'s own memberNames entry', () async {
+    final id = await repository.save(userId: 'owner-1', title: 'Palawan Trip', itinerary: mockItinerary, ownerName: 'Juan');
+
+    await repository.joinAsCollaborator(itineraryId: id, userId: 'friend-1', userName: 'Maria');
+
+    final trip = await repository.getById(id);
+    expect(trip!.memberNames, {'owner-1': 'Juan', 'friend-1': 'Maria'});
+    expect(trip.memberIds, ['owner-1', 'friend-1']);
+  });
+
+  test('leaveTrip() removes the leaving uid\'s memberNames entry too', () async {
+    final id = await repository.save(userId: 'owner-1', title: 'Palawan Trip', itinerary: mockItinerary, ownerName: 'Juan');
+    await repository.joinAsCollaborator(itineraryId: id, userId: 'friend-1', userName: 'Maria');
+
+    await repository.leaveTrip(itineraryId: id, userId: 'friend-1');
+
+    final trip = await repository.getById(id);
+    expect(trip!.memberNames, {'owner-1': 'Juan'});
+  });
+
   test('updatePackingItems() persists a checked-off item', () async {
     final id = await repository.save(userId: 'owner-1', title: 'Palawan Trip', itinerary: mockItinerary);
     final trip = await repository.getById(id);

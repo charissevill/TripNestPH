@@ -45,58 +45,86 @@ class _RecentlyViewedScreenState extends State<RecentlyViewedScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(icon: const Icon(Symbols.arrow_back_rounded), onPressed: () => context.pop()),
+        leading: IconButton(
+          icon: const Icon(Symbols.arrow_back_rounded),
+          onPressed: () => context.pop(),
+        ),
         title: const Text('Recently Viewed'),
       ),
-      body: FutureBuilder<List<Destination>>(
-        future: _future,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState != ConnectionState.done) {
-            return ListView(
-              padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
-              children: List.generate(5, (_) => LoadingWidget.listRow()),
-            );
+      body: RefreshIndicator(
+        onRefresh: () async {
+          final future = _load();
+          setState(() => _future = future);
+          try {
+            await future;
+          } catch (_) {
+            // Surfaced by the FutureBuilder's error state below; RefreshIndicator
+            // just needs this Future to complete either way.
           }
-          if (snapshot.hasError) {
-            return EmptyStateWidget(
-              icon: Symbols.error_outline_rounded,
-              title: 'Couldn\'t load your history',
-              message: AppException.from(snapshot.error!).message,
-              actionLabel: 'Retry',
-              onActionTap: () => setState(() {
-                _future = _load();
-              }),
-            );
-          }
-          final destinations = snapshot.data ?? const [];
-          if (destinations.isEmpty) {
-            return const EmptyStateWidget(
-              icon: Symbols.history_rounded,
-              title: 'Nothing viewed yet',
-              message: 'Destinations you open will show up here so you can find your way back.',
-            );
-          }
-          return LayoutBuilder(
-            builder: (context, constraints) {
-              return GridView.builder(
-                padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.md, AppSpacing.lg, AppSpacing.huge),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  crossAxisSpacing: AppSpacing.md,
-                  mainAxisSpacing: AppSpacing.lg,
-                  mainAxisExtent: _gridCellExtent,
-                ),
-                itemCount: destinations.length,
-                itemBuilder: (context, i) => DestinationCard(
-                  destination: destinations[i],
-                  width: double.infinity,
-                  imageHeight: _gridImageHeight,
-                  onTap: () => context.push(RoutePaths.destinationDetails(destinations[i].id)),
-                ),
-              );
-            },
-          );
         },
+        child: FutureBuilder<List<Destination>>(
+          future: _future,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState != ConnectionState.done) {
+              return LoadingWidget.grid();
+            }
+            if (snapshot.hasError) {
+              return ListView(
+                children: [
+                  EmptyStateWidget(
+                    icon: Symbols.error_outline_rounded,
+                    title: 'Couldn\'t load your history',
+                    message: AppException.from(snapshot.error!).message,
+                    actionLabel: 'Retry',
+                    onActionTap: () => setState(() {
+                      _future = _load();
+                    }),
+                  ),
+                ],
+              );
+            }
+            final destinations = snapshot.data ?? const [];
+            if (destinations.isEmpty) {
+              return ListView(
+                children: const [
+                  EmptyStateWidget(
+                    icon: Symbols.history_rounded,
+                    title: 'Nothing viewed yet',
+                    message:
+                        'Destinations you open will show up here so you can find your way back.',
+                  ),
+                ],
+              );
+            }
+            return LayoutBuilder(
+              builder: (context, constraints) {
+                return GridView.builder(
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.lg,
+                    AppSpacing.md,
+                    AppSpacing.lg,
+                    AppSpacing.huge,
+                  ),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    crossAxisSpacing: AppSpacing.md,
+                    mainAxisSpacing: AppSpacing.lg,
+                    mainAxisExtent: _gridCellExtent,
+                  ),
+                  itemCount: destinations.length,
+                  itemBuilder: (context, i) => DestinationCard(
+                    destination: destinations[i],
+                    width: double.infinity,
+                    imageHeight: _gridImageHeight,
+                    onTap: () => context.push(
+                      RoutePaths.destinationDetails(destinations[i].id),
+                    ),
+                  ),
+                );
+              },
+            );
+          },
+        ),
       ),
     );
   }

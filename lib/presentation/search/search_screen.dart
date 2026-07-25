@@ -14,6 +14,7 @@ import '../../core/widgets/dialogs/search_filter_sheet.dart';
 import '../../core/widgets/indicators/rating_widget.dart';
 import '../../core/widgets/inputs/search_bar_widget.dart';
 import '../../core/widgets/states/empty_state_widget.dart';
+import '../../core/widgets/states/loading_widget.dart';
 import '../../data/repositories/destination_repository.dart';
 import '../../data/repositories/festival_repository.dart';
 import '../../data/repositories/province_repository.dart';
@@ -104,7 +105,9 @@ class _SearchScreenState extends State<SearchScreen> {
       if (!mounted) return;
       setState(() {
         _recentSearches = results[0] as List<String>;
-        _popularDestinations = (results[1] as List).map((d) => d.name as String).toList();
+        _popularDestinations = (results[1] as List)
+            .map((d) => d.name as String)
+            .toList();
       });
     } catch (_) {
       // Non-critical — the suggestions view just shows fewer/no chips.
@@ -122,7 +125,10 @@ class _SearchScreenState extends State<SearchScreen> {
   /// festival just to dedupe province names.
   Future<void> _loadGeography() async {
     try {
-      final results = await Future.wait([_regionRepository.getAll(), _provinceRepository.getAll()]);
+      final results = await Future.wait([
+        _regionRepository.getAll(),
+        _provinceRepository.getAll(),
+      ]);
       if (!mounted) return;
       setState(() {
         _regions = results[0] as List<Region>;
@@ -145,10 +151,17 @@ class _SearchScreenState extends State<SearchScreen> {
       }
       return;
     }
-    _debounce = Timer(const Duration(milliseconds: 350), () => _runSearch(value));
+    _debounce = Timer(
+      const Duration(milliseconds: 350),
+      () => _runSearch(value),
+    );
   }
 
-  List<_SearchResult> _toResults(List destinations, List restaurants, List festivals) {
+  List<_SearchResult> _toResults(
+    List destinations,
+    List restaurants,
+    List festivals,
+  ) {
     return [
       ...destinations.map(
         (d) => _SearchResult(
@@ -188,9 +201,11 @@ class _SearchScreenState extends State<SearchScreen> {
 
   Future<void> _runSearch(String query) async {
     setState(() => _loading = true);
-    unawaited(_searchHistory.record(query).then((updated) {
-      if (mounted) setState(() => _recentSearches = updated);
-    }));
+    unawaited(
+      _searchHistory.record(query).then((updated) {
+        if (mounted) setState(() => _recentSearches = updated);
+      }),
+    );
     try {
       final destinationsFuture = _destinationRepository.searchByName(query);
       final restaurantsFuture = _restaurantRepository.searchByName(query);
@@ -202,8 +217,10 @@ class _SearchScreenState extends State<SearchScreen> {
       var results = _toResults(destinations, restaurants, festivals);
       // Firestore's prefix-search doesn't compose with extra filters, so
       // province/rating are applied client-side on top of the text match.
-      if (_provinceId != null) results = results.where((r) => r.provinceId == _provinceId).toList();
-      if (_minRating != null) results = results.where((r) => r.rating >= _minRating!).toList();
+      if (_provinceId != null)
+        results = results.where((r) => r.provinceId == _provinceId).toList();
+      if (_minRating != null)
+        results = results.where((r) => r.rating >= _minRating!).toList();
       setState(() {
         _results = results;
         _loading = false;
@@ -220,9 +237,18 @@ class _SearchScreenState extends State<SearchScreen> {
   Future<void> _runFilterOnly() async {
     setState(() => _loading = true);
     try {
-      final destinations = await _destinationRepository.filter(provinceId: _provinceId, minRating: _minRating);
-      final restaurants = await _restaurantRepository.filter(provinceId: _provinceId, minRating: _minRating);
-      final festivals = await _festivalRepository.filter(provinceId: _provinceId, minRating: _minRating);
+      final destinations = await _destinationRepository.filter(
+        provinceId: _provinceId,
+        minRating: _minRating,
+      );
+      final restaurants = await _restaurantRepository.filter(
+        provinceId: _provinceId,
+        minRating: _minRating,
+      );
+      final festivals = await _festivalRepository.filter(
+        provinceId: _provinceId,
+        minRating: _minRating,
+      );
       if (!mounted) return;
       setState(() {
         _results = _toResults(destinations, restaurants, festivals);
@@ -294,6 +320,14 @@ class _SearchScreenState extends State<SearchScreen> {
     }
   }
 
+  Future<void> _refresh() async {
+    if (_query.trim().isNotEmpty) {
+      await _runSearch(_query);
+    } else if (_hasFilters) {
+      await _runFilterOnly();
+    }
+  }
+
   void _openResult(_SearchResult result) {
     switch (result.type) {
       case _ResultType.destination:
@@ -319,7 +353,12 @@ class _SearchScreenState extends State<SearchScreen> {
         child: Column(
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.sm, AppSpacing.lg, AppSpacing.md),
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.lg,
+                AppSpacing.sm,
+                AppSpacing.lg,
+                AppSpacing.md,
+              ),
               child: Row(
                 children: [
                   InkWell(
@@ -345,7 +384,12 @@ class _SearchScreenState extends State<SearchScreen> {
             ),
             if (_hasFilters)
               Padding(
-                padding: const EdgeInsets.fromLTRB(AppSpacing.lg, 0, AppSpacing.lg, AppSpacing.sm),
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.lg,
+                  0,
+                  AppSpacing.lg,
+                  AppSpacing.sm,
+                ),
                 child: ActiveFilterChips(
                   provinceName: _provinceName,
                   minRating: _minRating,
@@ -366,24 +410,45 @@ class _SearchScreenState extends State<SearchScreen> {
                       },
                     )
                   : _loading && _results.isEmpty
-                      ? const Center(child: CircularProgressIndicator())
-                      : _results.isEmpty
-                          ? EmptyStateWidget(
-                              icon: Symbols.search_off_rounded,
-                              title: 'No results for "$_query"',
-                              message: 'Try a different keyword, or browse by category from Explore instead.',
-                              actionLabel: 'Go to Explore',
-                              onActionTap: () => context.go(RoutePaths.explore),
+                  ? ListView(
+                      children: List.generate(
+                        6,
+                        (_) => LoadingWidget.listRow(),
+                      ),
+                    )
+                  : RefreshIndicator(
+                      onRefresh: _refresh,
+                      child: _results.isEmpty
+                          ? ListView(
+                              children: [
+                                EmptyStateWidget(
+                                  icon: Symbols.search_off_rounded,
+                                  title: 'No results for "$_query"',
+                                  message:
+                                      'Try a different keyword, or browse by category from Explore instead.',
+                                  actionLabel: 'Go to Explore',
+                                  onActionTap: () =>
+                                      context.go(RoutePaths.explore),
+                                ),
+                              ],
                             )
                           : ListView.separated(
-                              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.sm),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: AppSpacing.lg,
+                                vertical: AppSpacing.sm,
+                              ),
                               itemCount: _results.length,
-                              separatorBuilder: (_, _) => const SizedBox(height: AppSpacing.sm),
+                              separatorBuilder: (_, _) =>
+                                  const SizedBox(height: AppSpacing.sm),
                               itemBuilder: (context, i) {
                                 final r = _results[i];
-                                return _SearchResultTile(result: r, onTap: () => _openResult(r));
+                                return _SearchResultTile(
+                                  result: r,
+                                  onTap: () => _openResult(r),
+                                );
                               },
                             ),
+                    ),
             ),
           ],
         ),
@@ -408,12 +473,20 @@ class _SuggestionsView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListView(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.md),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.lg,
+        vertical: AppSpacing.md,
+      ),
       children: [
         if (recentSearches.isNotEmpty) ...[
           Row(
             children: [
-              Expanded(child: Text('Recent Searches', style: Theme.of(context).textTheme.titleMedium)),
+              Expanded(
+                child: Text(
+                  'Recent Searches',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+              ),
               TextButton(onPressed: onClearRecent, child: const Text('Clear')),
             ],
           ),
@@ -422,19 +495,34 @@ class _SuggestionsView extends StatelessWidget {
             spacing: AppSpacing.sm,
             runSpacing: AppSpacing.sm,
             children: recentSearches
-                .map((s) => _SuggestionChip(label: s, icon: Symbols.history_rounded, onTap: () => onTapSuggestion(s)))
+                .map(
+                  (s) => _SuggestionChip(
+                    label: s,
+                    icon: Symbols.history_rounded,
+                    onTap: () => onTapSuggestion(s),
+                  ),
+                )
                 .toList(),
           ),
           const SizedBox(height: AppSpacing.xxl),
         ],
         if (popularDestinations.isNotEmpty) ...[
-          Text('Popular Destinations', style: Theme.of(context).textTheme.titleMedium),
+          Text(
+            'Popular Destinations',
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
           const SizedBox(height: AppSpacing.sm),
           Wrap(
             spacing: AppSpacing.sm,
             runSpacing: AppSpacing.sm,
             children: popularDestinations
-                .map((s) => _SuggestionChip(label: s, icon: Symbols.trending_up_rounded, onTap: () => onTapSuggestion(s)))
+                .map(
+                  (s) => _SuggestionChip(
+                    label: s,
+                    icon: Symbols.trending_up_rounded,
+                    onTap: () => onTapSuggestion(s),
+                  ),
+                )
                 .toList(),
           ),
         ],
@@ -444,7 +532,11 @@ class _SuggestionsView extends StatelessWidget {
 }
 
 class _SuggestionChip extends StatelessWidget {
-  const _SuggestionChip({required this.label, required this.icon, required this.onTap});
+  const _SuggestionChip({
+    required this.label,
+    required this.icon,
+    required this.onTap,
+  });
 
   final String label;
   final IconData icon;
@@ -456,7 +548,10 @@ class _SuggestionChip extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(AppRadius.pill),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: AppSpacing.sm,
+        ),
         decoration: BoxDecoration(
           color: Theme.of(context).colorScheme.surface,
           borderRadius: BorderRadius.circular(AppRadius.pill),
@@ -467,7 +562,12 @@ class _SuggestionChip extends StatelessWidget {
           children: [
             Icon(icon, size: 16, color: AppColors.textSecondary),
             const SizedBox(width: AppSpacing.xs),
-            Text(label, style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppColors.textPrimary)),
+            Text(
+              label,
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: AppColors.textPrimary),
+            ),
           ],
         ),
       ),
@@ -493,7 +593,11 @@ class _SearchResultTile extends StatelessWidget {
           color: theme.colorScheme.surface,
           borderRadius: BorderRadius.circular(AppRadius.lg),
           boxShadow: [
-            BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 10, offset: const Offset(0, 4)),
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
           ],
         ),
         child: Row(
@@ -512,19 +616,31 @@ class _SearchResultTile extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(result.title, style: theme.textTheme.titleMedium, maxLines: 1, overflow: TextOverflow.ellipsis),
+                  Text(
+                    result.title,
+                    style: theme.textTheme.titleMedium,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                   const SizedBox(height: 2),
-                  Text(result.subtitle, style: theme.textTheme.bodySmall, maxLines: 1, overflow: TextOverflow.ellipsis),
+                  Text(
+                    result.subtitle,
+                    style: theme.textTheme.bodySmall,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                   const SizedBox(height: 4),
                   RatingWidget(rating: result.rating, starSize: 14),
                 ],
               ),
             ),
-            const Icon(Symbols.chevron_right_rounded, color: AppColors.textTertiary),
+            const Icon(
+              Symbols.chevron_right_rounded,
+              color: AppColors.textTertiary,
+            ),
           ],
         ),
       ),
     );
   }
 }
-

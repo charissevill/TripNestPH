@@ -10,6 +10,7 @@ class Expense {
     required this.note,
     required this.loggedBy,
     required this.createdAt,
+    this.splitBetween = const [],
   });
 
   final String id;
@@ -25,6 +26,12 @@ class Expense {
   final String loggedBy;
   final DateTime createdAt;
 
+  /// Uids of the trip members this expense is split between. Empty means
+  /// "split between everyone on the trip" — both the default for a solo
+  /// traveler and the fallback for expenses logged before per-companion
+  /// splitting existed.
+  final List<String> splitBetween;
+
   factory Expense.fromMap(String id, Map<String, dynamic> map) {
     final timestamp = map['createdAt'];
     return Expense(
@@ -34,6 +41,7 @@ class Expense {
       note: map['note'] as String? ?? '',
       loggedBy: map['loggedBy'] as String? ?? '',
       createdAt: timestamp is Timestamp ? timestamp.toDate() : DateTime.now(),
+      splitBetween: List<String>.from(map['splitBetween'] as List? ?? const []),
     );
   }
 
@@ -44,6 +52,7 @@ class Expense {
       'note': note,
       'loggedBy': loggedBy,
       'createdAt': FieldValue.serverTimestamp(),
+      'splitBetween': splitBetween,
     };
   }
 }

@@ -98,12 +98,47 @@ class UserRepository {
     }
   }
 
-  /// Removes the profile document and its recently-viewed history — the
-  /// Firestore side of account deletion. The Firebase Auth user itself is
-  /// deleted separately by [AuthService.deleteAccount].
+  /// Records that [uid] opened a listing's Details screen — the "been
+  /// there" signal behind a review's Verified Visit badge (see
+  /// [hasVisited]). Deliberately separate from "Recently Viewed": that
+  /// history is user-clearable for privacy, but a review's verified badge
+  /// must stay accurate even after it's cleared, since it's stamped once at
+  /// review-creation time and never rechecked. Best-effort — a tracking
+  /// write failing should never block viewing the page itself.
+  Future<void> recordVisit({required String uid, required String targetType, required String targetId}) async {
+    try {
+      await _users.doc(uid).collection(FirestorePaths.visited).doc('${targetType}_$targetId').set({
+        'targetType': targetType,
+        'targetId': targetId,
+        'viewedAt': FieldValue.serverTimestamp(),
+      });
+    } catch (_) {
+      // Best-effort; see doc comment above.
+    }
+  }
+
+  Future<bool> hasVisited({required String uid, required String targetType, required String targetId}) async {
+    try {
+      final doc = await _users.doc(uid).collection(FirestorePaths.visited).doc('${targetType}_$targetId').get();
+      return doc.exists;
+    } catch (e) {
+      throw AppException.from(e);
+    }
+  }
+
+  /// Removes the profile document, its recently-viewed history and its
+  /// visited-listing records — the Firestore side of account deletion. The
+  /// Firebase Auth user itself is deleted separately by
+  /// [AuthService.deleteAccount].
   Future<void> deleteAccountData(String uid) async {
     try {
       await clearRecentlyViewed(uid);
+      final visited = await _users.doc(uid).collection(FirestorePaths.visited).get();
+      final batch = _db.batch();
+      for (final doc in visited.docs) {
+        batch.delete(doc.reference);
+      }
+      await batch.commit();
       await _users.doc(uid).delete();
     } catch (e) {
       throw AppException.from(e);

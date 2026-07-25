@@ -99,7 +99,10 @@ class _ExploreScreenState extends State<ExploreScreen> {
   /// festival just to dedupe province names.
   Future<void> _loadGeography() async {
     try {
-      final results = await Future.wait([_regionRepository.getAll(), _provinceRepository.getAll()]);
+      final results = await Future.wait([
+        _regionRepository.getAll(),
+        _provinceRepository.getAll(),
+      ]);
       if (!mounted) return;
       setState(() {
         _regions = results[0] as List<Region>;
@@ -223,11 +226,19 @@ class _ExploreScreenState extends State<ExploreScreen> {
       DocumentSnapshot<Map<String, dynamic>>? cursor;
       bool hasMore;
       if (_selectedCategory != null || _hasFilters) {
-        page = await _destinationRepository.filter(categoryId: _selectedCategory, provinceId: _provinceId, minRating: _minRating, limit: 60);
+        page = await _destinationRepository.filter(
+          categoryId: _selectedCategory,
+          provinceId: _provinceId,
+          minRating: _minRating,
+          limit: 60,
+        );
         cursor = null;
         hasMore = false;
       } else {
-        final result = await _destinationRepository.getPage(pageSize: _pageSize, startAfter: _destinationsCursor);
+        final result = await _destinationRepository.getPage(
+          pageSize: _pageSize,
+          startAfter: _destinationsCursor,
+        );
         page = result.items;
         cursor = result.lastDoc;
         hasMore = result.items.length == _pageSize;
@@ -264,11 +275,18 @@ class _ExploreScreenState extends State<ExploreScreen> {
       DocumentSnapshot<Map<String, dynamic>>? cursor;
       bool hasMore;
       if (_hasFilters) {
-        page = await _restaurantRepository.filter(provinceId: _provinceId, minRating: _minRating, limit: 60);
+        page = await _restaurantRepository.filter(
+          provinceId: _provinceId,
+          minRating: _minRating,
+          limit: 60,
+        );
         cursor = null;
         hasMore = false;
       } else {
-        final result = await _restaurantRepository.getPage(pageSize: _pageSize, startAfter: _restaurantsCursor);
+        final result = await _restaurantRepository.getPage(
+          pageSize: _pageSize,
+          startAfter: _restaurantsCursor,
+        );
         page = result.items;
         cursor = result.lastDoc;
         hasMore = result.items.length == _pageSize;
@@ -305,11 +323,18 @@ class _ExploreScreenState extends State<ExploreScreen> {
       DocumentSnapshot<Map<String, dynamic>>? cursor;
       bool hasMore;
       if (_hasFilters) {
-        page = await _festivalRepository.filter(provinceId: _provinceId, minRating: _minRating, limit: 60);
+        page = await _festivalRepository.filter(
+          provinceId: _provinceId,
+          minRating: _minRating,
+          limit: 60,
+        );
         cursor = null;
         hasMore = false;
       } else {
-        final result = await _festivalRepository.getPage(pageSize: _pageSize, startAfter: _festivalsCursor);
+        final result = await _festivalRepository.getPage(
+          pageSize: _pageSize,
+          startAfter: _festivalsCursor,
+        );
         page = result.items;
         cursor = result.lastDoc;
         hasMore = result.items.length == _pageSize;
@@ -339,13 +364,21 @@ class _ExploreScreenState extends State<ExploreScreen> {
         child: Column(
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.sm, AppSpacing.lg, AppSpacing.md),
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.lg,
+                AppSpacing.sm,
+                AppSpacing.lg,
+                AppSpacing.md,
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text('Explore', style: theme.textTheme.displayMedium),
                   const SizedBox(height: 2),
-                  Text('Find your next Philippine adventure', style: theme.textTheme.bodyMedium),
+                  Text(
+                    'Find your next Philippine adventure',
+                    style: theme.textTheme.bodyMedium,
+                  ),
                   const SizedBox(height: AppSpacing.lg),
                   SearchBarWidget(
                     readOnly: true,
@@ -371,7 +404,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
                 itemCount: _ExploreTab.values.length,
-                separatorBuilder: (_, _) => const SizedBox(width: AppSpacing.sm),
+                separatorBuilder: (_, _) =>
+                    const SizedBox(width: AppSpacing.sm),
                 itemBuilder: (context, i) {
                   final tab = _ExploreTab.values[i];
                   return _TabChip(
@@ -395,16 +429,24 @@ class _ExploreScreenState extends State<ExploreScreen> {
                 height: 106,
                 child: ListView.separated(
                   scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.lg,
+                  ),
                   itemCount: mockCategories.length,
-                  separatorBuilder: (_, _) => const SizedBox(width: AppSpacing.md),
+                  separatorBuilder: (_, _) =>
+                      const SizedBox(width: AppSpacing.md),
                   itemBuilder: (context, i) {
                     final category = mockCategories[i];
                     return CategoryCard(
                       category: category,
                       isSelected: _selectedCategory == category.id,
                       onTap: () {
-                        setState(() => _selectedCategory = _selectedCategory == category.id ? null : category.id);
+                        setState(
+                          () => _selectedCategory =
+                              _selectedCategory == category.id
+                              ? null
+                              : category.id,
+                        );
                         _loadDestinations(reset: true);
                       },
                     );
@@ -416,52 +458,62 @@ class _ExploreScreenState extends State<ExploreScreen> {
             Expanded(
               child: switch (_tab) {
                 _ExploreTab.destinations => _buildGrid(
-                    items: _destinations,
-                    isLoading: _loadingDestinations,
-                    error: _destinationsError,
-                    hasMore: _destinationsHasMore,
-                    onLoadMore: _loadDestinations,
-                    onRetry: () => _loadDestinations(reset: true),
-                    emptyMessage: _hasFilters
-                        ? 'No destinations match your filters — try widening them.'
-                        : 'No destinations in this category yet — try another one.',
-                    itemBuilder: (context, width, item) => DestinationCard(
-                      destination: item,
-                      width: width,
-                      imageHeight: _gridImageHeight,
-                      onTap: () => context.push(RoutePaths.destinationDetails(item.id)),
-                    ),
+                  items: _destinations,
+                  isLoading: _loadingDestinations,
+                  error: _destinationsError,
+                  hasMore: _destinationsHasMore,
+                  onLoadMore: _loadDestinations,
+                  onRetry: () => _loadDestinations(reset: true),
+                  onRefresh: () => _loadDestinations(reset: true),
+                  emptyMessage: _hasFilters
+                      ? 'No destinations match your filters — try widening them.'
+                      : 'No destinations in this category yet — try another one.',
+                  itemBuilder: (context, width, item) => DestinationCard(
+                    destination: item,
+                    width: width,
+                    imageHeight: _gridImageHeight,
+                    onTap: () =>
+                        context.push(RoutePaths.destinationDetails(item.id)),
                   ),
+                ),
                 _ExploreTab.restaurants => _buildGrid(
-                    items: _restaurants,
-                    isLoading: _loadingRestaurants,
-                    error: _restaurantsError,
-                    hasMore: _restaurantsHasMore,
-                    onLoadMore: _loadRestaurants,
-                    onRetry: () => _loadRestaurants(reset: true),
-                    emptyMessage: _hasFilters ? 'No restaurants match your filters — try widening them.' : 'No restaurants found.',
-                    itemBuilder: (context, width, item) => RestaurantCard(
-                      restaurant: item,
-                      width: width,
-                      imageHeight: _gridImageHeight,
-                      onTap: () => context.push(RoutePaths.restaurantDetails(item.id)),
-                    ),
+                  items: _restaurants,
+                  isLoading: _loadingRestaurants,
+                  error: _restaurantsError,
+                  hasMore: _restaurantsHasMore,
+                  onLoadMore: _loadRestaurants,
+                  onRetry: () => _loadRestaurants(reset: true),
+                  onRefresh: () => _loadRestaurants(reset: true),
+                  emptyMessage: _hasFilters
+                      ? 'No restaurants match your filters — try widening them.'
+                      : 'No restaurants found.',
+                  itemBuilder: (context, width, item) => RestaurantCard(
+                    restaurant: item,
+                    width: width,
+                    imageHeight: _gridImageHeight,
+                    onTap: () =>
+                        context.push(RoutePaths.restaurantDetails(item.id)),
                   ),
+                ),
                 _ExploreTab.festivals => _buildGrid(
-                    items: _festivals,
-                    isLoading: _loadingFestivals,
-                    error: _festivalsError,
-                    hasMore: _festivalsHasMore,
-                    onLoadMore: _loadFestivals,
-                    onRetry: () => _loadFestivals(reset: true),
-                    emptyMessage: _hasFilters ? 'No festivals match your filters — try widening them.' : 'No festivals found.',
-                    itemBuilder: (context, width, item) => FestivalCard(
-                      festival: item,
-                      width: width,
-                      imageHeight: _gridImageHeight,
-                      onTap: () => context.push(RoutePaths.festivalDetails(item.id)),
-                    ),
+                  items: _festivals,
+                  isLoading: _loadingFestivals,
+                  error: _festivalsError,
+                  hasMore: _festivalsHasMore,
+                  onLoadMore: _loadFestivals,
+                  onRetry: () => _loadFestivals(reset: true),
+                  onRefresh: () => _loadFestivals(reset: true),
+                  emptyMessage: _hasFilters
+                      ? 'No festivals match your filters — try widening them.'
+                      : 'No festivals found.',
+                  itemBuilder: (context, width, item) => FestivalCard(
+                    festival: item,
+                    width: width,
+                    imageHeight: _gridImageHeight,
+                    onTap: () =>
+                        context.push(RoutePaths.festivalDetails(item.id)),
                   ),
+                ),
               },
             ),
           ],
@@ -477,54 +529,91 @@ class _ExploreScreenState extends State<ExploreScreen> {
     required bool hasMore,
     required Future<void> Function() onLoadMore,
     required VoidCallback onRetry,
+    required Future<void> Function() onRefresh,
     required String emptyMessage,
     required Widget Function(BuildContext, double width, T item) itemBuilder,
   }) {
     if (items == null && isLoading) {
-      return LoadingWidget.carousel();
+      return LoadingWidget.grid();
     }
     if (items == null && error != null) {
-      return EmptyStateWidget(
-        icon: Symbols.error_outline_rounded,
-        title: 'Couldn\'t load this',
-        message: AppException.from(error).message,
-        actionLabel: 'Retry',
-        onActionTap: onRetry,
+      return RefreshIndicator(
+        onRefresh: onRefresh,
+        child: ListView(
+          children: [
+            EmptyStateWidget(
+              icon: Symbols.error_outline_rounded,
+              title: 'Couldn\'t load this',
+              message: AppException.from(error).message,
+              actionLabel: 'Retry',
+              onActionTap: onRetry,
+            ),
+          ],
+        ),
       );
     }
     final list = items ?? const [];
     if (list.isEmpty) {
-      return EmptyStateWidget(icon: Symbols.travel_explore_rounded, title: 'Nothing here yet', message: emptyMessage);
+      return RefreshIndicator(
+        onRefresh: onRefresh,
+        child: ListView(
+          children: [
+            EmptyStateWidget(
+              icon: Symbols.travel_explore_rounded,
+              title: 'Nothing here yet',
+              message: emptyMessage,
+            ),
+          ],
+        ),
+      );
     }
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final cardWidth = (constraints.maxWidth - AppSpacing.lg * 2 - AppSpacing.md) / 2;
-        return GridView.builder(
-          padding: const EdgeInsets.fromLTRB(AppSpacing.lg, 0, AppSpacing.lg, AppSpacing.huge),
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2,
-            crossAxisSpacing: AppSpacing.md,
-            mainAxisSpacing: AppSpacing.lg,
-            mainAxisExtent: _gridCellExtent,
-          ),
-          itemCount: list.length + (hasMore ? 1 : 0),
-          itemBuilder: (context, i) {
-            if (i >= list.length) {
-              return Padding(
-                padding: const EdgeInsets.only(top: AppSpacing.sm),
-                child: AnimatedButton(label: 'Load More', filled: false, isLoading: isLoading, onPressed: isLoading ? null : onLoadMore),
-              );
-            }
-            return itemBuilder(context, cardWidth, list[i]);
-          },
-        );
-      },
+    return RefreshIndicator(
+      onRefresh: onRefresh,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final cardWidth =
+              (constraints.maxWidth - AppSpacing.lg * 2 - AppSpacing.md) / 2;
+          return GridView.builder(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.lg,
+              0,
+              AppSpacing.lg,
+              AppSpacing.huge,
+            ),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              crossAxisSpacing: AppSpacing.md,
+              mainAxisSpacing: AppSpacing.lg,
+              mainAxisExtent: _gridCellExtent,
+            ),
+            itemCount: list.length + (hasMore ? 1 : 0),
+            itemBuilder: (context, i) {
+              if (i >= list.length) {
+                return Padding(
+                  padding: const EdgeInsets.only(top: AppSpacing.sm),
+                  child: AnimatedButton(
+                    label: 'Load More',
+                    filled: false,
+                    isLoading: isLoading,
+                    onPressed: isLoading ? null : onLoadMore,
+                  ),
+                );
+              }
+              return itemBuilder(context, cardWidth, list[i]);
+            },
+          );
+        },
+      ),
     );
   }
 }
 
 class _TabChip extends StatelessWidget {
-  const _TabChip({required this.label, required this.selected, required this.onTap});
+  const _TabChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
 
   final String label;
   final bool selected;
@@ -539,17 +628,22 @@ class _TabChip extends StatelessWidget {
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
         decoration: BoxDecoration(
-          color: selected ? AppColors.primary : Theme.of(context).colorScheme.surface,
+          color: selected
+              ? AppColors.primary
+              : Theme.of(context).colorScheme.surface,
           borderRadius: BorderRadius.circular(AppRadius.pill),
-          border: Border.all(color: selected ? AppColors.primary : AppColors.border),
+          border: Border.all(
+            color: selected ? AppColors.primary : AppColors.border,
+          ),
         ),
         alignment: Alignment.center,
         child: Text(
           label,
-          style: Theme.of(context).textTheme.labelMedium?.copyWith(color: selected ? Colors.white : AppColors.textPrimary),
+          style: Theme.of(context).textTheme.labelMedium?.copyWith(
+            color: selected ? Colors.white : AppColors.textPrimary,
+          ),
         ),
       ),
     );
   }
 }
-

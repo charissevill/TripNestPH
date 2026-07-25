@@ -1,6 +1,10 @@
+import 'dart:ui' as ui;
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -13,6 +17,7 @@ import 'core/providers/connectivity_provider.dart';
 import 'core/providers/favorites_provider.dart';
 import 'core/providers/theme_mode_provider.dart';
 import 'core/routes/app_router.dart';
+import 'core/services/analytics_service.dart';
 import 'core/services/notification_service.dart';
 import 'core/theme/app_theme.dart';
 import 'firebase_options.dart';
@@ -32,6 +37,15 @@ void main() async {
     await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
     FirebaseFirestore.instance.settings = const Settings(persistenceEnabled: true);
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+
+    // Debug builds report to the console instead of Crashlytics, so local
+    // crashes during development don't pollute production crash-free rates.
+    await FirebaseCrashlytics.instance.setCrashlyticsCollectionEnabled(!kDebugMode);
+    FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
+    ui.PlatformDispatcher.instance.onError = (error, stack) {
+      FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+      return true;
+    };
   } catch (e) {
     initError = e;
   }
@@ -87,6 +101,13 @@ class _TripNestAppState extends State<TripNestApp> {
     if (userId == _boundUserId) return;
     _boundUserId = userId;
     _favoritesProvider.bindToUser(userId);
+    AnalyticsService.instance.setUserId(userId);
+    // Best-effort, same as NotificationService below — no Firebase app
+    // exists in widget tests, and a crash-reporting hookup should never be
+    // what takes down sign-in.
+    try {
+      FirebaseCrashlytics.instance.setUserIdentifier(userId ?? '');
+    } catch (_) {}
     if (userId != null) {
       NotificationService.instance.registerForUser(userId);
     }

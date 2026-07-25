@@ -9,17 +9,23 @@ import '../../domain/models/business.dart';
 /// `restaurants`/`tourist_spots` collections. See `firestore.rules` for the
 /// owner-scoped write rules and admin approval workflow.
 class BusinessRepository {
-  BusinessRepository({FirebaseFirestore? firestore}) : _db = firestore ?? FirebaseFirestore.instance;
+  BusinessRepository({FirebaseFirestore? firestore})
+    : _db = firestore ?? FirebaseFirestore.instance;
 
   final FirebaseFirestore _db;
 
-  CollectionReference<Map<String, dynamic>> get _collection => _db.collection(FirestorePaths.businesses);
+  CollectionReference<Map<String, dynamic>> get _collection =>
+      _db.collection(FirestorePaths.businesses);
 
-  Business _fromDoc(QueryDocumentSnapshot<Map<String, dynamic>> doc) => Business.fromMap(doc.id, doc.data());
+  Business _fromDoc(QueryDocumentSnapshot<Map<String, dynamic>> doc) =>
+      Business.fromMap(doc.id, doc.data());
 
   /// Every listing owned by [uid] — a business owner can have more than one.
   Stream<List<Business>> streamForOwner(String uid) {
-    return _collection.where('ownerId', isEqualTo: uid).snapshots().map((s) => s.docs.map(_fromDoc).toList());
+    return _collection
+        .where('ownerId', isEqualTo: uid)
+        .snapshots()
+        .map((s) => s.docs.map(_fromDoc).toList());
   }
 
   Future<String> create(Business business) async {
@@ -64,12 +70,33 @@ class BusinessRepository {
   /// Admin-only queue — every business regardless of status, matching the
   /// `getAllForProvinceAdmin` pattern in `DestinationRepository`.
   Stream<List<Business>> streamAllForAdmin() {
-    return _collection.orderBy('createdAt', descending: true).snapshots().map((s) => s.docs.map(_fromDoc).toList());
+    return _collection
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map((s) => s.docs.map(_fromDoc).toList());
   }
 
-  Future<void> setStatus(String id, {required String status, String rejectionReason = ''}) async {
+  Future<void> setStatus(
+    String id, {
+    required String status,
+    String rejectionReason = '',
+  }) async {
     try {
-      await _collection.doc(id).update({'status': status, 'rejectionReason': rejectionReason});
+      await _collection.doc(id).update({
+        'status': status,
+        'rejectionReason': rejectionReason,
+      });
+    } catch (e) {
+      throw AppException.from(e);
+    }
+  }
+
+  /// Records the `restaurants/{id}` doc created for this business on its
+  /// first approval — see `RestaurantRepository.createFromBusiness` and
+  /// `AdminBusinessListScreen._approve`.
+  Future<void> setRestaurantId(String id, String restaurantId) async {
+    try {
+      await _collection.doc(id).update({'restaurantId': restaurantId});
     } catch (e) {
       throw AppException.from(e);
     }

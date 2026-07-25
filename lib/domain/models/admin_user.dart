@@ -58,12 +58,11 @@ class AdminUser {
   }
 }
 
-/// The four roles `firestore.rules` recognizes for `admin_users.role`.
+/// The three roles `firestore.rules` recognizes for `admin_users.role`.
 class AdminRole {
   AdminRole._();
 
   static const String admin = 'admin';
   static const String lgu = 'lgu';
   static const String businessOwner = 'businessOwner';
-  static const String eventOrganizer = 'eventOrganizer';
 }

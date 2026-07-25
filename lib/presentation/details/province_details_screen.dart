@@ -21,6 +21,7 @@ import '../../core/widgets/carousels/nearby_places_section.dart';
 import '../../core/widgets/details/info_stat_card.dart';
 import '../../core/widgets/layout/section_header.dart';
 import '../../core/widgets/states/empty_state_widget.dart';
+import '../../core/widgets/states/loading_widget.dart';
 import '../../data/repositories/business_repository.dart';
 import '../../data/repositories/destination_repository.dart';
 import '../../data/repositories/festival_repository.dart';
@@ -69,38 +70,69 @@ class _ProvinceDetailsScreenState extends State<ProvinceDetailsScreen> {
 
     final featured = province.featuredDestinationIds.isNotEmpty
         ? await _destinationRepository.getByIds(province.featuredDestinationIds)
-        : await _destinationRepository.filter(provinceId: province.id, limit: 10);
-    final festivals = await _festivalRepository.filter(provinceId: province.id, limit: 10);
-    final restaurants = await _restaurantRepository.filter(provinceId: province.id, limit: 10);
+        : await _destinationRepository.filter(
+            provinceId: province.id,
+            limit: 10,
+          );
+    final festivals = await _festivalRepository.filter(
+      provinceId: province.id,
+      limit: 10,
+    );
+    final restaurants = await _restaurantRepository.filter(
+      provinceId: province.id,
+      limit: 10,
+    );
     // Best-effort: a business-directory hiccup should never block the rest
     // of the page, same reasoning as every other supplementary section here.
-    final businesses = await _businessRepository.getApprovedForProvince(province.id).catchError((_) => <Business>[]);
+    final businesses = await _businessRepository
+        .getApprovedForProvince(province.id)
+        .catchError((_) => <Business>[]);
 
-    return _ProvinceDetailsData(province: province, destinations: featured, festivals: festivals, restaurants: restaurants, businesses: businesses);
+    return _ProvinceDetailsData(
+      province: province,
+      destinations: featured,
+      festivals: festivals,
+      restaurants: restaurants,
+      businesses: businesses,
+    );
+  }
+
+  Future<void> _refresh() async {
+    final future = _load();
+    setState(() => _future = future);
+    try {
+      await future;
+    } catch (_) {
+      // Surfaced by the FutureBuilder's error state below; RefreshIndicator
+      // just needs this Future to complete either way.
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: FutureBuilder<_ProvinceDetailsData>(
-        future: _future,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState != ConnectionState.done) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.hasError) {
-            return SafeArea(
-              child: EmptyStateWidget(
-                icon: Symbols.error_outline_rounded,
-                title: 'Couldn\'t load this province',
-                message: AppException.from(snapshot.error!).message,
-                actionLabel: 'Go back',
-                onActionTap: () => context.pop(),
-              ),
-            );
-          }
-          return _ProvinceDetailsBody(data: snapshot.data!);
-        },
+      body: RefreshIndicator(
+        onRefresh: _refresh,
+        child: FutureBuilder<_ProvinceDetailsData>(
+          future: _future,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState != ConnectionState.done) {
+              return LoadingWidget.detailPage();
+            }
+            if (snapshot.hasError) {
+              return SafeArea(
+                child: EmptyStateWidget(
+                  icon: Symbols.error_outline_rounded,
+                  title: 'Couldn\'t load this province',
+                  message: AppException.from(snapshot.error!).message,
+                  actionLabel: 'Go back',
+                  onActionTap: () => context.pop(),
+                ),
+              );
+            }
+            return _ProvinceDetailsBody(data: snapshot.data!);
+          },
+        ),
       ),
     );
   }
@@ -141,7 +173,10 @@ class _ProvinceDetailsBody extends StatelessWidget {
           surfaceTintColor: Colors.transparent,
           leading: Padding(
             padding: const EdgeInsets.only(left: AppSpacing.md),
-            child: _CircleButton(icon: Symbols.arrow_back_rounded, onTap: () => context.pop()),
+            child: _CircleButton(
+              icon: Symbols.arrow_back_rounded,
+              onTap: () => context.pop(),
+            ),
           ),
           flexibleSpace: FlexibleSpaceBar(
             collapseMode: CollapseMode.pin,
@@ -149,72 +184,103 @@ class _ProvinceDetailsBody extends StatelessWidget {
           ),
         ),
         SliverPadding(
-          padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.lg, AppSpacing.lg, AppSpacing.huge),
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.lg,
+            AppSpacing.lg,
+            AppSpacing.lg,
+            AppSpacing.huge,
+          ),
           sliver: SliverList.list(
             children: [
               AnimatedButton(
                 label: 'View on Google Maps',
                 icon: Symbols.map_rounded,
                 filled: false,
-                onPressed: () => MapsLauncher.openPlaceSearch('${province.name}, Philippines'),
+                onPressed: () => MapsLauncher.openPlaceSearch(
+                  '${province.name}, Philippines',
+                ),
               ),
               const SizedBox(height: AppSpacing.xl),
               if (!province.hasContent) ...[
                 const EmptyStateWidget(
                   icon: Symbols.auto_stories_rounded,
                   title: 'Content coming soon',
-                  message: 'This province\'s travel guide is still being written — check back soon.',
+                  message:
+                      'This province\'s travel guide is still being written — check back soon.',
                 ),
                 const SizedBox(height: AppSpacing.md),
               ] else ...[
-                Text(province.overview, style: theme.textTheme.bodyMedium?.copyWith(height: 1.6)),
+                Text(
+                  province.overview,
+                  style: theme.textTheme.bodyMedium?.copyWith(height: 1.6),
+                ),
                 const SizedBox(height: AppSpacing.xl),
                 Row(
                   children: [
-                    InfoStatCard(icon: Symbols.calendar_month_rounded, label: 'Best Time', value: province.bestTimeToVisit.split(';').first.trim()),
+                    InfoStatCard(
+                      icon: Symbols.calendar_month_rounded,
+                      label: 'Best Time',
+                      value: province.bestTimeToVisit.split(';').first.trim(),
+                    ),
                     const SizedBox(width: AppSpacing.sm),
                     InfoStatCard(
                       icon: Symbols.payments_rounded,
                       label: 'Daily Budget',
-                      value: '₱${province.estimatedDailyBudgetMin.toStringAsFixed(0)}–${province.estimatedDailyBudgetMax.toStringAsFixed(0)}',
+                      value:
+                          '₱${province.estimatedDailyBudgetMin.toStringAsFixed(0)}–${province.estimatedDailyBudgetMax.toStringAsFixed(0)}',
                     ),
                   ],
                 ),
                 const SizedBox(height: AppSpacing.xxl),
                 Text('Local Culture', style: theme.textTheme.titleLarge),
                 const SizedBox(height: AppSpacing.sm),
-                Text(province.localCulture, style: theme.textTheme.bodyMedium?.copyWith(height: 1.6)),
+                Text(
+                  province.localCulture,
+                  style: theme.textTheme.bodyMedium?.copyWith(height: 1.6),
+                ),
               ],
               if (data.destinations.isNotEmpty) ...[
                 const SizedBox(height: AppSpacing.xxl),
-                const SectionHeader(title: 'Featured Attractions', padding: EdgeInsets.zero),
+                const SectionHeader(
+                  title: 'Featured Attractions',
+                  padding: EdgeInsets.zero,
+                ),
                 const SizedBox(height: AppSpacing.md),
                 SizedBox(
                   height: 250,
                   child: ListView.separated(
                     scrollDirection: Axis.horizontal,
                     itemCount: data.destinations.length,
-                    separatorBuilder: (_, _) => const SizedBox(width: AppSpacing.md),
+                    separatorBuilder: (_, _) =>
+                        const SizedBox(width: AppSpacing.md),
                     itemBuilder: (context, i) => DestinationCard(
                       destination: data.destinations[i],
-                      onTap: () => context.push(RoutePaths.destinationDetails(data.destinations[i].id)),
+                      onTap: () => context.push(
+                        RoutePaths.destinationDetails(data.destinations[i].id),
+                      ),
                     ),
                   ),
                 ),
               ],
               if (data.festivals.isNotEmpty) ...[
                 const SizedBox(height: AppSpacing.xl),
-                const SectionHeader(title: 'Local Festivals', padding: EdgeInsets.zero),
+                const SectionHeader(
+                  title: 'Local Festivals',
+                  padding: EdgeInsets.zero,
+                ),
                 const SizedBox(height: AppSpacing.md),
                 SizedBox(
                   height: 250,
                   child: ListView.separated(
                     scrollDirection: Axis.horizontal,
                     itemCount: data.festivals.length,
-                    separatorBuilder: (_, _) => const SizedBox(width: AppSpacing.md),
+                    separatorBuilder: (_, _) =>
+                        const SizedBox(width: AppSpacing.md),
                     itemBuilder: (context, i) => FestivalCard(
                       festival: data.festivals[i],
-                      onTap: () => context.push(RoutePaths.festivalDetails(data.festivals[i].id)),
+                      onTap: () => context.push(
+                        RoutePaths.festivalDetails(data.festivals[i].id),
+                      ),
                     ),
                   ),
                 ),
@@ -230,28 +296,40 @@ class _ProvinceDetailsBody extends StatelessWidget {
               NearbyPlacesSection(
                 title: 'Getting Around',
                 includedTypes: PlaceCategory.transportTerminals,
-                textQuery: 'bus and transport terminals in ${province.name}, Philippines',
+                textQuery:
+                    'bus and transport terminals in ${province.name}, Philippines',
                 areaLabel: province.name,
               ),
               if (data.businesses.isNotEmpty) ...[
                 const SizedBox(height: AppSpacing.xl),
-                const SectionHeader(title: 'Local Businesses', padding: EdgeInsets.zero),
+                const SectionHeader(
+                  title: 'Local Businesses',
+                  padding: EdgeInsets.zero,
+                ),
                 const SizedBox(height: AppSpacing.md),
-                ...data.businesses.map((business) => _BusinessTile(business: business)),
+                ...data.businesses.map(
+                  (business) => _BusinessTile(business: business),
+                ),
               ],
               if (data.restaurants.isNotEmpty) ...[
                 const SizedBox(height: AppSpacing.xl),
-                const SectionHeader(title: 'Where to Eat', padding: EdgeInsets.zero),
+                const SectionHeader(
+                  title: 'Where to Eat',
+                  padding: EdgeInsets.zero,
+                ),
                 const SizedBox(height: AppSpacing.md),
                 SizedBox(
                   height: 250,
                   child: ListView.separated(
                     scrollDirection: Axis.horizontal,
                     itemCount: data.restaurants.length,
-                    separatorBuilder: (_, _) => const SizedBox(width: AppSpacing.md),
+                    separatorBuilder: (_, _) =>
+                        const SizedBox(width: AppSpacing.md),
                     itemBuilder: (context, i) => RestaurantCard(
                       restaurant: data.restaurants[i],
-                      onTap: () => context.push(RoutePaths.restaurantDetails(data.restaurants[i].id)),
+                      onTap: () => context.push(
+                        RoutePaths.restaurantDetails(data.restaurants[i].id),
+                      ),
                     ),
                   ),
                 ),
@@ -268,16 +346,23 @@ class _ProvinceDetailsBody extends StatelessWidget {
                       children: [
                         const Padding(
                           padding: EdgeInsets.only(top: 3),
-                          child: Icon(Symbols.lightbulb_rounded, size: 18, color: AppColors.accentDark),
+                          child: Icon(
+                            Symbols.lightbulb_rounded,
+                            size: 18,
+                            color: AppColors.accentDark,
+                          ),
                         ),
                         const SizedBox(width: AppSpacing.sm),
-                        Expanded(child: Text(tip, style: theme.textTheme.bodyMedium)),
+                        Expanded(
+                          child: Text(tip, style: theme.textTheme.bodyMedium),
+                        ),
                       ],
                     ),
                   ),
                 ),
               ],
-              if (province.hasContent && province.emergencyHotlines.isNotEmpty) ...[
+              if (province.hasContent &&
+                  province.emergencyHotlines.isNotEmpty) ...[
                 const SizedBox(height: AppSpacing.xxl),
                 Text('Emergency Hotlines', style: theme.textTheme.titleLarge),
                 const SizedBox(height: AppSpacing.sm),
@@ -289,10 +374,24 @@ class _ProvinceDetailsBody extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(vertical: 4),
                       child: Row(
                         children: [
-                          const Icon(Symbols.emergency_rounded, size: 18, color: AppColors.error),
+                          const Icon(
+                            Symbols.emergency_rounded,
+                            size: 18,
+                            color: AppColors.error,
+                          ),
                           const SizedBox(width: AppSpacing.sm),
-                          Expanded(child: Text(hotline.label, style: theme.textTheme.bodyMedium)),
-                          Text(hotline.number, style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700)),
+                          Expanded(
+                            child: Text(
+                              hotline.label,
+                              style: theme.textTheme.bodyMedium,
+                            ),
+                          ),
+                          Text(
+                            hotline.number,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -322,13 +421,17 @@ class _ProvinceGallery extends StatefulWidget {
   State<_ProvinceGallery> createState() => _ProvinceGalleryState();
 }
 
-class _ProvinceGalleryState extends State<_ProvinceGallery> with AutoAdvanceGalleryMixin {
+class _ProvinceGalleryState extends State<_ProvinceGallery>
+    with AutoAdvanceGalleryMixin {
   final PageController _pageController = PageController();
 
   @override
   void initState() {
     super.initState();
-    final imageCount = [widget.province.heroImageUrl, ...widget.province.galleryImageUrls].where((u) => u.isNotEmpty).length;
+    final imageCount = [
+      widget.province.heroImageUrl,
+      ...widget.province.galleryImageUrls,
+    ].where((u) => u.isNotEmpty).length;
     startAutoAdvance(_pageController, imageCount);
   }
 
@@ -342,7 +445,10 @@ class _ProvinceGalleryState extends State<_ProvinceGallery> with AutoAdvanceGall
   @override
   Widget build(BuildContext context) {
     final province = widget.province;
-    final images = [province.heroImageUrl, ...province.galleryImageUrls].where((u) => u.isNotEmpty).toList();
+    final images = [
+      province.heroImageUrl,
+      ...province.galleryImageUrls,
+    ].where((u) => u.isNotEmpty).toList();
 
     return Stack(
       fit: StackFit.expand,
@@ -353,7 +459,8 @@ class _ProvinceGalleryState extends State<_ProvinceGallery> with AutoAdvanceGall
           PageView.builder(
             controller: _pageController,
             itemCount: images.length,
-            itemBuilder: (context, index) => CachedNetworkImage(imageUrl: images[index], fit: BoxFit.cover),
+            itemBuilder: (context, index) =>
+                CachedNetworkImage(imageUrl: images[index], fit: BoxFit.cover),
           ),
         IgnorePointer(
           child: DecoratedBox(
@@ -361,7 +468,10 @@ class _ProvinceGalleryState extends State<_ProvinceGallery> with AutoAdvanceGall
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
-                colors: [Colors.transparent, Colors.black.withValues(alpha: 0.6)],
+                colors: [
+                  Colors.transparent,
+                  Colors.black.withValues(alpha: 0.6),
+                ],
               ),
             ),
           ),
@@ -399,7 +509,11 @@ class _ProvinceGalleryState extends State<_ProvinceGallery> with AutoAdvanceGall
                 const SizedBox(height: AppSpacing.sm),
                 Text(
                   province.name,
-                  style: const TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.w700),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 26,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ],
             ),
@@ -425,30 +539,55 @@ class _BusinessTile extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: AppSpacing.sm),
       padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(color: theme.colorScheme.surface, borderRadius: BorderRadius.circular(AppRadius.lg), border: Border.all(color: AppColors.border)),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: Border.all(color: AppColors.border),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Expanded(child: Text(business.name, style: theme.textTheme.titleMedium)),
-              TagChip(label: BusinessCategory.label(business.category), color: AppColors.primary),
+              Expanded(
+                child: Text(business.name, style: theme.textTheme.titleMedium),
+              ),
+              TagChip(
+                label: BusinessCategory.label(business.category),
+                color: AppColors.primary,
+              ),
             ],
           ),
           if (business.description.isNotEmpty) ...[
             const SizedBox(height: 4),
-            Text(business.description, style: theme.textTheme.bodySmall, maxLines: 2, overflow: TextOverflow.ellipsis),
+            Text(
+              business.description,
+              style: theme.textTheme.bodySmall,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
           ],
-          if (business.address.isNotEmpty || business.contactNumber.isNotEmpty) ...[
+          if (business.address.isNotEmpty ||
+              business.contactNumber.isNotEmpty) ...[
             const SizedBox(height: AppSpacing.xs),
             Row(
               children: [
-                const Icon(Symbols.location_on_rounded, size: 14, color: AppColors.textTertiary),
+                const Icon(
+                  Symbols.location_on_rounded,
+                  size: 14,
+                  color: AppColors.textTertiary,
+                ),
                 const SizedBox(width: 4),
                 Expanded(
                   child: Text(
-                    [business.address, business.contactNumber].where((s) => s.isNotEmpty).join(' · '),
-                    style: const TextStyle(fontSize: 12, color: AppColors.textTertiary),
+                    [
+                      business.address,
+                      business.contactNumber,
+                    ].where((s) => s.isNotEmpty).join(' · '),
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textTertiary,
+                    ),
                   ),
                 ),
               ],
@@ -457,8 +596,18 @@ class _BusinessTile extends StatelessWidget {
           if (business.websiteUrl.isNotEmpty) ...[
             const SizedBox(height: AppSpacing.xs),
             InkWell(
-              onTap: () => launchUrl(Uri.parse(business.websiteUrl), mode: LaunchMode.externalApplication),
-              child: Text(business.websiteUrl, style: const TextStyle(color: AppColors.primary, fontSize: 12, decoration: TextDecoration.underline)),
+              onTap: () => launchUrl(
+                Uri.parse(business.websiteUrl),
+                mode: LaunchMode.externalApplication,
+              ),
+              child: Text(
+                business.websiteUrl,
+                style: const TextStyle(
+                  color: AppColors.primary,
+                  fontSize: 12,
+                  decoration: TextDecoration.underline,
+                ),
+              ),
             ),
           ],
         ],
@@ -480,7 +629,10 @@ class _CircleButton extends StatelessWidget {
       child: Container(
         width: 36,
         height: 36,
-        decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.35), shape: BoxShape.circle),
+        decoration: BoxDecoration(
+          color: Colors.black.withValues(alpha: 0.35),
+          shape: BoxShape.circle,
+        ),
         child: Icon(icon, color: Colors.white, size: 18),
       ),
     );

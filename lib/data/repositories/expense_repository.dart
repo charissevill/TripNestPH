@@ -29,6 +29,7 @@ class ExpenseRepository {
     required double amount,
     required String note,
     required String loggedBy,
+    List<String> splitBetween = const [],
   }) async {
     try {
       await _collection(itineraryId).add(
@@ -39,6 +40,7 @@ class ExpenseRepository {
           note: note,
           loggedBy: loggedBy,
           createdAt: DateTime.now(),
+          splitBetween: splitBetween,
         ).toMap(),
       );
     } catch (e) {

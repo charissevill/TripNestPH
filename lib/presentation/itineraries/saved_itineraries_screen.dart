@@ -11,6 +11,7 @@ import '../../core/utils/app_exception.dart';
 import '../../core/widgets/banners/offline_banner.dart';
 import '../../core/widgets/dialogs/confirmation_dialog.dart';
 import '../../core/widgets/states/empty_state_widget.dart';
+import '../../core/widgets/states/loading_widget.dart';
 import '../../data/repositories/itinerary_repository.dart';
 import '../../domain/models/saved_itinerary.dart';
 
@@ -20,42 +21,68 @@ import '../../domain/models/saved_itinerary.dart';
 class SavedItinerariesScreen extends StatelessWidget {
   const SavedItinerariesScreen({super.key});
 
-  Future<void> _confirmDelete(BuildContext context, ItineraryRepository repository, SavedItinerary trip) async {
+  Future<void> _confirmDelete(
+    BuildContext context,
+    ItineraryRepository repository,
+    SavedItinerary trip,
+  ) async {
     final confirmed = await showConfirmationDialog(
       context,
       title: 'Remove this trip?',
-      message: '"${trip.title}" will be permanently removed from your saved trips.',
+      message:
+          '"${trip.title}" will be permanently removed from your saved trips.',
       confirmLabel: 'Remove',
       isDestructive: true,
     );
     if (confirmed) await repository.delete(trip.id);
   }
 
-  Future<void> _duplicateTrip(BuildContext context, ItineraryRepository repository, SavedItinerary trip, String uid) async {
+  Future<void> _duplicateTrip(
+    BuildContext context,
+    ItineraryRepository repository,
+    SavedItinerary trip,
+    String uid,
+  ) async {
     try {
-      await repository.duplicate(trip.id, uid);
+      final ownerName = context.read<AuthProvider>().currentUser?.name ?? '';
+      await repository.duplicate(trip.id, uid, ownerName: ownerName);
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('"${trip.title}" duplicated.')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('"${trip.title}" duplicated.')));
       }
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(AppException.from(e).message)));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(AppException.from(e).message)));
       }
     }
   }
 
-  Future<void> _confirmLeave(BuildContext context, ItineraryRepository repository, SavedItinerary trip, String uid) async {
+  Future<void> _confirmLeave(
+    BuildContext context,
+    ItineraryRepository repository,
+    SavedItinerary trip,
+    String uid,
+  ) async {
     final confirmed = await showConfirmationDialog(
       context,
       title: 'Leave this trip?',
-      message: 'You\'ll lose access to "${trip.title}" unless someone invites you again.',
+      message:
+          'You\'ll lose access to "${trip.title}" unless someone invites you again.',
       confirmLabel: 'Leave',
       isDestructive: true,
     );
-    if (confirmed) await repository.leaveTrip(itineraryId: trip.id, userId: uid);
+    if (confirmed)
+      await repository.leaveTrip(itineraryId: trip.id, userId: uid);
   }
 
-  Future<void> _joinTrip(BuildContext context, ItineraryRepository repository, String uid) async {
+  Future<void> _joinTrip(
+    BuildContext context,
+    ItineraryRepository repository,
+    String uid,
+  ) async {
     final controller = TextEditingController();
     final code = await showDialog<String>(
       context: context,
@@ -63,12 +90,21 @@ class SavedItinerariesScreen extends StatelessWidget {
         title: const Text('Join a Shared Trip'),
         content: TextField(
           controller: controller,
-          decoration: const InputDecoration(labelText: 'Trip code', hintText: 'Paste the code your friend shared'),
+          decoration: const InputDecoration(
+            labelText: 'Trip code',
+            hintText: 'Paste the code your friend shared',
+          ),
           autofocus: true,
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.of(context).pop(controller.text.trim()), child: const Text('Join')),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(controller.text.trim()),
+            child: const Text('Join'),
+          ),
         ],
       ),
     );
@@ -78,23 +114,39 @@ class SavedItinerariesScreen extends StatelessWidget {
       final trip = await repository.getById(code);
       if (trip == null) {
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No trip found with that code.')));
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('No trip found with that code.')),
+          );
         }
         return;
       }
       if (trip.userId == uid || trip.collaboratorIds.contains(uid)) {
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('You already have access to this trip.')));
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('You already have access to this trip.'),
+            ),
+          );
         }
         return;
       }
-      await repository.joinAsCollaborator(itineraryId: code, userId: uid);
+      if (!context.mounted) return;
+      final userName = context.read<AuthProvider>().currentUser?.name ?? '';
+      await repository.joinAsCollaborator(
+        itineraryId: code,
+        userId: uid,
+        userName: userName,
+      );
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Joined "${trip.title}".')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Joined "${trip.title}".')));
       }
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(AppException.from(e).message)));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(AppException.from(e).message)));
       }
     }
   }
@@ -106,7 +158,10 @@ class SavedItinerariesScreen extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(icon: const Icon(Symbols.arrow_back_rounded), onPressed: () => context.pop()),
+        leading: IconButton(
+          icon: const Icon(Symbols.arrow_back_rounded),
+          onPressed: () => context.pop(),
+        ),
         title: const Text('Saved Trips'),
         actions: [
           if (uid != null) ...[
@@ -128,25 +183,36 @@ class SavedItinerariesScreen extends StatelessWidget {
           const OfflineBanner(),
           Expanded(
             child: uid == null
-                ? const EmptyStateWidget(icon: Symbols.map_rounded, title: 'Sign in required', message: 'Sign in to view your saved trips.')
+                ? const EmptyStateWidget(
+                    icon: Symbols.map_rounded,
+                    title: 'Sign in required',
+                    message: 'Sign in to view your saved trips.',
+                  )
                 : StreamBuilder<List<SavedItinerary>>(
                     stream: repository.streamForUser(uid),
                     builder: (context, snapshot) {
                       if (snapshot.connectionState == ConnectionState.waiting) {
-                        return const Center(child: CircularProgressIndicator());
+                        return ListView(
+                          children: List.generate(
+                            4,
+                            (_) => LoadingWidget.listRow(),
+                          ),
+                        );
                       }
                       final trips = snapshot.data ?? const [];
                       if (trips.isEmpty) {
                         return const EmptyStateWidget(
                           icon: Symbols.map_rounded,
                           title: 'No saved trips yet',
-                          message: 'Generate an itinerary from the AI Planner and save it to see it here.',
+                          message:
+                              'Generate an itinerary from the AI Planner and save it to see it here.',
                         );
                       }
                       return ListView.separated(
                         padding: const EdgeInsets.all(AppSpacing.lg),
                         itemCount: trips.length,
-                        separatorBuilder: (_, _) => const SizedBox(height: AppSpacing.md),
+                        separatorBuilder: (_, _) =>
+                            const SizedBox(height: AppSpacing.md),
                         itemBuilder: (context, i) {
                           final trip = trips[i];
                           final isOwner = trip.userId == uid;
@@ -155,11 +221,31 @@ class SavedItinerariesScreen extends StatelessWidget {
                             isOwner: isOwner,
                             onTap: () => context.push(
                               RoutePaths.generatedItinerary,
-                              extra: {'itinerary': trip.itinerary, 'savedId': trip.id},
+                              extra: {
+                                'itinerary': trip.itinerary,
+                                'savedId': trip.id,
+                              },
                             ),
-                            onDelete: isOwner ? () => _confirmDelete(context, repository, trip) : null,
-                            onDuplicate: isOwner ? () => _duplicateTrip(context, repository, trip, uid) : null,
-                            onLeave: isOwner ? null : () => _confirmLeave(context, repository, trip, uid),
+                            onDelete: isOwner
+                                ? () =>
+                                      _confirmDelete(context, repository, trip)
+                                : null,
+                            onDuplicate: isOwner
+                                ? () => _duplicateTrip(
+                                    context,
+                                    repository,
+                                    trip,
+                                    uid,
+                                  )
+                                : null,
+                            onLeave: isOwner
+                                ? null
+                                : () => _confirmLeave(
+                                    context,
+                                    repository,
+                                    trip,
+                                    uid,
+                                  ),
                           );
                         },
                       );
@@ -201,7 +287,11 @@ class _SavedItineraryTile extends StatelessWidget {
           color: theme.colorScheme.surface,
           borderRadius: BorderRadius.circular(AppRadius.lg),
           boxShadow: [
-            BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 12, offset: const Offset(0, 6)),
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 12,
+              offset: const Offset(0, 6),
+            ),
           ],
         ),
         child: Row(
@@ -214,7 +304,10 @@ class _SavedItineraryTile extends StatelessWidget {
                 borderRadius: BorderRadius.circular(AppRadius.md),
               ),
               alignment: Alignment.center,
-              child: Icon(isOwner ? Symbols.map_rounded : Symbols.group_rounded, color: AppColors.primary),
+              child: Icon(
+                isOwner ? Symbols.map_rounded : Symbols.group_rounded,
+                color: AppColors.primary,
+              ),
             ),
             const SizedBox(width: AppSpacing.md),
             Expanded(
@@ -234,14 +327,21 @@ class _SavedItineraryTile extends StatelessWidget {
             ),
             if (isOwner)
               PopupMenuButton<VoidCallback?>(
-                icon: const Icon(Symbols.more_vert_rounded, color: AppColors.textSecondary),
+                icon: const Icon(
+                  Symbols.more_vert_rounded,
+                  color: AppColors.textSecondary,
+                ),
                 onSelected: (action) => action?.call(),
                 itemBuilder: (context) => [
                   PopupMenuItem(
                     value: onDuplicate,
                     child: const Row(
                       children: [
-                        Icon(Symbols.content_copy_rounded, size: 18, color: AppColors.textSecondary),
+                        Icon(
+                          Symbols.content_copy_rounded,
+                          size: 18,
+                          color: AppColors.textSecondary,
+                        ),
                         SizedBox(width: AppSpacing.sm),
                         Text('Duplicate'),
                       ],
@@ -251,9 +351,16 @@ class _SavedItineraryTile extends StatelessWidget {
                     value: onDelete,
                     child: const Row(
                       children: [
-                        Icon(Symbols.delete_outline_rounded, size: 18, color: AppColors.error),
+                        Icon(
+                          Symbols.delete_outline_rounded,
+                          size: 18,
+                          color: AppColors.error,
+                        ),
                         SizedBox(width: AppSpacing.sm),
-                        Text('Remove', style: TextStyle(color: AppColors.error)),
+                        Text(
+                          'Remove',
+                          style: TextStyle(color: AppColors.error),
+                        ),
                       ],
                     ),
                   ),
@@ -261,7 +368,10 @@ class _SavedItineraryTile extends StatelessWidget {
               )
             else
               IconButton(
-                icon: const Icon(Symbols.logout_rounded, color: AppColors.error),
+                icon: const Icon(
+                  Symbols.logout_rounded,
+                  color: AppColors.error,
+                ),
                 onPressed: onLeave,
               ),
           ],

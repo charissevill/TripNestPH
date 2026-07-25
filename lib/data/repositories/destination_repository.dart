@@ -17,9 +17,12 @@ class DestinationRepository {
 
   /// Every traveler-facing query filters to `status == 'published'` so
   /// content drafted in the Admin Portal (Phase 4) never surfaces here —
-  /// direct lookups (getById/getByIds) intentionally skip this filter so
-  /// an already-favorited or already-linked spot doesn't 404 if an admin
-  /// later drafts it.
+  /// `getById` intentionally skips this filter so an already-favorited or
+  /// already-linked spot doesn't 404 if an admin later drafts it, but
+  /// `getByIds` (a batch *query*, not a single-doc lookup) can't skip it:
+  /// firestore.rules requires a `list` operation to be provably
+  /// published-only, so an unfiltered batch query would be rejected
+  /// outright rather than just missing the drafted item.
   Query<Map<String, dynamic>> get _publishedOnly => _collection.where('status', isEqualTo: 'published');
 
   Future<List<Destination>> getFeatured({int limit = 10}) => _query(
@@ -76,7 +79,8 @@ class DestinationRepository {
       }
       final results = <Destination>[];
       for (final chunk in chunks) {
-        final snapshot = await _collection.where(FieldPath.documentId, whereIn: chunk).get();
+        final snapshot =
+            await _collection.where(FieldPath.documentId, whereIn: chunk).where('status', isEqualTo: 'published').get();
         results.addAll(snapshot.docs.map(_fromDoc));
       }
       return results;

@@ -81,7 +81,20 @@ class _ReviewTile extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  Expanded(child: Text(review.authorName, style: theme.textTheme.titleMedium)),
+                  Expanded(
+                    child: Row(
+                      children: [
+                        Flexible(child: Text(review.authorName, style: theme.textTheme.titleMedium, overflow: TextOverflow.ellipsis)),
+                        if (review.verified) ...[
+                          const SizedBox(width: 6),
+                          const Tooltip(
+                            message: 'Verified Visit — viewed this listing before reviewing',
+                            child: Icon(Symbols.verified_rounded, size: 15, color: AppColors.success),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
                   Text(review.date, style: theme.textTheme.bodySmall),
                   if (isOwn) _OwnReviewMenu(onEdit: () => onEdit?.call(review), onDelete: () => onDelete?.call(review))
                   else if (onReport != null)

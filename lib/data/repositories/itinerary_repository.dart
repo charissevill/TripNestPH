@@ -79,6 +79,7 @@ class ItineraryRepository {
     required String title,
     required Itinerary itinerary,
     DateTime? startDate,
+    String ownerName = '',
   }) async {
     try {
       final doc = await _collection.add(
@@ -88,6 +89,7 @@ class ItineraryRepository {
           title: title,
           itinerary: itinerary,
           savedAt: DateTime.now(),
+          memberNames: ownerName.isEmpty ? const {} : {userId: ownerName},
           packingItems: PackingItem.defaults(),
           startDate: startDate,
         ).toMap(),
@@ -114,12 +116,12 @@ class ItineraryRepository {
   /// itinerary content, a fresh id/savedAt, no collaborators or start date
   /// carried over (a plain `save()`, just sourced from an existing trip
   /// instead of a freshly generated one). Returns the new trip's id.
-  Future<String> duplicate(String sourceId, String userId) async {
+  Future<String> duplicate(String sourceId, String userId, {String ownerName = ''}) async {
     final source = await getById(sourceId);
     if (source == null) {
       throw const AppException('This trip is no longer available.');
     }
-    return save(userId: userId, title: '${source.title} (Copy)', itinerary: source.itinerary);
+    return save(userId: userId, title: '${source.title} (Copy)', itinerary: source.itinerary, ownerName: ownerName);
   }
 
   Future<void> delete(String id) async {
@@ -131,12 +133,17 @@ class ItineraryRepository {
   }
 
   /// Joins a shared trip using its id as the share code. Only ever adds the
-  /// caller's own uid — enforced again server-side by Firestore rules.
-  Future<void> joinAsCollaborator({required String itineraryId, required String userId}) async {
+  /// caller's own uid — enforced again server-side by Firestore rules. Also
+  /// tags the joiner's own display name into `memberNames` (their own entry
+  /// only) so the owner can see who's who in the Budget Tracker without
+  /// needing read access to anyone else's `users/{uid}` profile.
+  Future<void> joinAsCollaborator({required String itineraryId, required String userId, String userName = ''}) async {
     try {
-      await _collection.doc(itineraryId).update({
+      final update = <String, dynamic>{
         'collaboratorIds': FieldValue.arrayUnion([userId]),
-      });
+      };
+      if (userName.isNotEmpty) update['memberNames.$userId'] = userName;
+      await _collection.doc(itineraryId).update(update);
     } catch (e) {
       throw AppException.from(e);
     }
@@ -148,6 +155,7 @@ class ItineraryRepository {
     try {
       await _collection.doc(itineraryId).update({
         'collaboratorIds': FieldValue.arrayRemove([userId]),
+        'memberNames.$userId': FieldValue.delete(),
       });
     } catch (e) {
       throw AppException.from(e);

@@ -22,6 +22,7 @@ class FirestorePaths {
 
   // Subcollections.
   static const String recentlyViewed = 'recently_viewed';
+  static const String visited = 'visited';
   static const String expenses = 'expenses';
   static const String cities = 'cities';
 

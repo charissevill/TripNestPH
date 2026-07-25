@@ -8,10 +8,14 @@ import '../../core/theme/app_spacing.dart';
 import '../../core/utils/app_exception.dart';
 import '../../core/widgets/buttons/animated_button.dart';
 import '../../core/widgets/inputs/hero_image_picker.dart';
+import '../../core/widgets/states/loading_widget.dart';
 import '../../data/repositories/business_repository.dart';
 import '../../data/repositories/province_repository.dart';
+import '../../data/repositories/restaurant_repository.dart';
 import '../../domain/models/business.dart';
 import '../../domain/models/province.dart';
+
+const List<String> _priceRanges = ['₱', '₱₱', '₱₱₱', '₱₱₱₱'];
 
 /// A `businessOwner` account's self-service listing. Shows the owner's
 /// current listing (any status) with an edit form, or an empty "create
@@ -35,7 +39,10 @@ class _MyBusinessScreenState extends State<MyBusinessScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(icon: const Icon(Symbols.arrow_back_rounded), onPressed: () => context.pop()),
+        leading: IconButton(
+          icon: const Icon(Symbols.arrow_back_rounded),
+          onPressed: () => context.pop(),
+        ),
         title: const Text('My Business'),
       ),
       body: SafeArea(
@@ -43,7 +50,7 @@ class _MyBusinessScreenState extends State<MyBusinessScreen> {
           stream: _repository.streamForOwner(widget.uid),
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
+              return LoadingWidget.block(height: 300);
             }
             final businesses = snapshot.data ?? const [];
             final existing = businesses.isEmpty ? null : businesses.first;
@@ -67,15 +74,36 @@ class _BusinessForm extends StatefulWidget {
 
 class _BusinessFormState extends State<_BusinessForm> {
   final BusinessRepository _repository = BusinessRepository();
+  final RestaurantRepository _restaurantRepository = RestaurantRepository();
 
-  late final _nameController = TextEditingController(text: widget.existing?.name ?? '');
-  late final _descController = TextEditingController(text: widget.existing?.description ?? '');
-  late final _addressController = TextEditingController(text: widget.existing?.address ?? '');
-  late final _contactController = TextEditingController(text: widget.existing?.contactNumber ?? '');
-  late final _websiteController = TextEditingController(text: widget.existing?.websiteUrl ?? '');
+  late final _nameController = TextEditingController(
+    text: widget.existing?.name ?? '',
+  );
+  late final _descController = TextEditingController(
+    text: widget.existing?.description ?? '',
+  );
+  late final _addressController = TextEditingController(
+    text: widget.existing?.address ?? '',
+  );
+  late final _contactController = TextEditingController(
+    text: widget.existing?.contactNumber ?? '',
+  );
+  late final _websiteController = TextEditingController(
+    text: widget.existing?.websiteUrl ?? '',
+  );
+  late final _cuisineController = TextEditingController(
+    text: widget.existing?.cuisine ?? '',
+  );
+  late final _openingHoursController = TextEditingController(
+    text: widget.existing?.openingHours ?? '',
+  );
   late String _heroImageUrl = widget.existing?.heroImageUrl ?? '';
+  late String _priceRange = _priceRanges.contains(widget.existing?.priceRange)
+      ? widget.existing!.priceRange
+      : _priceRanges.first;
 
-  late String _category = widget.existing?.category ?? BusinessCategory.accommodation;
+  late String _category =
+      widget.existing?.category ?? BusinessCategory.accommodation;
   Province? _selectedProvince;
   late Future<List<Province>> _provincesFuture;
   bool _saving = false;
@@ -99,7 +127,15 @@ class _BusinessFormState extends State<_BusinessForm> {
 
   @override
   void dispose() {
-    for (final c in [_nameController, _descController, _addressController, _contactController, _websiteController]) {
+    for (final c in [
+      _nameController,
+      _descController,
+      _addressController,
+      _contactController,
+      _websiteController,
+      _cuisineController,
+      _openingHoursController,
+    ]) {
       c.dispose();
     }
     super.dispose();
@@ -108,15 +144,21 @@ class _BusinessFormState extends State<_BusinessForm> {
   Future<void> _save({bool resubmit = false}) async {
     final province = _selectedProvince;
     if (_nameController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Business name is required.')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Business name is required.')),
+      );
       return;
     }
     if (province == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Province is required.')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Province is required.')));
       return;
     }
     if (_descController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('A short description is required.')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('A short description is required.')),
+      );
       return;
     }
 
@@ -129,10 +171,18 @@ class _BusinessFormState extends State<_BusinessForm> {
       description: _descController.text.trim(),
       provinceId: province.id,
       provinceName: province.name,
+      regionId: province.regionId,
       address: _addressController.text.trim(),
       contactNumber: _contactController.text.trim(),
       websiteUrl: _websiteController.text.trim(),
       heroImageUrl: _heroImageUrl,
+      cuisine: _category == BusinessCategory.foodAndDining
+          ? _cuisineController.text.trim()
+          : '',
+      priceRange: _priceRange,
+      openingHours: _category == BusinessCategory.foodAndDining
+          ? _openingHoursController.text.trim()
+          : '',
     );
 
     try {
@@ -142,12 +192,32 @@ class _BusinessFormState extends State<_BusinessForm> {
         await _repository.resubmit(widget.existing!.id, business);
       } else {
         await _repository.update(widget.existing!.id, business);
+        // Already approved and linked to a restaurant — keep it in sync
+        // with this edit (see the class doc on Business).
+        final restaurantId = widget.existing!.restaurantId;
+        if (restaurantId.isNotEmpty) {
+          await _restaurantRepository.updateFromBusiness(
+            restaurantId,
+            business,
+          );
+        }
       }
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(widget.existing == null ? 'Listing submitted for review.' : 'Listing updated.')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              widget.existing == null
+                  ? 'Listing submitted for review.'
+                  : 'Listing updated.',
+            ),
+          ),
+        );
       }
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(AppException.from(e).message)));
+      if (mounted)
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(AppException.from(e).message)));
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -157,17 +227,33 @@ class _BusinessFormState extends State<_BusinessForm> {
     final theme = Theme.of(context);
     switch (business.status) {
       case 'approved':
-        return _Banner(color: AppColors.success, icon: Symbols.check_circle_rounded, text: 'Live — travelers can see this listing on your province page.');
+        return _Banner(
+          color: AppColors.success,
+          icon: Symbols.check_circle_rounded,
+          text: 'Live — travelers can see this listing on your province page.',
+        );
       case 'rejected':
         return _Banner(
           color: AppColors.error,
           icon: Symbols.error_rounded,
-          text: business.rejectionReason.isEmpty ? 'Rejected. Edit and resubmit below.' : 'Rejected: ${business.rejectionReason}\nEdit and resubmit below.',
+          text: business.rejectionReason.isEmpty
+              ? 'Rejected. Edit and resubmit below.'
+              : 'Rejected: ${business.rejectionReason}\nEdit and resubmit below.',
         );
       case 'suspended':
-        return const _Banner(color: AppColors.error, icon: Symbols.block_rounded, text: 'Suspended by an admin — contact support if you believe this is a mistake.');
+        return const _Banner(
+          color: AppColors.error,
+          icon: Symbols.block_rounded,
+          text:
+              'Suspended by an admin — contact support if you believe this is a mistake.',
+        );
       default:
-        return _Banner(color: AppColors.warning, icon: Symbols.hourglass_top_rounded, text: 'Pending review.', textStyle: theme.textTheme.bodyMedium);
+        return _Banner(
+          color: AppColors.warning,
+          icon: Symbols.hourglass_top_rounded,
+          text: 'Pending review.',
+          textStyle: theme.textTheme.bodyMedium,
+        );
     }
   }
 
@@ -177,38 +263,103 @@ class _BusinessFormState extends State<_BusinessForm> {
       future: _provincesFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState != ConnectionState.done) {
-          return const Center(child: CircularProgressIndicator());
+          return LoadingWidget.block(height: 400);
         }
         final provinces = snapshot.data ?? const [];
         final existing = widget.existing;
         return ListView(
-          padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.md, AppSpacing.lg, AppSpacing.huge),
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.lg,
+            AppSpacing.md,
+            AppSpacing.lg,
+            AppSpacing.huge,
+          ),
           children: [
-            if (existing != null) ...[_statusBanner(existing), const SizedBox(height: AppSpacing.lg)],
-            TextField(controller: _nameController, decoration: const InputDecoration(labelText: 'Business Name')),
+            if (existing != null) ...[
+              _statusBanner(existing),
+              const SizedBox(height: AppSpacing.lg),
+            ],
+            TextField(
+              controller: _nameController,
+              decoration: const InputDecoration(labelText: 'Business Name'),
+            ),
             const SizedBox(height: AppSpacing.md),
             DropdownButtonFormField<String>(
               initialValue: _category,
               decoration: const InputDecoration(labelText: 'Category'),
-              items: BusinessCategory.all.map((c) => DropdownMenuItem(value: c, child: Text(BusinessCategory.label(c)))).toList(),
-              onChanged: (value) => setState(() => _category = value ?? _category),
+              items: BusinessCategory.all
+                  .map(
+                    (c) => DropdownMenuItem(
+                      value: c,
+                      child: Text(BusinessCategory.label(c)),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (value) =>
+                  setState(() => _category = value ?? _category),
             ),
+            if (_category == BusinessCategory.foodAndDining) ...[
+              const SizedBox(height: AppSpacing.md),
+              TextField(
+                controller: _cuisineController,
+                decoration: const InputDecoration(
+                  labelText: 'Cuisine',
+                  hintText: 'e.g. Filipino, Seafood',
+                ),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              DropdownButtonFormField<String>(
+                initialValue: _priceRange,
+                decoration: const InputDecoration(labelText: 'Price Range'),
+                items: _priceRanges
+                    .map((p) => DropdownMenuItem(value: p, child: Text(p)))
+                    .toList(),
+                onChanged: (value) =>
+                    setState(() => _priceRange = value ?? _priceRange),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              TextField(
+                controller: _openingHoursController,
+                decoration: const InputDecoration(
+                  labelText: 'Opening Hours',
+                  hintText: 'e.g. 10:00 AM – 9:00 PM daily',
+                ),
+              ),
+            ],
             const SizedBox(height: AppSpacing.md),
             DropdownButtonFormField<Province>(
               initialValue: _selectedProvince,
               decoration: const InputDecoration(labelText: 'Province'),
               isExpanded: true,
-              items: provinces.map((p) => DropdownMenuItem(value: p, child: Text(p.name))).toList(),
+              items: provinces
+                  .map((p) => DropdownMenuItem(value: p, child: Text(p.name)))
+                  .toList(),
               onChanged: (value) => setState(() => _selectedProvince = value),
             ),
             const SizedBox(height: AppSpacing.md),
-            TextField(controller: _descController, maxLines: 4, decoration: const InputDecoration(labelText: 'Description', alignLabelWithHint: true)),
+            TextField(
+              controller: _descController,
+              maxLines: 4,
+              decoration: const InputDecoration(
+                labelText: 'Description',
+                alignLabelWithHint: true,
+              ),
+            ),
             const SizedBox(height: AppSpacing.md),
-            TextField(controller: _addressController, decoration: const InputDecoration(labelText: 'Address')),
+            TextField(
+              controller: _addressController,
+              decoration: const InputDecoration(labelText: 'Address'),
+            ),
             const SizedBox(height: AppSpacing.md),
-            TextField(controller: _contactController, decoration: const InputDecoration(labelText: 'Contact Number')),
+            TextField(
+              controller: _contactController,
+              decoration: const InputDecoration(labelText: 'Contact Number'),
+            ),
             const SizedBox(height: AppSpacing.md),
-            TextField(controller: _websiteController, decoration: const InputDecoration(labelText: 'Website URL')),
+            TextField(
+              controller: _websiteController,
+              decoration: const InputDecoration(labelText: 'Website URL'),
+            ),
             const SizedBox(height: AppSpacing.md),
             HeroImagePicker(
               imageUrl: _heroImageUrl,
@@ -218,7 +369,9 @@ class _BusinessFormState extends State<_BusinessForm> {
             ),
             const SizedBox(height: AppSpacing.xxl),
             AnimatedButton(
-              label: existing == null ? 'Submit for Review' : (existing.isRejected ? 'Edit & Resubmit' : 'Save Changes'),
+              label: existing == null
+                  ? 'Submit for Review'
+                  : (existing.isRejected ? 'Edit & Resubmit' : 'Save Changes'),
               isLoading: _saving,
               onPressed: () => _save(resubmit: existing?.isRejected ?? false),
             ),
@@ -230,7 +383,12 @@ class _BusinessFormState extends State<_BusinessForm> {
 }
 
 class _Banner extends StatelessWidget {
-  const _Banner({required this.color, required this.icon, required this.text, this.textStyle});
+  const _Banner({
+    required this.color,
+    required this.icon,
+    required this.text,
+    this.textStyle,
+  });
 
   final Color color;
   final IconData icon;
@@ -241,13 +399,21 @@ class _Banner extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(AppRadius.md)),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(AppRadius.md),
+      ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(icon, color: color, size: 20),
           const SizedBox(width: AppSpacing.sm),
-          Expanded(child: Text(text, style: (textStyle ?? const TextStyle()).copyWith(color: color))),
+          Expanded(
+            child: Text(
+              text,
+              style: (textStyle ?? const TextStyle()).copyWith(color: color),
+            ),
+          ),
         ],
       ),
     );

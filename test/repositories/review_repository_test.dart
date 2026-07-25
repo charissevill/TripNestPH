@@ -66,6 +66,33 @@ void main() {
     expect(await reviewRepository.getByUser('user-1'), isEmpty);
   });
 
+  test('addReview() persists the verified flag so getByUser() reads it back', () async {
+    await reviewRepository.addReview(
+      review: Review(
+        id: '',
+        userId: 'user-1',
+        targetId: 'dest-1',
+        targetType: ReviewTargetType.destination,
+        authorName: 'Traveler',
+        authorAvatarUrl: '',
+        rating: 5,
+        comment: 'Been here before, loved it!',
+        createdAt: DateTime(2026, 1, 1),
+        verified: true,
+      ),
+    );
+
+    final reviews = await reviewRepository.getByUser('user-1');
+    expect(reviews.single.verified, isTrue);
+  });
+
+  test('addReview() without an explicit verified flag defaults to false', () async {
+    await reviewRepository.addReview(review: _review(id: '', rating: 4));
+
+    final reviews = await reviewRepository.getByUser('user-1');
+    expect(reviews.single.verified, isFalse);
+  });
+
   test('getByUser() only returns that user\'s reviews, newest first', () async {
     await reviewRepository.addReview(
       review: Review(

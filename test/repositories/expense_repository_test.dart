@@ -42,4 +42,25 @@ void main() {
     final remaining = await repository.streamForItinerary('trip-1').first;
     expect(remaining, isEmpty);
   });
+
+  test('add() without splitBetween defaults to an empty list (split between everyone)', () async {
+    await repository.add(itineraryId: 'trip-1', category: 'Food', amount: 500, note: '', loggedBy: 'user-1');
+
+    final expenses = await repository.streamForItinerary('trip-1').first;
+    expect(expenses.first.splitBetween, isEmpty);
+  });
+
+  test('add() with splitBetween persists exactly who it was split with', () async {
+    await repository.add(
+      itineraryId: 'trip-1',
+      category: 'Food',
+      amount: 500,
+      note: '',
+      loggedBy: 'user-1',
+      splitBetween: ['user-1', 'user-2'],
+    );
+
+    final expenses = await repository.streamForItinerary('trip-1').first;
+    expect(expenses.first.splitBetween, ['user-1', 'user-2']);
+  });
 }

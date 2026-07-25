@@ -47,14 +47,16 @@ service firebase.storage {
       allow write: if isOwner(userId) && isImage() && request.resource.size < 5 * 1024 * 1024;
     }
 
-    // Destination/restaurant/festival photos are managed from the Admin
-    // Portal (tourist spots by admin/lgu, restaurants by admin/businessOwner,
-    // festivals by admin/lgu/eventOrganizer) — matches firestore.rules'
+    // Destination/festival photos are managed from the Admin Portal
+    // (tourist spots and festivals by admin/lgu) — matches firestore.rules'
     // write permissions for those same collections. Reads stay open to any
-    // signed-in traveler.
+    // signed-in traveler. Restaurant photos are NOT here — a restaurant's
+    // `heroImageUrl` is mirrored from its linked business's own
+    // `business_gallery` upload (see the class doc on Business), not
+    // uploaded separately.
     match /destination_photos/{allPaths=**} {
       allow read: if isSignedIn();
-      allow write: if hasAdminRole(['admin', 'lgu', 'businessOwner', 'eventOrganizer']) && isImage() && request.resource.size < 10 * 1024 * 1024;
+      allow write: if hasAdminRole(['admin', 'lgu']) && isImage() && request.resource.size < 10 * 1024 * 1024;
     }
 
     // Business permits: private to the owning Business Owner and admins
@@ -76,7 +78,7 @@ service firebase.storage {
     // firestore.rules).
     match /notification_images/{fileName} {
       allow read: if isSignedIn();
-      allow write: if hasAdminRole(['admin', 'lgu', 'eventOrganizer']) && isImage() && request.resource.size < 5 * 1024 * 1024;
+      allow write: if hasAdminRole(['admin', 'lgu']) && isImage() && request.resource.size < 5 * 1024 * 1024;
     }
 
     // Admin Portal account photos: self-service, any admin role.

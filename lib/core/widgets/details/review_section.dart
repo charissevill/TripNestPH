@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../../../data/repositories/review_report_repository.dart';
 import '../../../data/repositories/review_repository.dart';
+import '../../../data/repositories/user_repository.dart';
 import '../../../domain/models/review.dart';
 import '../../providers/auth_provider.dart';
 import '../../theme/app_spacing.dart';
@@ -30,6 +31,7 @@ class ReviewSection extends StatefulWidget {
 class _ReviewSectionState extends State<ReviewSection> {
   final ReviewRepository _repository = ReviewRepository();
   final ReviewReportRepository _reportRepository = ReviewReportRepository();
+  final UserRepository _userRepository = UserRepository();
 
   Future<void> _writeReview(BuildContext context, {Review? existing}) async {
     final auth = context.read<AuthProvider>();
@@ -64,10 +66,17 @@ class _ReviewSectionState extends State<ReviewSection> {
         );
       } else {
         final user = auth.currentUser;
+        final uid = auth.firebaseUser!.uid;
+        // Best-effort: a failed visit-history lookup should never block
+        // submitting the review itself — it just misses out on the badge.
+        var verified = false;
+        try {
+          verified = await _userRepository.hasVisited(uid: uid, targetType: widget.targetType.name, targetId: widget.targetId);
+        } catch (_) {}
         await _repository.addReview(
           review: Review(
             id: '',
-            userId: auth.firebaseUser!.uid,
+            userId: uid,
             targetId: widget.targetId,
             targetType: widget.targetType,
             authorName: user?.name.isNotEmpty == true ? user!.name : 'Traveler',
@@ -75,6 +84,7 @@ class _ReviewSectionState extends State<ReviewSection> {
             rating: result.rating,
             comment: result.comment,
             createdAt: DateTime.now(),
+            verified: verified,
           ),
           photos: result.newPhotos,
         );

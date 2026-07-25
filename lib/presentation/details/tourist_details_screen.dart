@@ -18,6 +18,7 @@ import '../../core/utils/maps_launcher.dart';
 import '../../core/utils/share_text.dart';
 import '../../core/widgets/buttons/animated_button.dart';
 import '../../core/widgets/cards/destination_card.dart';
+import '../../core/widgets/states/loading_widget.dart';
 import '../../core/widgets/cards/restaurant_card.dart';
 import '../../core/widgets/cards/tag_chip.dart';
 import '../../core/widgets/carousels/nearby_places_section.dart';
@@ -63,51 +64,86 @@ class _TouristDetailsScreenState extends State<TouristDetailsScreen> {
   Future<_TouristDetailsData> _load() async {
     final uid = context.read<AuthProvider>().firebaseUser?.uid;
 
-    final destination = await _destinationRepository.getById(widget.destinationId);
+    final destination = await _destinationRepository.getById(
+      widget.destinationId,
+    );
     if (destination == null) {
       throw const AppException('This destination is no longer available.');
     }
-    final nearbyRestaurants = await _restaurantRepository.getByIds(destination.nearbyRestaurantIds);
+    final nearbyRestaurants = await _restaurantRepository.getByIds(
+      destination.nearbyRestaurantIds,
+    );
     final nearbyAttractions = await _destinationRepository.getByIds(
-      destination.nearbyDestinationIds.where((id) => id != destination.id).toList(),
+      destination.nearbyDestinationIds
+          .where((id) => id != destination.id)
+          .toList(),
     );
 
     if (uid != null) {
       unawaited(_userRepository.recordRecentlyViewed(uid, destination.id));
+      unawaited(
+        _userRepository.recordVisit(
+          uid: uid,
+          targetType: 'destination',
+          targetId: destination.id,
+        ),
+      );
     }
 
-    return _TouristDetailsData(destination: destination, nearbyRestaurants: nearbyRestaurants, nearbyAttractions: nearbyAttractions);
+    return _TouristDetailsData(
+      destination: destination,
+      nearbyRestaurants: nearbyRestaurants,
+      nearbyAttractions: nearbyAttractions,
+    );
+  }
+
+  Future<void> _refresh() async {
+    final future = _load();
+    setState(() => _future = future);
+    try {
+      await future;
+    } catch (_) {
+      // Surfaced by the FutureBuilder's error state below; RefreshIndicator
+      // just needs this Future to complete either way.
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: FutureBuilder<_TouristDetailsData>(
-        future: _future,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState != ConnectionState.done) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.hasError) {
-            return SafeArea(
-              child: EmptyStateWidget(
-                icon: Symbols.error_outline_rounded,
-                title: 'Couldn\'t load this destination',
-                message: AppException.from(snapshot.error!).message,
-                actionLabel: 'Go back',
-                onActionTap: () => context.pop(),
-              ),
-            );
-          }
-          return _TouristDetailsBody(data: snapshot.data!);
-        },
+      body: RefreshIndicator(
+        onRefresh: _refresh,
+        child: FutureBuilder<_TouristDetailsData>(
+          future: _future,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState != ConnectionState.done) {
+              return LoadingWidget.detailPage();
+            }
+            if (snapshot.hasError) {
+              return SafeArea(
+                child: EmptyStateWidget(
+                  icon: Symbols.error_outline_rounded,
+                  title: 'Couldn\'t load this destination',
+                  message: AppException.from(snapshot.error!).message,
+                  actionLabel: 'Go back',
+                  onActionTap: () => context.pop(),
+                ),
+              );
+            }
+            return _TouristDetailsBody(data: snapshot.data!);
+          },
+        ),
       ),
     );
   }
 }
 
 class _TouristDetailsData {
-  const _TouristDetailsData({required this.destination, required this.nearbyRestaurants, required this.nearbyAttractions});
+  const _TouristDetailsData({
+    required this.destination,
+    required this.nearbyRestaurants,
+    required this.nearbyAttractions,
+  });
 
   final Destination destination;
   final List<Restaurant> nearbyRestaurants;
@@ -137,7 +173,12 @@ class _TouristDetailsBody extends StatelessWidget {
             heroTag: 'destination-${destination.id}',
           ),
           SliverPadding(
-            padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.lg, AppSpacing.lg, AppSpacing.huge),
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.lg,
+              AppSpacing.lg,
+              AppSpacing.lg,
+              AppSpacing.huge,
+            ),
             sliver: SliverList.list(
               children: [
                 Row(
@@ -147,20 +188,33 @@ class _TouristDetailsBody extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(destination.name, style: theme.textTheme.displayMedium),
+                          Text(
+                            destination.name,
+                            style: theme.textTheme.displayMedium,
+                          ),
                           const SizedBox(height: 4),
                           InkWell(
-                            onTap: () => context.push(RoutePaths.provinceDetails(destination.provinceId)),
+                            onTap: () => context.push(
+                              RoutePaths.provinceDetails(
+                                destination.provinceId,
+                              ),
+                            ),
                             child: Row(
                               children: [
-                                const Icon(Symbols.location_on_rounded, size: 16, color: AppColors.textSecondary),
+                                const Icon(
+                                  Symbols.location_on_rounded,
+                                  size: 16,
+                                  color: AppColors.textSecondary,
+                                ),
                                 const SizedBox(width: 2),
                                 Flexible(
                                   child: Text(
                                     destination.provinceName,
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
-                                    style: theme.textTheme.bodyMedium?.copyWith(decoration: TextDecoration.underline),
+                                    style: theme.textTheme.bodyMedium?.copyWith(
+                                      decoration: TextDecoration.underline,
+                                    ),
                                   ),
                                 ),
                               ],
@@ -169,17 +223,36 @@ class _TouristDetailsBody extends StatelessWidget {
                         ],
                       ),
                     ),
-                    RatingWidget(rating: destination.rating, reviewCount: destination.reviewCount, starSize: 20),
+                    RatingWidget(
+                      rating: destination.rating,
+                      reviewCount: destination.reviewCount,
+                      starSize: 20,
+                    ),
                   ],
                 ),
                 const SizedBox(height: AppSpacing.lg),
                 Row(
                   children: [
-                    InfoStatCard(icon: Symbols.confirmation_number_rounded, label: 'Entrance Fee', value: destination.entranceFee),
+                    InfoStatCard(
+                      icon: Symbols.confirmation_number_rounded,
+                      label: 'Entrance Fee',
+                      value: destination.entranceFee,
+                    ),
                     const SizedBox(width: AppSpacing.sm),
-                    InfoStatCard(icon: Symbols.calendar_month_rounded, label: 'Best Time', value: destination.bestTimeToVisit.split('(').first.trim()),
+                    InfoStatCard(
+                      icon: Symbols.calendar_month_rounded,
+                      label: 'Best Time',
+                      value: destination.bestTimeToVisit
+                          .split('(')
+                          .first
+                          .trim(),
+                    ),
                     const SizedBox(width: AppSpacing.sm),
-                    InfoStatCard(icon: Symbols.star_rounded, label: 'Rating', value: destination.rating.toStringAsFixed(1)),
+                    InfoStatCard(
+                      icon: Symbols.star_rounded,
+                      label: 'Rating',
+                      value: destination.rating.toStringAsFixed(1),
+                    ),
                   ],
                 ),
                 const SizedBox(height: AppSpacing.xxl),
@@ -188,24 +261,44 @@ class _TouristDetailsBody extends StatelessWidget {
                 Wrap(
                   spacing: AppSpacing.sm,
                   runSpacing: AppSpacing.sm,
-                  children: destination.highlights.map((h) => TagChip(label: h, color: AppColors.primary)).toList(),
+                  children: destination.highlights
+                      .map((h) => TagChip(label: h, color: AppColors.primary))
+                      .toList(),
                 ),
                 const SizedBox(height: AppSpacing.xxl),
                 Text('About', style: theme.textTheme.titleLarge),
                 const SizedBox(height: AppSpacing.sm),
-                Text(destination.longDescription, style: theme.textTheme.bodyMedium?.copyWith(height: 1.6)),
+                Text(
+                  destination.longDescription,
+                  style: theme.textTheme.bodyMedium?.copyWith(height: 1.6),
+                ),
                 const SizedBox(height: AppSpacing.xxl),
                 Text('Location', style: theme.textTheme.titleLarge),
                 const SizedBox(height: AppSpacing.sm),
-                MapPreview(latitude: destination.latitude, longitude: destination.longitude, label: destination.name),
-                if (destination.openingHours.isNotEmpty || destination.phoneNumber.isNotEmpty) ...[
+                MapPreview(
+                  latitude: destination.latitude,
+                  longitude: destination.longitude,
+                  label: destination.name,
+                ),
+                if (destination.openingHours.isNotEmpty ||
+                    destination.phoneNumber.isNotEmpty) ...[
                   const SizedBox(height: AppSpacing.md),
                   if (destination.openingHours.isNotEmpty)
-                    _InfoRow(icon: Symbols.schedule_rounded, text: destination.openingHours),
+                    _InfoRow(
+                      icon: Symbols.schedule_rounded,
+                      text: destination.openingHours,
+                    ),
                   if (destination.phoneNumber.isNotEmpty)
-                    _InfoRow(icon: Symbols.call_rounded, text: destination.phoneNumber, onTap: () => launchUrl(Uri.parse('tel:${destination.phoneNumber}'))),
+                    _InfoRow(
+                      icon: Symbols.call_rounded,
+                      text: destination.phoneNumber,
+                      onTap: () => launchUrl(
+                        Uri.parse('tel:${destination.phoneNumber}'),
+                      ),
+                    ),
                 ],
-                if (destination.websiteUrl.isNotEmpty || destination.facebookUrl.isNotEmpty) ...[
+                if (destination.websiteUrl.isNotEmpty ||
+                    destination.facebookUrl.isNotEmpty) ...[
                   const SizedBox(height: AppSpacing.md),
                   Row(
                     children: [
@@ -215,10 +308,12 @@ class _TouristDetailsBody extends StatelessWidget {
                             label: 'Website',
                             icon: Symbols.language_rounded,
                             filled: false,
-                            onPressed: () => MapsLauncher.openUrl(destination.websiteUrl),
+                            onPressed: () =>
+                                MapsLauncher.openUrl(destination.websiteUrl),
                           ),
                         ),
-                      if (destination.websiteUrl.isNotEmpty && destination.facebookUrl.isNotEmpty)
+                      if (destination.websiteUrl.isNotEmpty &&
+                          destination.facebookUrl.isNotEmpty)
                         const SizedBox(width: AppSpacing.sm),
                       if (destination.facebookUrl.isNotEmpty)
                         Expanded(
@@ -226,7 +321,8 @@ class _TouristDetailsBody extends StatelessWidget {
                             label: 'Facebook',
                             icon: Symbols.thumb_up_rounded,
                             filled: false,
-                            onPressed: () => MapsLauncher.openUrl(destination.facebookUrl),
+                            onPressed: () =>
+                                MapsLauncher.openUrl(destination.facebookUrl),
                           ),
                         ),
                     ],
@@ -243,44 +339,66 @@ class _TouristDetailsBody extends StatelessWidget {
                       children: [
                         const Padding(
                           padding: EdgeInsets.only(top: 3),
-                          child: Icon(Symbols.lightbulb_rounded, size: 18, color: AppColors.accentDark),
+                          child: Icon(
+                            Symbols.lightbulb_rounded,
+                            size: 18,
+                            color: AppColors.accentDark,
+                          ),
                         ),
                         const SizedBox(width: AppSpacing.sm),
-                        Expanded(child: Text(tip, style: theme.textTheme.bodyMedium)),
+                        Expanded(
+                          child: Text(tip, style: theme.textTheme.bodyMedium),
+                        ),
                       ],
                     ),
                   ),
                 ),
                 if (data.nearbyRestaurants.isNotEmpty) ...[
                   const SizedBox(height: AppSpacing.md),
-                  const SectionHeader(title: 'Nearby Restaurants', padding: EdgeInsets.zero),
+                  const SectionHeader(
+                    title: 'Nearby Restaurants',
+                    padding: EdgeInsets.zero,
+                  ),
                   const SizedBox(height: AppSpacing.md),
                   SizedBox(
                     height: 250,
                     child: ListView.separated(
                       scrollDirection: Axis.horizontal,
                       itemCount: data.nearbyRestaurants.length,
-                      separatorBuilder: (_, _) => const SizedBox(width: AppSpacing.md),
+                      separatorBuilder: (_, _) =>
+                          const SizedBox(width: AppSpacing.md),
                       itemBuilder: (context, i) => RestaurantCard(
                         restaurant: data.nearbyRestaurants[i],
-                        onTap: () => context.push(RoutePaths.restaurantDetails(data.nearbyRestaurants[i].id)),
+                        onTap: () => context.push(
+                          RoutePaths.restaurantDetails(
+                            data.nearbyRestaurants[i].id,
+                          ),
+                        ),
                       ),
                     ),
                   ),
                 ],
                 if (data.nearbyAttractions.isNotEmpty) ...[
                   const SizedBox(height: AppSpacing.xl),
-                  const SectionHeader(title: 'Nearby Attractions', padding: EdgeInsets.zero),
+                  const SectionHeader(
+                    title: 'Nearby Attractions',
+                    padding: EdgeInsets.zero,
+                  ),
                   const SizedBox(height: AppSpacing.md),
                   SizedBox(
                     height: 250,
                     child: ListView.separated(
                       scrollDirection: Axis.horizontal,
                       itemCount: data.nearbyAttractions.length,
-                      separatorBuilder: (_, _) => const SizedBox(width: AppSpacing.md),
+                      separatorBuilder: (_, _) =>
+                          const SizedBox(width: AppSpacing.md),
                       itemBuilder: (context, i) => DestinationCard(
                         destination: data.nearbyAttractions[i],
-                        onTap: () => context.push(RoutePaths.destinationDetails(data.nearbyAttractions[i].id)),
+                        onTap: () => context.push(
+                          RoutePaths.destinationDetails(
+                            data.nearbyAttractions[i].id,
+                          ),
+                        ),
                       ),
                     ),
                   ),
@@ -314,7 +432,12 @@ class _TouristDetailsBody extends StatelessWidget {
       ),
       bottomNavigationBar: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.sm, AppSpacing.lg, AppSpacing.sm),
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.lg,
+            AppSpacing.sm,
+            AppSpacing.lg,
+            AppSpacing.sm,
+          ),
           child: Row(
             children: [
               Expanded(
@@ -324,10 +447,10 @@ class _TouristDetailsBody extends StatelessWidget {
                   filled: false,
                   onPressed: destination.hasCoordinates
                       ? () => MapsLauncher.openDirections(
-                            latitude: destination.latitude!,
-                            longitude: destination.longitude!,
-                            label: destination.name,
-                          )
+                          latitude: destination.latitude!,
+                          longitude: destination.longitude!,
+                          label: destination.name,
+                        )
                       : null,
                 ),
               ),
@@ -366,11 +489,12 @@ class _InfoRow extends StatelessWidget {
           children: [
             Icon(icon, size: 18, color: AppColors.textSecondary),
             const SizedBox(width: AppSpacing.sm),
-            Expanded(child: Text(text, style: Theme.of(context).textTheme.bodyMedium)),
+            Expanded(
+              child: Text(text, style: Theme.of(context).textTheme.bodyMedium),
+            ),
           ],
         ),
       ),
     );
   }
 }
-

@@ -24,6 +24,8 @@ class Restaurant {
     this.phoneNumber = '',
     this.websiteUrl = '',
     this.facebookUrl = '',
+    this.ownerId = '',
+    this.businessId = '',
   });
 
   final String id;
@@ -62,6 +64,18 @@ class Restaurant {
   final String websiteUrl;
   final String facebookUrl;
 
+  /// Uid of the `businessOwner` account whose approved `businesses` listing
+  /// this was mirrored from — every restaurant has one now (see
+  /// `RestaurantRepository.createFromBusiness`); empty only for legacy
+  /// restaurants seeded before the Admin Portal used to curate this
+  /// collection directly. `firestore.rules` uses this to let the owner keep
+  /// their own listing's info in sync.
+  final String ownerId;
+
+  /// Back-reference to the `businesses/{id}` doc this was mirrored from —
+  /// empty for the same legacy restaurants as [ownerId].
+  final String businessId;
+
   bool get hasCoordinates => latitude != null && longitude != null;
 
   factory Restaurant.fromMap(String id, Map<String, dynamic> map) {
@@ -74,7 +88,9 @@ class Restaurant {
       regionId: map['regionId'] as String? ?? '',
       cityId: map['cityId'] as String? ?? '',
       heroImageUrl: map['heroImageUrl'] as String? ?? '',
-      galleryImageUrls: List<String>.from(map['galleryImageUrls'] as List? ?? const []),
+      galleryImageUrls: List<String>.from(
+        map['galleryImageUrls'] as List? ?? const [],
+      ),
       rating: (map['rating'] as num?)?.toDouble() ?? 0,
       reviewCount: (map['reviewCount'] as num?)?.toInt() ?? 0,
       priceRange: map['priceRange'] as String? ?? '₱',
@@ -89,6 +105,8 @@ class Restaurant {
       phoneNumber: map['phoneNumber'] as String? ?? '',
       websiteUrl: map['websiteUrl'] as String? ?? '',
       facebookUrl: map['facebookUrl'] as String? ?? '',
+      ownerId: map['ownerId'] as String? ?? '',
+      businessId: map['businessId'] as String? ?? '',
     );
   }
 
@@ -114,6 +132,8 @@ class Restaurant {
       'phoneNumber': phoneNumber,
       'websiteUrl': websiteUrl,
       'facebookUrl': facebookUrl,
+      'ownerId': ownerId,
+      'businessId': businessId,
     };
   }
 
@@ -140,12 +160,18 @@ class Restaurant {
       phoneNumber: phoneNumber,
       websiteUrl: websiteUrl,
       facebookUrl: facebookUrl,
+      ownerId: ownerId,
+      businessId: businessId,
     );
   }
 }
 
 class MenuItem {
-  const MenuItem({required this.name, required this.price, required this.imageUrl});
+  const MenuItem({
+    required this.name,
+    required this.price,
+    required this.imageUrl,
+  });
 
   final String name;
   final String price;
@@ -159,5 +185,9 @@ class MenuItem {
     );
   }
 
-  Map<String, dynamic> toMap() => {'name': name, 'price': price, 'imageUrl': imageUrl};
+  Map<String, dynamic> toMap() => {
+    'name': name,
+    'price': price,
+    'imageUrl': imageUrl,
+  };
 }

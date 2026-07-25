@@ -35,6 +35,51 @@ void main() {
       expect(dark.colorScheme.onSurface, AppColors.darkTextPrimary);
       expect(dark.colorScheme.tertiary, AppColors.accent);
     });
+
+    testWidgets('resolves the 4-shade scale to the reused AppColors.primaryDark/primaryLight values', (tester) async {
+      final light = AppTheme.light(themePresets.first);
+      expect(light.colorScheme.primaryFixedDim, AppColors.primaryDark, reason: 'shade 1');
+      expect(light.colorScheme.primaryContainer, AppColors.primaryLight, reason: 'shade 3');
+      expect(light.colorScheme.primaryFixed, const Color(0xFFD7EFFA), reason: 'shade 4');
+    });
+  });
+
+  group('AppTheme.light with the simple single-color presets (Teal/Coral/Indigo) — unchanged', () {
+    testWidgets('shade fields fall back to exactly the same computed values used before shades existed', (
+      tester,
+    ) async {
+      for (final name in ['Teal', 'Coral', 'Indigo']) {
+        final preset = themePresets.firstWhere((p) => p.name == name);
+        final theme = AppTheme.light(preset);
+
+        expect(
+          theme.colorScheme.primaryFixedDim,
+          Color.lerp(preset.primary, Colors.black, 0.25),
+          reason: '$name shade 1 fallback',
+        );
+        expect(
+          theme.colorScheme.primaryFixed,
+          preset.primary.withValues(alpha: 0.1),
+          reason: '$name shade 4 fallback',
+        );
+      }
+    });
+  });
+
+  group('AppTheme.light with Violet and Rose', () {
+    testWidgets('resolves each hand-designed 4-shade scale to its exact hex values', (tester) async {
+      final violet = themePresets.firstWhere((p) => p.name == 'Violet');
+      final violetTheme = AppTheme.light(violet);
+      expect(violetTheme.colorScheme.primaryFixedDim, const Color(0xFF5B21B6), reason: 'Violet shade 1');
+      expect(violetTheme.colorScheme.primaryContainer, const Color(0xFFA78BFA), reason: 'Violet shade 3');
+      expect(violetTheme.colorScheme.primaryFixed, const Color(0xFFEDE4FE), reason: 'Violet shade 4');
+
+      final rose = themePresets.firstWhere((p) => p.name == 'Rose');
+      final roseTheme = AppTheme.light(rose);
+      expect(roseTheme.colorScheme.primaryFixedDim, const Color(0xFFA3155F), reason: 'Rose shade 1');
+      expect(roseTheme.colorScheme.primaryContainer, const Color(0xFFF272C0), reason: 'Rose shade 3');
+      expect(roseTheme.colorScheme.primaryFixed, const Color(0xFFFCE3F1), reason: 'Rose shade 4');
+    });
   });
 
   group('AppTheme.light/dark with the Forest preset', () {
@@ -47,6 +92,9 @@ void main() {
       expect(theme.cardTheme.color, const Color(0xFFFAF6ED), reason: 'card surface (Cream)');
       expect(theme.colorScheme.onSurface, const Color(0xFF2B2B28), reason: 'primary text (Charcoal)');
       expect(theme.colorScheme.onSurfaceVariant, const Color(0xFF5C5B54), reason: 'secondary text');
+      expect(theme.colorScheme.primaryFixedDim, const Color(0xFF14342A), reason: 'shade 1 (Pine)');
+      expect(theme.colorScheme.primaryContainer, const Color(0xFF4F9573), reason: 'shade 3 (Moss)');
+      expect(theme.colorScheme.primaryFixed, const Color(0xFFCFE8DA), reason: 'shade 4 (Sage/Mint)');
 
       // Buttons must actually read the resolved primary, not the fixed
       // AppColors.primary — this is the exact gap that made buttons not
@@ -88,6 +136,11 @@ void main() {
     final gradientColors = decoration.gradient!.colors;
 
     expect(gradientColors.first, const Color(0xFF24563F), reason: 'button should paint Forest green, not fixed blue');
+    expect(
+      gradientColors[1],
+      const Color(0xFF14342A),
+      reason: 'gradient dark stop should be Forest\'s real designed shade 1 (Pine), not a generic darken',
+    );
   });
 }
 

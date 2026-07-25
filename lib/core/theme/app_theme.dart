@@ -31,6 +31,15 @@ class AppTheme {
     final baseTextTheme = AppTypography.textTheme(textPrimary, textSecondary);
     final textTheme = fontFamily == 'Poppins' ? baseTextTheme : GoogleFonts.getTextTheme(fontFamily, baseTextTheme);
 
+    // The 4-shade monochromatic scale around primary (shade 2): shadeDark
+    // (shade 1, darkest — pressed states/dark accents), shadeMid (shade 3 —
+    // icons/secondary accents, via primaryContainer), shadeLight (shade 4,
+    // lightest tint — chip/selection fills). Falls back to exactly what
+    // AppTheme computed before shades were preset-specific, so simple
+    // single-color presets (Teal/Coral/Indigo) look pixel-identical.
+    final shadeDark = preset.shadeDark ?? Color.lerp(primary, Colors.black, 0.25)!;
+    final shadeLight = preset.shadeLight ?? primary.withValues(alpha: 0.1);
+
     final base = ThemeData(brightness: Brightness.light, useMaterial3: true);
     final colorScheme = ColorScheme.fromSeed(
       seedColor: primary,
@@ -44,6 +53,9 @@ class AppTheme {
       outline: AppColors.border,
       onSurface: textPrimary,
       onSurfaceVariant: textSecondary,
+      primaryFixedDim: shadeDark,
+      primaryContainer: preset.shadeMid,
+      primaryFixed: shadeLight,
     );
 
     return base.copyWith(
@@ -163,6 +175,18 @@ class AppTheme {
     final baseTextTheme = AppTypography.textTheme(textPrimary, textSecondary);
     final textTheme = fontFamily == 'Poppins' ? baseTextTheme : GoogleFonts.getTextTheme(fontFamily, baseTextTheme);
 
+    // Dark-mode shades aren't hand-designed separately. Shade 1 (darkest,
+    // used as the button gradient's second stop) lightens toward white —
+    // matching how darkPrimary already lightens, and Material's own
+    // pressed-state overlays flip direction between light/dark themes.
+    // Shades 3/4 are meant to read as gentle fills/tints against a surface,
+    // not bright highlights, so they blend toward the dark surface instead
+    // of toward white — lightening an already-pale tint further would wash
+    // it out to near-white, the opposite of "a subtle tinted fill."
+    final shadeDark = Color.lerp(preset.shadeDark ?? Color.lerp(preset.primary, Colors.black, 0.25)!, Colors.white, 0.25)!;
+    final shadeMid = preset.shadeMid == null ? null : Color.lerp(preset.shadeMid, surface, 0.5);
+    final shadeLight = Color.lerp(preset.shadeLight ?? preset.primary.withValues(alpha: 0.1), surface, 0.55)!;
+
     final base = ThemeData(brightness: Brightness.dark, useMaterial3: true);
     final colorScheme = ColorScheme.fromSeed(
       seedColor: preset.primary,
@@ -176,6 +200,9 @@ class AppTheme {
       outline: AppColors.darkBorder,
       onSurface: textPrimary,
       onSurfaceVariant: textSecondary,
+      primaryFixedDim: shadeDark,
+      primaryContainer: shadeMid,
+      primaryFixed: shadeLight,
     );
 
     return base.copyWith(

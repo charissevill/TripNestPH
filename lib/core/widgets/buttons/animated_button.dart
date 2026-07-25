@@ -45,10 +45,7 @@ class _AnimatedButtonState extends State<AnimatedButton> with SingleTickerProvid
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final disabled = widget.onPressed == null || widget.isLoading;
-    final defaultGradientColors = [
-      theme.colorScheme.primary,
-      Color.lerp(theme.colorScheme.primary, Colors.black, 0.25)!,
-    ];
+    final defaultGradientColors = [theme.colorScheme.primary, theme.colorScheme.primaryFixedDim];
     final gradient = widget.filled ? LinearGradient(colors: widget.gradientColors ?? defaultGradientColors) : null;
 
     Widget content = AnimatedContainer(

@@ -699,9 +699,7 @@ class _SelectableCard extends StatelessWidget {
           horizontal: AppSpacing.xs,
         ),
         decoration: BoxDecoration(
-          color: selected
-              ? theme.colorScheme.primary.withValues(alpha: 0.1)
-              : theme.colorScheme.surface,
+          color: selected ? theme.colorScheme.primaryFixed : theme.colorScheme.surface,
           borderRadius: BorderRadius.circular(AppRadius.lg),
           border: Border.all(
             color: selected ? theme.colorScheme.primary : theme.colorScheme.outline,

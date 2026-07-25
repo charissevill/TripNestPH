@@ -249,10 +249,8 @@ class _AiPlannerScreenState extends State<AiPlannerScreen> {
                         const SizedBox(height: 4),
                         Text(
                           'Answer a few questions and get a personalized day-by-day itinerary.',
-                          style: TextStyle(
+                          style: theme.textTheme.bodySmall?.copyWith(
                             color: Colors.white.withValues(alpha: 0.9),
-                            fontSize: 13,
-                            height: 1.4,
                           ),
                         ),
                       ],
@@ -284,7 +282,7 @@ class _AiPlannerScreenState extends State<AiPlannerScreen> {
                 decoration: BoxDecoration(
                   color: theme.colorScheme.surface,
                   borderRadius: BorderRadius.circular(AppRadius.lg),
-                  border: Border.all(color: AppColors.border),
+                  border: Border.all(color: theme.colorScheme.outline),
                 ),
                 child: Row(
                   children: [
@@ -297,14 +295,14 @@ class _AiPlannerScreenState extends State<AiPlannerScreen> {
                             : 'Select a destination',
                         style: theme.textTheme.bodyLarge?.copyWith(
                           color: _destination == null && _province == null
-                              ? AppColors.textTertiary
-                              : AppColors.textPrimary,
+                              ? theme.colorScheme.onSurfaceVariant
+                              : theme.colorScheme.onSurface,
                         ),
                       ),
                     ),
-                    const Icon(
+                    Icon(
                       Symbols.expand_more_rounded,
-                      color: AppColors.textSecondary,
+                      color: theme.textTheme.bodyMedium?.color,
                     ),
                   ],
                 ),
@@ -350,7 +348,7 @@ class _AiPlannerScreenState extends State<AiPlannerScreen> {
               decoration: BoxDecoration(
                 color: theme.colorScheme.surface,
                 borderRadius: BorderRadius.circular(AppRadius.lg),
-                border: Border.all(color: AppColors.border),
+                border: Border.all(color: theme.colorScheme.outline),
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -370,10 +368,10 @@ class _AiPlannerScreenState extends State<AiPlannerScreen> {
                             style: theme.textTheme.titleLarge,
                           ),
                           const SizedBox(width: 4),
-                          const Icon(
+                          Icon(
                             Symbols.edit_rounded,
                             size: 15,
-                            color: AppColors.textTertiary,
+                            color: theme.colorScheme.onSurfaceVariant,
                           ),
                         ],
                       ),
@@ -415,7 +413,7 @@ class _AiPlannerScreenState extends State<AiPlannerScreen> {
                   decoration: BoxDecoration(
                     color: theme.colorScheme.surface,
                     borderRadius: BorderRadius.circular(AppRadius.lg),
-                    border: Border.all(color: AppColors.border),
+                    border: Border.all(color: theme.colorScheme.outline),
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -436,10 +434,10 @@ class _AiPlannerScreenState extends State<AiPlannerScreen> {
                               ),
                               if (!locked) ...[
                                 const SizedBox(width: 4),
-                                const Icon(
+                                Icon(
                                   Symbols.edit_rounded,
                                   size: 15,
-                                  color: AppColors.textTertiary,
+                                  color: theme.colorScheme.onSurfaceVariant,
                                 ),
                               ],
                             ],
@@ -472,7 +470,7 @@ class _AiPlannerScreenState extends State<AiPlannerScreen> {
             Text(
               _travelerRangeHint(_travelerType),
               style: theme.textTheme.bodySmall?.copyWith(
-                color: AppColors.textTertiary,
+                color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
             const SizedBox(height: AppSpacing.xxl),
@@ -655,16 +653,17 @@ class _FieldLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Row(
       children: [
-        Icon(icon, size: 18, color: AppColors.primary),
+        Icon(icon, size: 18, color: theme.colorScheme.primary),
         const SizedBox(width: AppSpacing.xs),
         Flexible(
           child: Text(
             label,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.titleMedium,
+            style: theme.textTheme.titleMedium,
           ),
         ),
       ],
@@ -701,11 +700,11 @@ class _SelectableCard extends StatelessWidget {
         ),
         decoration: BoxDecoration(
           color: selected
-              ? AppColors.primary.withValues(alpha: 0.1)
+              ? theme.colorScheme.primary.withValues(alpha: 0.1)
               : theme.colorScheme.surface,
           borderRadius: BorderRadius.circular(AppRadius.lg),
           border: Border.all(
-            color: selected ? AppColors.primary : AppColors.border,
+            color: selected ? theme.colorScheme.primary : theme.colorScheme.outline,
             width: selected ? 1.6 : 1,
           ),
         ),
@@ -713,14 +712,14 @@ class _SelectableCard extends StatelessWidget {
           children: [
             Icon(
               icon,
-              color: selected ? AppColors.primary : AppColors.textSecondary,
+              color: selected ? theme.colorScheme.primary : theme.textTheme.bodyMedium?.color,
               size: 26,
             ),
             const SizedBox(height: 6),
             Text(
               title,
               style: theme.textTheme.titleSmall?.copyWith(
-                color: selected ? AppColors.primary : AppColors.textPrimary,
+                color: selected ? theme.colorScheme.primary : theme.colorScheme.onSurface,
               ),
             ),
             const SizedBox(height: 2),
@@ -751,6 +750,7 @@ class _SelectableChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(AppRadius.pill),
@@ -761,12 +761,10 @@ class _SelectableChip extends StatelessWidget {
           vertical: AppSpacing.sm,
         ),
         decoration: BoxDecoration(
-          color: selected
-              ? AppColors.primary
-              : Theme.of(context).colorScheme.surface,
+          color: selected ? theme.colorScheme.primary : theme.colorScheme.surface,
           borderRadius: BorderRadius.circular(AppRadius.pill),
           border: Border.all(
-            color: selected ? AppColors.primary : AppColors.border,
+            color: selected ? theme.colorScheme.primary : theme.colorScheme.outline,
           ),
         ),
         child: Row(
@@ -775,13 +773,13 @@ class _SelectableChip extends StatelessWidget {
             Icon(
               icon,
               size: 16,
-              color: selected ? Colors.white : AppColors.textSecondary,
+              color: selected ? Colors.white : theme.textTheme.bodyMedium?.color,
             ),
             const SizedBox(width: AppSpacing.xs),
             Text(
               label,
-              style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                color: selected ? Colors.white : AppColors.textPrimary,
+              style: theme.textTheme.labelMedium?.copyWith(
+                color: selected ? Colors.white : theme.colorScheme.onSurface,
               ),
             ),
           ],
@@ -799,6 +797,7 @@ class _StepperButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final enabled = onTap != null;
     return InkWell(
       onTap: onTap,
@@ -807,15 +806,13 @@ class _StepperButton extends StatelessWidget {
         width: 34,
         height: 34,
         decoration: BoxDecoration(
-          color: enabled
-              ? AppColors.primary.withValues(alpha: 0.1)
-              : AppColors.border,
+          color: enabled ? theme.colorScheme.primary.withValues(alpha: 0.1) : theme.colorScheme.outline,
           shape: BoxShape.circle,
         ),
         child: Icon(
           icon,
           size: 18,
-          color: enabled ? AppColors.primary : AppColors.textTertiary,
+          color: enabled ? theme.colorScheme.primary : theme.colorScheme.onSurfaceVariant,
         ),
       ),
     );
@@ -939,7 +936,7 @@ class _DestinationPickerSheetState extends State<_DestinationPickerSheet> {
                 width: 44,
                 height: 5,
                 decoration: BoxDecoration(
-                  color: AppColors.border,
+                  color: theme.colorScheme.outline,
                   borderRadius: BorderRadius.circular(AppRadius.pill),
                 ),
               ),
@@ -1031,19 +1028,18 @@ class _DestinationPickerSheetState extends State<_DestinationPickerSheet> {
                                       Navigator.of(context).pop(destination),
                                   contentPadding: EdgeInsets.zero,
                                   leading: CircleAvatar(
-                                    backgroundColor: AppColors.primary
-                                        .withValues(alpha: 0.12),
-                                    child: const Icon(
+                                    backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.12),
+                                    child: Icon(
                                       Symbols.place_rounded,
-                                      color: AppColors.primary,
+                                      color: theme.colorScheme.primary,
                                     ),
                                   ),
                                   title: Text(destination.name),
                                   subtitle: Text(destination.provinceName),
                                   trailing: selected
-                                      ? const Icon(
+                                      ? Icon(
                                           Symbols.check_circle_rounded,
-                                          color: AppColors.primary,
+                                          color: theme.colorScheme.primary,
                                         )
                                       : null,
                                 );
@@ -1082,20 +1078,18 @@ class _DestinationPickerSheetState extends State<_DestinationPickerSheet> {
                             onTap: () => Navigator.of(context).pop(province),
                             contentPadding: EdgeInsets.zero,
                             leading: CircleAvatar(
-                              backgroundColor: AppColors.primary.withValues(
-                                alpha: 0.12,
-                              ),
-                              child: const Icon(
+                              backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.12),
+                              child: Icon(
                                 Symbols.public_rounded,
-                                color: AppColors.primary,
+                                color: theme.colorScheme.primary,
                               ),
                             ),
                             title: Text(province.name),
                             subtitle: Text(province.regionName),
                             trailing: selected
-                                ? const Icon(
+                                ? Icon(
                                     Symbols.check_circle_rounded,
-                                    color: AppColors.primary,
+                                    color: theme.colorScheme.primary,
                                   )
                                 : null,
                           );

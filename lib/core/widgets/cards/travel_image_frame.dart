@@ -20,6 +20,7 @@ class TravelImageFrame extends StatelessWidget {
     this.bottomRight,
     this.borderRadius = AppRadius.lg,
     this.heroTag,
+    this.emptyIcon,
   });
 
   final String imageUrl;
@@ -31,23 +32,39 @@ class TravelImageFrame extends StatelessWidget {
   final double borderRadius;
   final Object? heroTag;
 
+  /// When set and [imageUrl] is empty, skips the network image entirely and
+  /// renders this icon directly instead — lets callers with no photo (e.g. a
+  /// live Places result with no `photoUrl`) pick a fallback that fits their
+  /// content (hotel vs. landmark) rather than always showing a generic
+  /// broken-image glyph.
+  final IconData? emptyIcon;
+
   @override
   Widget build(BuildContext context) {
-    Widget image = CachedNetworkImage(
-      imageUrl: imageUrl,
-      fit: BoxFit.cover,
-      fadeInDuration: const Duration(milliseconds: 280),
-      placeholder: (context, _) => Shimmer.fromColors(
-        baseColor: AppColors.shimmerBase,
-        highlightColor: AppColors.shimmerHighlight,
-        child: Container(color: AppColors.shimmerBase),
-      ),
-      errorWidget: (context, _, _) => Container(
+    Widget image;
+    if (imageUrl.isEmpty && emptyIcon != null) {
+      image = Container(
         color: AppColors.shimmerBase,
         alignment: Alignment.center,
-        child: const Icon(Symbols.image_rounded, color: AppColors.textTertiary, size: 32),
-      ),
-    );
+        child: Icon(emptyIcon, color: Theme.of(context).colorScheme.onSurfaceVariant, size: 32),
+      );
+    } else {
+      image = CachedNetworkImage(
+        imageUrl: imageUrl,
+        fit: BoxFit.cover,
+        fadeInDuration: const Duration(milliseconds: 280),
+        placeholder: (context, _) => Shimmer.fromColors(
+          baseColor: AppColors.shimmerBase,
+          highlightColor: AppColors.shimmerHighlight,
+          child: Container(color: AppColors.shimmerBase),
+        ),
+        errorWidget: (context, _, _) => Container(
+          color: AppColors.shimmerBase,
+          alignment: Alignment.center,
+          child: Icon(emptyIcon ?? Symbols.image_rounded, color: Theme.of(context).colorScheme.onSurfaceVariant, size: 32),
+        ),
+      );
+    }
 
     if (heroTag != null) {
       image = Hero(tag: heroTag!, child: image);
@@ -64,11 +81,11 @@ class TravelImageFrame extends StatelessWidget {
             image,
             Positioned.fill(
               child: DecoratedBox(
-                decoration: BoxDecoration(
+                decoration: const BoxDecoration(
                   gradient: LinearGradient(
                     begin: Alignment.center,
                     end: Alignment.bottomCenter,
-                    colors: [Colors.transparent, Colors.black.withValues(alpha: 0.55)],
+                    colors: AppColors.imageScrim,
                   ),
                 ),
               ),

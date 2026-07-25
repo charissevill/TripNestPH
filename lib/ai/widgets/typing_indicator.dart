@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
-import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_shadows.dart';
 import '../../core/theme/app_spacing.dart';
 
 /// The "AI is typing" bubble — three dots pulsing in sequence, styled like
@@ -24,7 +24,7 @@ class TypingIndicator extends StatelessWidget {
             bottomLeft: Radius.circular(AppRadius.sm),
             bottomRight: Radius.circular(AppRadius.lg),
           ),
-          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, 4))],
+          boxShadow: AppShadows.card,
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -34,7 +34,7 @@ class TypingIndicator extends StatelessWidget {
               child: Container(
                 width: 7,
                 height: 7,
-                decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
+                decoration: BoxDecoration(color: Theme.of(context).colorScheme.primary, shape: BoxShape.circle),
               )
                   .animate(onPlay: (controller) => controller.repeat(reverse: true))
                   .fade(begin: 1, end: 0.25, duration: 600.ms, delay: (i * 150).ms),

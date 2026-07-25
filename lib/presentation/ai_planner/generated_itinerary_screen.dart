@@ -14,6 +14,7 @@ import '../../core/providers/auth_provider.dart';
 import '../../core/routes/route_paths.dart';
 import '../../core/services/notification_service.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_shadows.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/utils/app_exception.dart';
 import '../../core/utils/expense_split.dart';
@@ -24,6 +25,7 @@ import '../../core/widgets/banners/offline_banner.dart';
 import '../../core/widgets/dialogs/confirmation_dialog.dart';
 import '../../core/widgets/cards/restaurant_card.dart';
 import '../../core/widgets/cards/destination_card.dart';
+import '../../core/widgets/cards/travel_image_frame.dart';
 import '../../core/widgets/indicators/rating_widget.dart';
 import '../../core/widgets/layout/section_header.dart';
 import '../../data/mock/mock_itinerary.dart';
@@ -556,12 +558,12 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
                 fit: StackFit.expand,
                 children: [
                   CachedNetworkImage(imageUrl: itinerary.coverImageUrl, fit: BoxFit.cover),
-                  DecoratedBox(
+                  const DecoratedBox(
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
-                        colors: [Colors.transparent, Colors.black.withValues(alpha: 0.6)],
+                        colors: AppColors.imageScrim,
                       ),
                     ),
                   ),
@@ -574,16 +576,16 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
                       children: [
                         Text(
                           'Your Itinerary',
-                          style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 13, fontWeight: FontWeight.w600),
+                          style: theme.textTheme.titleSmall?.copyWith(color: Colors.white.withValues(alpha: 0.85)),
                         ),
                         Text(
                           itinerary.destinationName,
-                          style: const TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.w700),
+                          style: theme.textTheme.headlineLarge?.copyWith(color: Colors.white),
                         ),
                         const SizedBox(height: 4),
                         Text(
                           '${itinerary.totalDays} days · ${itinerary.travelers} travelers',
-                          style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 13),
+                          style: theme.textTheme.bodySmall?.copyWith(color: Colors.white.withValues(alpha: 0.9)),
                         ),
                       ],
                     ),
@@ -794,7 +796,7 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
                 Container(
                   padding: const EdgeInsets.all(AppSpacing.md),
                   decoration: BoxDecoration(
-                    color: AppColors.secondary.withValues(alpha: 0.08),
+                    color: theme.colorScheme.secondary.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(AppRadius.lg),
                   ),
                   child: Column(
@@ -805,7 +807,7 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
                             child: Row(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Icon(Symbols.eco_rounded, size: 18, color: AppColors.secondaryDark),
+                                Icon(Symbols.eco_rounded, size: 18, color: theme.colorScheme.secondary),
                                 const SizedBox(width: AppSpacing.sm),
                                 Expanded(child: Text(tip, style: theme.textTheme.bodyMedium)),
                               ],
@@ -858,25 +860,24 @@ class _ActionButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return InkWell(
       onTap: busy ? null : onTap,
-      borderRadius: BorderRadius.circular(AppRadius.md),
+      borderRadius: BorderRadius.circular(AppRadius.lg),
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
         decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surface,
-          borderRadius: BorderRadius.circular(AppRadius.md),
-          boxShadow: [
-            BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, 4)),
-          ],
+          color: theme.colorScheme.surface,
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+          boxShadow: AppShadows.card,
         ),
         child: Column(
           children: [
             busy
                 ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                : Icon(icon, size: 20, color: AppColors.primary),
+                : Icon(icon, size: 20, color: theme.colorScheme.primary),
             const SizedBox(height: 4),
-            Text(label, style: Theme.of(context).textTheme.labelSmall?.copyWith(color: AppColors.textPrimary)),
+            Text(label, style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onSurface)),
           ],
         ),
       ),
@@ -909,22 +910,14 @@ class _PlaceRecommendationCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(AppRadius.lg),
-              child: place.photoUrl.isNotEmpty
-                  ? CachedNetworkImage(imageUrl: place.photoUrl, height: 120, width: double.infinity, fit: BoxFit.cover)
-                  : Container(
-                      height: 120,
-                      width: double.infinity,
-                      color: AppColors.background,
-                      alignment: Alignment.center,
-                      child: Icon(fallbackIcon, color: AppColors.textTertiary, size: 32),
-                    ),
+            TravelImageFrame(
+              imageUrl: place.photoUrl,
+              height: 120,
+              emptyIcon: fallbackIcon,
+              bottomRight: place.rating != null ? RatingBadge(rating: place.rating!) : null,
             ),
             const SizedBox(height: AppSpacing.sm),
             Text(place.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: theme.textTheme.titleSmall),
-            const SizedBox(height: 2),
-            if (place.rating != null) RatingWidget(rating: place.rating!, reviewCount: place.userRatingCount, starSize: 14),
           ],
         ),
       ),
@@ -952,7 +945,10 @@ class _WeatherTile extends StatelessWidget {
           const SizedBox(height: 6),
           Icon(forecast.icon, color: Colors.white, size: 26),
           const SizedBox(height: 6),
-          Text('${forecast.highTemp}° / ${forecast.lowTemp}°', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 13)),
+          Text(
+            '${forecast.highTemp}° / ${forecast.lowTemp}°',
+            style: theme.textTheme.titleSmall?.copyWith(color: Colors.white, fontWeight: FontWeight.w700),
+          ),
         ],
       ),
     );
@@ -972,9 +968,7 @@ class _BudgetSummaryCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(AppRadius.lg),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 14, offset: const Offset(0, 6)),
-        ],
+        boxShadow: AppShadows.card,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1004,8 +998,8 @@ class _BudgetSummaryCard extends StatelessWidget {
                     children: [
                       Icon(item.icon, size: 18, color: item.color),
                       const SizedBox(width: AppSpacing.xs),
-                      Expanded(child: Text(item.label, style: theme.textTheme.bodyMedium?.copyWith(color: AppColors.textPrimary))),
-                      Text('₱${item.amount.toStringAsFixed(0)}', style: theme.textTheme.labelMedium?.copyWith(color: AppColors.textPrimary)),
+                      Expanded(child: Text(item.label, style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurface))),
+                      Text('₱${item.amount.toStringAsFixed(0)}', style: theme.textTheme.labelMedium?.copyWith(color: theme.colorScheme.onSurface)),
                     ],
                   ),
                   const SizedBox(height: 6),
@@ -1014,7 +1008,7 @@ class _BudgetSummaryCard extends StatelessWidget {
                     child: LinearProgressIndicator(
                       value: percent,
                       minHeight: 6,
-                      backgroundColor: AppColors.border,
+                      backgroundColor: theme.colorScheme.outline,
                       color: item.color,
                     ),
                   ),
@@ -1059,9 +1053,7 @@ class _BudgetTrackerCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(AppRadius.lg),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 14, offset: const Offset(0, 6)),
-        ],
+        boxShadow: AppShadows.card,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1071,7 +1063,7 @@ class _BudgetTrackerCard extends StatelessWidget {
               Expanded(child: Text('Actual Spend', style: theme.textTheme.bodyMedium)),
               Text(
                 '₱${totalSpent.toStringAsFixed(0)} / ₱${itinerary.totalBudget.toStringAsFixed(0)}',
-                style: theme.textTheme.titleMedium?.copyWith(color: overBudget ? AppColors.error : AppColors.textPrimary),
+                style: theme.textTheme.titleMedium?.copyWith(color: overBudget ? theme.colorScheme.error : theme.colorScheme.onSurface),
               ),
             ],
           ),
@@ -1081,18 +1073,18 @@ class _BudgetTrackerCard extends StatelessWidget {
             child: LinearProgressIndicator(
               value: itinerary.totalBudget > 0 ? (totalSpent / itinerary.totalBudget).clamp(0, 1) : 0,
               minHeight: 8,
-              backgroundColor: AppColors.border,
-              color: overBudget ? AppColors.error : AppColors.primary,
+              backgroundColor: theme.colorScheme.outline,
+              color: overBudget ? theme.colorScheme.error : theme.colorScheme.primary,
             ),
           ),
           if (overBudget) ...[
             const SizedBox(height: 6),
             Text('Over budget by ₱${(totalSpent - itinerary.totalBudget).toStringAsFixed(0)}',
-                style: theme.textTheme.labelSmall?.copyWith(color: AppColors.error)),
+                style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.error)),
           ],
           if (expenses.isEmpty) ...[
             const SizedBox(height: AppSpacing.md),
-            Text('No expenses logged yet.', style: theme.textTheme.bodySmall?.copyWith(color: AppColors.textTertiary)),
+            Text('No expenses logged yet.', style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
           ] else ...[
             const SizedBox(height: AppSpacing.md),
             ...expenses.map((expense) => Padding(
@@ -1105,7 +1097,7 @@ class _BudgetTrackerCard extends StatelessWidget {
                           children: [
                             Text(expense.category, style: theme.textTheme.bodyMedium),
                             if (expense.note.isNotEmpty)
-                              Text(expense.note, style: theme.textTheme.bodySmall?.copyWith(color: AppColors.textTertiary)),
+                              Text(expense.note, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
                             if (allMemberIds.length > 1)
                               Builder(builder: (context) {
                                 final split = effectiveSplit(expense, allMemberIds);
@@ -1114,7 +1106,7 @@ class _BudgetTrackerCard extends StatelessWidget {
                                     : 'split with ${split.map(_nameFor).join(', ')}';
                                 return Text(
                                   'Paid by ${_nameFor(expense.loggedBy)} · $splitLabel',
-                                  style: theme.textTheme.bodySmall?.copyWith(color: AppColors.textTertiary),
+                                  style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
                                 );
                               }),
                           ],
@@ -1122,7 +1114,7 @@ class _BudgetTrackerCard extends StatelessWidget {
                       ),
                       Text('₱${expense.amount.toStringAsFixed(0)}', style: theme.textTheme.labelMedium),
                       IconButton(
-                        icon: const Icon(Symbols.close_rounded, size: 18, color: AppColors.textTertiary),
+                        icon: Icon(Symbols.close_rounded, size: 18, color: theme.colorScheme.onSurfaceVariant),
                         onPressed: () => onDelete(expense),
                       ),
                     ],
@@ -1149,9 +1141,9 @@ class _ExpenseBreakdownChart extends StatelessWidget {
     return totals;
   }
 
-  Color _colorFor(String category) {
+  Color _colorFor(String category, Color fallback) {
     final match = itinerary.budgetBreakdown.where((b) => b.label == category);
-    return match.isEmpty ? AppColors.textTertiary : match.first.color;
+    return match.isEmpty ? fallback : match.first.color;
   }
 
   @override
@@ -1165,9 +1157,7 @@ class _ExpenseBreakdownChart extends StatelessWidget {
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(AppRadius.lg),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 14, offset: const Offset(0, 6)),
-        ],
+        boxShadow: AppShadows.card,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1184,7 +1174,12 @@ class _ExpenseBreakdownChart extends StatelessWidget {
                   PieChartData(
                     sections: [
                       for (final entry in entries)
-                        PieChartSectionData(value: entry.value, color: _colorFor(entry.key), radius: 22, showTitle: false),
+                        PieChartSectionData(
+                          value: entry.value,
+                          color: _colorFor(entry.key, theme.colorScheme.onSurfaceVariant),
+                          radius: 22,
+                          showTitle: false,
+                        ),
                     ],
                     sectionsSpace: 2,
                     centerSpaceRadius: 28,
@@ -1204,7 +1199,10 @@ class _ExpenseBreakdownChart extends StatelessWidget {
                             Container(
                               width: 10,
                               height: 10,
-                              decoration: BoxDecoration(color: _colorFor(entry.key), shape: BoxShape.circle),
+                              decoration: BoxDecoration(
+                                color: _colorFor(entry.key, theme.colorScheme.onSurfaceVariant),
+                                shape: BoxShape.circle,
+                              ),
                             ),
                             const SizedBox(width: AppSpacing.xs),
                             Expanded(
@@ -1256,9 +1254,7 @@ class _SplitSummaryCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(AppRadius.lg),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 14, offset: const Offset(0, 6)),
-        ],
+        boxShadow: AppShadows.card,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1273,7 +1269,7 @@ class _SplitSummaryCard extends StatelessWidget {
                 : net > 0
                     ? 'Gets back ₱${net.toStringAsFixed(0)}'
                     : 'Owes ₱${(-net).toStringAsFixed(0)}';
-            final color = settled ? AppColors.textTertiary : (net > 0 ? AppColors.success : AppColors.error);
+            final color = settled ? theme.colorScheme.onSurfaceVariant : (net > 0 ? AppColors.success : theme.colorScheme.error);
             return Padding(
               padding: const EdgeInsets.only(bottom: AppSpacing.sm),
               child: Row(
@@ -1305,14 +1301,12 @@ class _PackingChecklistCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(AppRadius.lg),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 14, offset: const Offset(0, 6)),
-        ],
+        boxShadow: AppShadows.card,
       ),
       child: items.isEmpty
           ? Padding(
               padding: const EdgeInsets.all(AppSpacing.md),
-              child: Text('No items yet.', style: theme.textTheme.bodySmall?.copyWith(color: AppColors.textTertiary)),
+              child: Text('No items yet.', style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
             )
           : Column(
               children: items
@@ -1325,11 +1319,11 @@ class _PackingChecklistCard extends StatelessWidget {
                           item.label,
                           style: theme.textTheme.bodyMedium?.copyWith(
                             decoration: item.checked ? TextDecoration.lineThrough : null,
-                            color: item.checked ? AppColors.textTertiary : AppColors.textPrimary,
+                            color: item.checked ? theme.colorScheme.onSurfaceVariant : theme.colorScheme.onSurface,
                           ),
                         ),
                         secondary: IconButton(
-                          icon: const Icon(Symbols.close_rounded, size: 18, color: AppColors.textTertiary),
+                          icon: Icon(Symbols.close_rounded, size: 18, color: theme.colorScheme.onSurfaceVariant),
                           onPressed: () => onRemove(item),
                         ),
                       ))
@@ -1363,13 +1357,11 @@ class _CompanionsCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(AppRadius.lg),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 14, offset: const Offset(0, 6)),
-        ],
+        boxShadow: AppShadows.card,
       ),
       child: Row(
         children: [
-          const Icon(Symbols.group_rounded, color: AppColors.primary),
+          Icon(Symbols.group_rounded, color: theme.colorScheme.primary),
           const SizedBox(width: AppSpacing.sm),
           Expanded(
             child: Text(
@@ -1383,8 +1375,8 @@ class _CompanionsCard extends StatelessWidget {
           else
             TextButton.icon(
               onPressed: onLeave,
-              icon: const Icon(Symbols.logout_rounded, size: 18, color: AppColors.error),
-              label: const Text('Leave', style: TextStyle(color: AppColors.error)),
+              icon: Icon(Symbols.logout_rounded, size: 18, color: theme.colorScheme.error),
+              label: Text('Leave', style: TextStyle(color: theme.colorScheme.error)),
             ),
         ],
       ),
@@ -1418,24 +1410,26 @@ class _TripDatesCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: theme.colorScheme.surface,
           borderRadius: BorderRadius.circular(AppRadius.lg),
-          boxShadow: [
-            BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 12, offset: const Offset(0, 6)),
-          ],
+          boxShadow: AppShadows.card,
         ),
         child: Row(
           children: [
-            const Icon(Symbols.calendar_month_rounded, color: AppColors.primary),
+            Icon(Symbols.calendar_month_rounded, color: theme.colorScheme.primary),
             const SizedBox(width: AppSpacing.sm),
             Expanded(
               child: Text(
                 label,
                 style: theme.textTheme.bodyMedium?.copyWith(
-                  color: startDate == null ? AppColors.textTertiary : AppColors.textPrimary,
+                  color: startDate == null ? theme.colorScheme.onSurfaceVariant : theme.colorScheme.onSurface,
                 ),
               ),
             ),
             if (isOwner && onTap != null)
-              Icon(startDate == null ? Symbols.add_rounded : Symbols.edit_rounded, size: 18, color: AppColors.textTertiary),
+              Icon(
+                startDate == null ? Symbols.add_rounded : Symbols.edit_rounded,
+                size: 18,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
           ],
         ),
       ),
@@ -1463,9 +1457,7 @@ class _DayCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(AppRadius.lg),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 14, offset: const Offset(0, 6)),
-        ],
+        boxShadow: AppShadows.card,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1475,7 +1467,7 @@ class _DayCard extends StatelessWidget {
               Container(
                 width: 32,
                 height: 32,
-                decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
+                decoration: BoxDecoration(color: theme.colorScheme.primary, shape: BoxShape.circle),
                 alignment: Alignment.center,
                 child: Text('${day.dayNumber}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
               ),
@@ -1486,7 +1478,10 @@ class _DayCard extends StatelessWidget {
                   children: [
                     Text(day.dateLabel, style: theme.textTheme.titleMedium),
                     if (date != null)
-                      Text(DateFormat('EEE, MMM d, y').format(date!), style: theme.textTheme.bodySmall?.copyWith(color: AppColors.textTertiary)),
+                      Text(
+                        DateFormat('EEE, MMM d, y').format(date!),
+                        style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                      ),
                   ],
                 ),
               ),
@@ -1522,10 +1517,10 @@ class _TimelineActivity extends StatelessWidget {
               Container(
                 width: 34,
                 height: 34,
-                decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.12), shape: BoxShape.circle),
-                child: Icon(activity.icon, size: 17, color: AppColors.primary),
+                decoration: BoxDecoration(color: theme.colorScheme.primary.withValues(alpha: 0.12), shape: BoxShape.circle),
+                child: Icon(activity.icon, size: 17, color: theme.colorScheme.primary),
               ),
-              if (!isLast) Expanded(child: Container(width: 2, color: AppColors.border)),
+              if (!isLast) Expanded(child: Container(width: 2, color: theme.colorScheme.outline)),
             ],
           ),
           const SizedBox(width: AppSpacing.md),
@@ -1535,7 +1530,7 @@ class _TimelineActivity extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(activity.time, style: theme.textTheme.labelMedium?.copyWith(color: AppColors.primary)),
+                  Text(activity.time, style: theme.textTheme.labelMedium?.copyWith(color: theme.colorScheme.primary)),
                   const SizedBox(height: 2),
                   Text(activity.title, style: theme.textTheme.titleMedium),
                   const SizedBox(height: 2),
@@ -1543,7 +1538,7 @@ class _TimelineActivity extends StatelessWidget {
                   const SizedBox(height: 4),
                   Row(
                     children: [
-                      const Icon(Symbols.location_on_rounded, size: 13, color: AppColors.textTertiary),
+                      Icon(Symbols.location_on_rounded, size: 13, color: theme.colorScheme.onSurfaceVariant),
                       const SizedBox(width: 2),
                       Text(activity.location, style: theme.textTheme.bodySmall),
                     ],

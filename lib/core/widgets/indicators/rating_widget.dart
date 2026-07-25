@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
-import '../../theme/app_colors.dart';
 import '../../theme/app_spacing.dart';
 
 /// A compact star + numeric rating, with an optional review-count suffix.
@@ -15,22 +14,23 @@ class RatingWidget extends StatelessWidget {
     this.reviewCount,
     this.starSize = 16,
     this.textStyle,
-    this.starColor = AppColors.accent,
+    this.starColor,
   });
 
   final double rating;
   final int? reviewCount;
   final double starSize;
   final TextStyle? textStyle;
-  final Color starColor;
+  final Color? starColor;
 
   @override
   Widget build(BuildContext context) {
     final style = textStyle ?? Theme.of(context).textTheme.labelMedium;
+    final resolvedStarColor = starColor ?? Theme.of(context).colorScheme.tertiary;
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(Symbols.star_rounded, size: starSize, color: starColor, fill: 1),
+        Icon(Symbols.star_rounded, size: starSize, color: resolvedStarColor, fill: 1),
         const SizedBox(width: AppSpacing.xxs),
         Text(rating.toStringAsFixed(1), style: style?.copyWith(color: Theme.of(context).colorScheme.onSurface, fontWeight: FontWeight.w700)),
         if (reviewCount != null) ...[
@@ -60,11 +60,11 @@ class RatingBadge extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Symbols.star_rounded, size: 14, color: AppColors.accent, fill: 1),
+          Icon(Symbols.star_rounded, size: 14, color: Theme.of(context).colorScheme.tertiary, fill: 1),
           const SizedBox(width: 3),
           Text(
             rating.toStringAsFixed(1),
-            style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700),
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(color: Colors.white, fontWeight: FontWeight.w700),
           ),
         ],
       ),

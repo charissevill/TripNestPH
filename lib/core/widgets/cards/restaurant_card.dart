@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 
 import '../../../domain/models/restaurant.dart';
 import '../../providers/favorites_provider.dart';
-import '../../theme/app_colors.dart';
 import '../../theme/app_spacing.dart';
 import '../buttons/bookmark_button.dart';
 import '../indicators/rating_widget.dart';
@@ -19,7 +18,7 @@ class RestaurantCard extends StatelessWidget {
     required this.restaurant,
     required this.onTap,
     this.width = 220,
-    this.imageHeight = 150,
+    this.imageHeight = 160,
   });
 
   final Restaurant restaurant;
@@ -50,9 +49,9 @@ class RestaurantCard extends StatelessWidget {
                       runSpacing: 4,
                       children: [
                         if (restaurant.businessId.isNotEmpty)
-                          const TagChip(label: 'Verified Partner', color: AppColors.primary),
+                          TagChip(label: 'Verified Partner', color: theme.colorScheme.primary),
                         if (restaurant.isPopular)
-                          const TagChip(label: 'Popular', color: AppColors.accentDark),
+                          TagChip(label: 'Popular', color: theme.colorScheme.tertiary),
                       ],
                     )
                   : null,

@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 
 import '../../../domain/models/destination.dart';
 import '../../providers/favorites_provider.dart';
-import '../../theme/app_colors.dart';
 import '../../theme/app_spacing.dart';
 import '../buttons/bookmark_button.dart';
 import '../indicators/rating_widget.dart';
@@ -46,7 +45,7 @@ class DestinationCard extends StatelessWidget {
               imageUrl: destination.heroImageUrl,
               height: imageHeight,
               topLeft: destination.isHiddenGem
-                  ? const TagChip(label: 'Hidden Gem', color: AppColors.secondary)
+                  ? TagChip(label: 'Hidden Gem', color: theme.colorScheme.secondary)
                   : null,
               topRight: BookmarkButton(
                 isSaved: isSaved,

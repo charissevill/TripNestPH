@@ -3,7 +3,7 @@ import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:share_plus/share_plus.dart';
 
-import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_shadows.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/utils/maps_launcher.dart';
 import '../models/ai_message.dart';
@@ -23,9 +23,9 @@ class ChatBubble extends StatelessWidget {
     final isUser = message.isUser;
 
     final bubbleColor = isUser
-        ? AppColors.primary
+        ? theme.colorScheme.primary
         : message.isError
-            ? AppColors.error.withValues(alpha: 0.08)
+            ? theme.colorScheme.error.withValues(alpha: 0.08)
             : theme.colorScheme.surface;
 
     return Align(
@@ -42,9 +42,7 @@ class ChatBubble extends StatelessWidget {
             bottomLeft: Radius.circular(isUser ? AppRadius.lg : AppRadius.sm),
             bottomRight: Radius.circular(isUser ? AppRadius.sm : AppRadius.lg),
           ),
-          boxShadow: isUser
-              ? null
-              : [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, 4))],
+          boxShadow: isUser ? null : AppShadows.card,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -56,9 +54,9 @@ class ChatBubble extends StatelessWidget {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Symbols.error_rounded, size: 15, color: AppColors.error),
+                    Icon(Symbols.error_rounded, size: 15, color: theme.colorScheme.error),
                     const SizedBox(width: 4),
-                    Text('Couldn\'t reply', style: theme.textTheme.labelSmall?.copyWith(color: AppColors.error)),
+                    Text('Couldn\'t reply', style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.error)),
                   ],
                 ),
               ),
@@ -86,7 +84,7 @@ class ChatBubble extends StatelessWidget {
                   onPressed: () => Share.share(message.content, subject: 'TripNest PH AI Recommendation'),
                   icon: const Icon(Symbols.ios_share_rounded, size: 16),
                   iconSize: 16,
-                  color: AppColors.textSecondary,
+                  color: theme.textTheme.bodyMedium?.color,
                   tooltip: 'Share this recommendation',
                 ),
               ),

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
-import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_shadows.dart';
 import '../../core/theme/app_spacing.dart';
 
 /// The message composer pinned to the bottom of the chat screen: a rounded
@@ -47,7 +47,7 @@ class _ChatInputBarState extends State<ChatInputBar> {
                 decoration: BoxDecoration(
                   color: theme.colorScheme.surface,
                   borderRadius: BorderRadius.circular(AppRadius.pill),
-                  boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 12, offset: const Offset(0, 4))],
+                  boxShadow: AppShadows.card,
                 ),
                 child: TextField(
                   controller: _controller,
@@ -77,10 +77,14 @@ class _ChatInputBarState extends State<ChatInputBar> {
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(
-                  color: widget.enabled ? AppColors.primary : AppColors.border,
+                  color: widget.enabled ? theme.colorScheme.primary : theme.colorScheme.outline,
                   shape: BoxShape.circle,
                 ),
-                child: Icon(Symbols.send_rounded, color: widget.enabled ? Colors.white : AppColors.textTertiary, size: 20),
+                child: Icon(
+                  Symbols.send_rounded,
+                  color: widget.enabled ? Colors.white : theme.colorScheme.onSurfaceVariant,
+                  size: 20,
+                ),
               ),
             ),
           ],

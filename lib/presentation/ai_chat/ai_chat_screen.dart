@@ -7,9 +7,9 @@ import '../../ai/providers/ai_chat_provider.dart';
 import '../../ai/widgets/chat_bubble.dart';
 import '../../ai/widgets/chat_input_bar.dart';
 import '../../ai/widgets/prompt_suggestion_chips.dart';
+import '../../ai/widgets/suggestion_pill.dart';
 import '../../ai/widgets/typing_indicator.dart';
 import '../../core/providers/auth_provider.dart';
-import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/widgets/branding/app_logo.dart';
 import '../../data/repositories/destination_repository.dart';
@@ -190,7 +190,6 @@ class _AiChatScreenState extends State<AiChatScreen> {
   @override
   Widget build(BuildContext context) {
     final chat = context.watch<AiChatProvider>();
-    final theme = Theme.of(context);
 
     return Scaffold(
       appBar: AppBar(
@@ -231,11 +230,9 @@ class _AiChatScreenState extends State<AiChatScreen> {
                   separatorBuilder: (_, _) => const SizedBox(width: AppSpacing.sm),
                   itemBuilder: (context, i) {
                     const quickFollowUps = ['Estimate my budget', 'Any hidden gems?', 'Safety tips'];
-                    return ActionChip(
-                      label: Text(quickFollowUps[i], style: theme.textTheme.labelMedium),
-                      backgroundColor: theme.colorScheme.surface,
-                      side: const BorderSide(color: AppColors.border),
-                      onPressed: chat.isSending ? null : () => _send(quickFollowUps[i]),
+                    return SuggestionPill(
+                      label: quickFollowUps[i],
+                      onTap: chat.isSending ? null : () => _send(quickFollowUps[i]),
                     );
                   },
                 ),

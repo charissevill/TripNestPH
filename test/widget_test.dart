@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:firebase_auth_mocks/firebase_auth_mocks.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:tripnest_ph/core/providers/auth_provider.dart';
 import 'package:tripnest_ph/core/providers/favorites_provider.dart';
@@ -18,6 +19,7 @@ import 'support/fake_image_http_overrides.dart';
 void main() {
   setUpAll(() {
     HttpOverrides.global = FakeImageHttpOverrides();
+    SharedPreferences.setMockInitialValues({});
   });
 
   testWidgets('App boots to the splash screen', (tester) async {

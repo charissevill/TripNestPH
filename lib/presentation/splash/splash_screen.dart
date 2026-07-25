@@ -5,6 +5,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/routes/route_paths.dart';
+import '../../core/services/local_preferences_service.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/widgets/branding/app_logo.dart';
@@ -20,13 +21,28 @@ class SplashScreen extends StatefulWidget {
 
 class _SplashScreenState extends State<SplashScreen> {
   Timer? _navigationTimer;
+  final LocalPreferencesService _preferences = LocalPreferencesService();
 
   @override
   void initState() {
     super.initState();
-    _navigationTimer = Timer(const Duration(milliseconds: 2600), () {
-      if (mounted) context.go(RoutePaths.onboarding);
-    });
+    _navigationTimer = Timer(const Duration(milliseconds: 2600), _navigateNext);
+  }
+
+  /// Onboarding only ever appears once per install — everyone else (signed
+  /// out or not) lands on Login instead, and the router's own redirect
+  /// logic takes it from there (straight through to Home if already signed
+  /// in and verified).
+  Future<void> _navigateNext() async {
+    final hasSeenOnboarding = await _preferences.getHasSeenOnboarding();
+    if (!mounted) return;
+    if (hasSeenOnboarding) {
+      context.go(RoutePaths.login);
+      return;
+    }
+    await _preferences.setHasSeenOnboarding(true);
+    if (!mounted) return;
+    context.go(RoutePaths.onboarding);
   }
 
   @override

@@ -4,6 +4,7 @@ import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:firebase_auth_mocks/firebase_auth_mocks.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:tripnest_ph/core/providers/auth_provider.dart';
 import 'package:tripnest_ph/core/providers/favorites_provider.dart';
@@ -30,6 +31,11 @@ Future<void> _settle(WidgetTester tester, [int steps = 20]) async {
 void main() {
   setUpAll(() {
     HttpOverrides.global = FakeImageHttpOverrides();
+    // SplashScreen now reads LocalPreferencesService (has-seen-onboarding
+    // flag) — give it a real (if empty) backing store instead of an
+    // unmocked platform channel. Empty means "not seen yet", i.e. a fresh
+    // install, matching this test's "splash -> onboarding" expectation.
+    SharedPreferences.setMockInitialValues({});
   });
 
   testWidgets(

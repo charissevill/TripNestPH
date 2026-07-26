@@ -354,6 +354,11 @@ class AiRepository {
         recommendedAccommodations: accommodations,
         recommendedPlaceAttractions: placeAttractionRecs,
         accommodationName: request.accommodationName ?? '',
+        // Empty destinationId means a whole-province trip (see AiPlannerScreen's
+        // _generate()) — no single destination to anchor day route maps to.
+        destinationId: request.destinationId.isEmpty ? null : request.destinationId,
+        destinationLatitude: request.latitude,
+        destinationLongitude: request.longitude,
       );
     } on AiException {
       rethrow;

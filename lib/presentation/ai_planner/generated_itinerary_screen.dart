@@ -791,6 +791,10 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
                         date: _savedItinerary?.dateForDay(day.dayNumber),
                         restaurants: restaurants,
                         destinations: attractions,
+                        mainDestinationId: itinerary.destinationId,
+                        mainDestinationName: itinerary.destinationName,
+                        mainDestinationLatitude: itinerary.destinationLatitude,
+                        mainDestinationLongitude: itinerary.destinationLongitude,
                       ),
                     )),
                 if (restaurants.isNotEmpty) ...[
@@ -1494,7 +1498,16 @@ class _TripDatesCard extends StatelessWidget {
 }
 
 class _DayCard extends StatelessWidget {
-  const _DayCard({required this.day, this.date, required this.restaurants, required this.destinations});
+  const _DayCard({
+    required this.day,
+    this.date,
+    required this.restaurants,
+    required this.destinations,
+    this.mainDestinationId,
+    this.mainDestinationName,
+    this.mainDestinationLatitude,
+    this.mainDestinationLongitude,
+  });
 
   final ItineraryDay day;
 
@@ -1510,10 +1523,25 @@ class _DayCard extends StatelessWidget {
   final List<Restaurant> restaurants;
   final List<Destination> destinations;
 
+  /// The trip's own destination — see `matchDayToRoute`'s doc comment for
+  /// why this is checked separately from [destinations].
+  final String? mainDestinationId;
+  final String? mainDestinationName;
+  final double? mainDestinationLatitude;
+  final double? mainDestinationLongitude;
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final routeStops = matchDayToRoute(day, restaurants: restaurants, destinations: destinations);
+    final routeStops = matchDayToRoute(
+      day,
+      restaurants: restaurants,
+      destinations: destinations,
+      mainDestinationId: mainDestinationId,
+      mainDestinationName: mainDestinationName,
+      mainDestinationLatitude: mainDestinationLatitude,
+      mainDestinationLongitude: mainDestinationLongitude,
+    );
     return Container(
       padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(

@@ -20,6 +20,9 @@ class Itinerary {
     this.recommendedAccommodations = const [],
     this.recommendedPlaceAttractions = const [],
     this.accommodationName = '',
+    this.destinationId,
+    this.destinationLatitude,
+    this.destinationLongitude,
   });
 
   final String destinationName;
@@ -55,6 +58,17 @@ class Itinerary {
   /// before this field existed.
   final String accommodationName;
 
+  /// The trip's own destination — a real `tourist_spots` id/coordinate
+  /// (null for a whole-province trip, which has no single destination, or
+  /// for itineraries saved before this field existed). Lets the day route
+  /// map (see `itinerary_route_matcher.dart`) recognize activities that
+  /// describe the destination itself, by far the most common case, rather
+  /// than only ever matching against separately-recommended restaurants/
+  /// attractions (which deliberately exclude the destination itself).
+  final String? destinationId;
+  final double? destinationLatitude;
+  final double? destinationLongitude;
+
   factory Itinerary.fromMap(Map<String, dynamic> map) {
     return Itinerary(
       destinationName: map['destinationName'] as String? ?? '',
@@ -81,6 +95,9 @@ class Itinerary {
           .map((e) => PlaceRecommendation.fromMap(Map<String, dynamic>.from(e as Map)))
           .toList(),
       accommodationName: map['accommodationName'] as String? ?? '',
+      destinationId: map['destinationId'] as String?,
+      destinationLatitude: (map['destinationLatitude'] as num?)?.toDouble(),
+      destinationLongitude: (map['destinationLongitude'] as num?)?.toDouble(),
     );
   }
 
@@ -100,6 +117,9 @@ class Itinerary {
       'recommendedAccommodations': recommendedAccommodations.map((p) => p.toMap()).toList(),
       'recommendedPlaceAttractions': recommendedPlaceAttractions.map((p) => p.toMap()).toList(),
       'accommodationName': accommodationName,
+      'destinationId': destinationId,
+      'destinationLatitude': destinationLatitude,
+      'destinationLongitude': destinationLongitude,
     };
   }
 }

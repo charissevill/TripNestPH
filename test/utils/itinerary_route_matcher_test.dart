@@ -56,6 +56,71 @@ void main() {
     expect(stops[1].destinationId, isNull);
   });
 
+  test('matches activities describing the trip\'s own destination, which is never in `destinations`', () {
+    final day = const ItineraryDay(
+      dayNumber: 1,
+      dateLabel: 'Day 1',
+      activities: [
+        ItineraryActivity(
+          time: 'Morning',
+          title: 'Explore Kawasan Falls',
+          description: 'Take in the scenery.',
+          iconKey: 'landscape',
+          location: 'Kawasan Falls, Cebu',
+        ),
+        ItineraryActivity(
+          time: 'Afternoon',
+          title: 'Canyoneering at Kawasan Falls',
+          description: 'Go canyoneering with a certified guide.',
+          iconKey: 'hiking',
+          location: 'Kawasan Falls, Cebu',
+        ),
+      ],
+    );
+
+    // Deliberately empty `destinations` — matches the app's real behavior
+    // (the trip's own destination is never included in that list).
+    final stops = matchDayToRoute(
+      day,
+      restaurants: const [],
+      destinations: const [],
+      mainDestinationId: 'kawasan-falls',
+      mainDestinationName: 'Kawasan Falls',
+      mainDestinationLatitude: 9.8225,
+      mainDestinationLongitude: 123.3803,
+    );
+
+    expect(stops, hasLength(2));
+    expect(stops[0].destinationId, 'kawasan-falls');
+    expect(stops[0].latitude, 9.8225);
+    expect(stops[1].destinationId, 'kawasan-falls');
+  });
+
+  test('does not match the main destination when no coordinates are given for it', () {
+    final day = const ItineraryDay(
+      dayNumber: 1,
+      dateLabel: 'Day 1',
+      activities: [
+        ItineraryActivity(
+          time: 'Morning',
+          title: 'Explore Kawasan Falls',
+          description: 'Take in the scenery.',
+          iconKey: 'landscape',
+          location: 'Kawasan Falls, Cebu',
+        ),
+      ],
+    );
+
+    final stops = matchDayToRoute(
+      day,
+      restaurants: const [],
+      destinations: const [],
+      mainDestinationName: 'Kawasan Falls',
+    );
+
+    expect(stops, isEmpty);
+  });
+
   test('matches a place named only in the description, not the title/location', () {
     final day = ItineraryDay(
       dayNumber: 1,

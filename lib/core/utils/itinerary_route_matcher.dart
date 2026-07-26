@@ -45,12 +45,25 @@ const int _minMatchableNameLength = 4;
 /// hallucination risk, and a wrong pin is worse than no pin. Restaurants are
 /// checked before destinations, since "Lunch/Dinner at X" activities are
 /// common and should resolve to the restaurant, not a same-named attraction.
+///
+/// [mainDestinationName]/[mainDestinationLatitude]/[mainDestinationLongitude]
+/// (and its id, [mainDestinationId], for tap-to-navigate) represent the
+/// trip's own destination — checked last, since it's by far the most common
+/// thing a day's activities describe ("Explore Kawasan Falls", "Canyoneering
+/// at Kawasan Falls", ...), but [destinations] never includes it (that list
+/// is "other nearby attractions", deliberately excluding the destination
+/// itself elsewhere in the app).
+///
 /// Returned in activity order (Morning/Afternoon/Evening), so callers can
 /// use this list directly for both markers and a connecting route line.
 List<RouteStop> matchDayToRoute(
   ItineraryDay day, {
   required List<Restaurant> restaurants,
   required List<Destination> destinations,
+  String? mainDestinationId,
+  String? mainDestinationName,
+  double? mainDestinationLatitude,
+  double? mainDestinationLongitude,
 }) {
   final stops = <RouteStop>[];
   for (final activity in day.activities) {
@@ -79,6 +92,23 @@ List<RouteStop> matchDayToRoute(
           latitude: destination.latitude!,
           longitude: destination.longitude!,
           destinationId: destination.id,
+        ),
+      );
+      continue;
+    }
+
+    if (mainDestinationName != null &&
+        mainDestinationName.length >= _minMatchableNameLength &&
+        mainDestinationLatitude != null &&
+        mainDestinationLongitude != null &&
+        haystack.contains(mainDestinationName.toLowerCase())) {
+      stops.add(
+        RouteStop(
+          time: activity.time,
+          name: mainDestinationName,
+          latitude: mainDestinationLatitude,
+          longitude: mainDestinationLongitude,
+          destinationId: mainDestinationId,
         ),
       );
     }

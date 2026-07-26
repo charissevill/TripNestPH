@@ -56,6 +56,28 @@ void main() {
     expect(stops[1].destinationId, isNull);
   });
 
+  test('matches a place named only in the description, not the title/location', () {
+    final day = ItineraryDay(
+      dayNumber: 1,
+      dateLabel: 'Day 1',
+      activities: [
+        ItineraryActivity(
+          time: 'Afternoon',
+          title: 'Explore the town',
+          description: 'Visit ${destination.name} and take in the view.',
+          iconKey: 'landscape',
+          location: 'Town center',
+        ),
+      ],
+    );
+
+    final stops = matchDayToRoute(day, restaurants: const [], destinations: [destination]);
+
+    expect(stops, hasLength(1));
+    expect(stops[0].name, destination.name);
+    expect(stops[0].destinationId, destination.id);
+  });
+
   test('does not match activities that mention no known place', () {
     final day = const ItineraryDay(
       dayNumber: 1,

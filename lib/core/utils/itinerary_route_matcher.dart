@@ -36,7 +36,10 @@ const int _minMatchableNameLength = 4;
 
 /// Resolves [day]'s activities against [restaurants]/[destinations] — both
 /// already-loaded, real Firestore data with real coordinates — by checking
-/// whether an activity's title/location text contains one of their names.
+/// whether an activity's title/location/description text contains one of
+/// their names. Description is included because the AI often names the
+/// specific place there (e.g. "Visit Magellan's Cross and Basilica del
+/// Santo Niño") rather than in the shorter title/location fields.
 /// Deliberately never asks an AI model for coordinates directly: an LLM
 /// inventing lat/lng for a "specific place name" it wrote itself is a
 /// hallucination risk, and a wrong pin is worse than no pin. Restaurants are
@@ -51,7 +54,7 @@ List<RouteStop> matchDayToRoute(
 }) {
   final stops = <RouteStop>[];
   for (final activity in day.activities) {
-    final haystack = '${activity.title} ${activity.location}'.toLowerCase();
+    final haystack = '${activity.title} ${activity.location} ${activity.description}'.toLowerCase();
 
     final restaurant = _firstMatch(haystack, restaurants, (r) => r.name, (r) => r.hasCoordinates);
     if (restaurant != null) {

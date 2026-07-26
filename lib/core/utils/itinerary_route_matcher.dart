@@ -12,6 +12,7 @@ class RouteStop {
     required this.longitude,
     this.destinationId,
     this.restaurantId,
+    this.placeMapsUri,
   });
 
   /// The matched activity's `time`, e.g. "Morning".
@@ -21,12 +22,19 @@ class RouteStop {
   final double longitude;
 
   /// Set when [name] matched a real `Destination` — mutually exclusive
-  /// with [restaurantId].
+  /// with [restaurantId]/[placeMapsUri].
   final String? destinationId;
 
   /// Set when [name] matched a real `Restaurant` — mutually exclusive
-  /// with [destinationId].
+  /// with [destinationId]/[placeMapsUri].
   final String? restaurantId;
+
+  /// Set when [name] matched a live Places API recommendation
+  /// (`Itinerary.recommendedAccommodations`/`recommendedPlaceAttractions`) —
+  /// those have no Firestore id to navigate to in-app, so callers should
+  /// open this real Google Maps link instead. Mutually exclusive with
+  /// [destinationId]/[restaurantId].
+  final String? placeMapsUri;
 }
 
 /// Names shorter than this are skipped when matching — a name that short
@@ -46,6 +54,12 @@ const int _minMatchableNameLength = 4;
 /// checked before destinations, since "Lunch/Dinner at X" activities are
 /// common and should resolve to the restaurant, not a same-named attraction.
 ///
+/// [placeRecommendations] covers `Itinerary.recommendedAccommodations`/
+/// `recommendedPlaceAttractions` — live Places API picks with no Firestore
+/// id, checked after [restaurants]/[destinations] but before the main
+/// destination (they're just as specific as a curated destination, unlike
+/// the broader main-destination fallback).
+///
 /// [mainDestinationName]/[mainDestinationLatitude]/[mainDestinationLongitude]
 /// (and its id, [mainDestinationId], for tap-to-navigate) represent the
 /// trip's own destination — checked last, since it's by far the most common
@@ -54,12 +68,19 @@ const int _minMatchableNameLength = 4;
 /// is "other nearby attractions", deliberately excluding the destination
 /// itself elsewhere in the app).
 ///
-/// Returned in activity order (Morning/Afternoon/Evening), so callers can
-/// use this list directly for both markers and a connecting route line.
+/// Returned in activity order (Morning/Afternoon/Evening). If fewer than 2
+/// activities resolve this way — a day of generic activities like "Beach
+/// Relaxation"/"Farewell Dinner" with no specific real place named anywhere
+/// — a trailing anchor stop for the trip's own destination is appended
+/// (when its coordinates are available), so every day still centers on
+/// somewhere real instead of showing nothing. This never fabricates a
+/// specific activity's location — it's just the one thing genuinely true of
+/// every activity in a destination-based trip: it happens in/around there.
 List<RouteStop> matchDayToRoute(
   ItineraryDay day, {
   required List<Restaurant> restaurants,
   required List<Destination> destinations,
+  List<PlaceRecommendation> placeRecommendations = const [],
   String? mainDestinationId,
   String? mainDestinationName,
   double? mainDestinationLatitude,
@@ -97,6 +118,20 @@ List<RouteStop> matchDayToRoute(
       continue;
     }
 
+    final place = _firstMatch(haystack, placeRecommendations, (p) => p.name, (p) => p.hasCoordinates);
+    if (place != null) {
+      stops.add(
+        RouteStop(
+          time: activity.time,
+          name: place.name,
+          latitude: place.latitude!,
+          longitude: place.longitude!,
+          placeMapsUri: place.mapsUri.isEmpty ? null : place.mapsUri,
+        ),
+      );
+      continue;
+    }
+
     if (mainDestinationName != null &&
         mainDestinationName.length >= _minMatchableNameLength &&
         mainDestinationLatitude != null &&
@@ -112,6 +147,23 @@ List<RouteStop> matchDayToRoute(
         ),
       );
     }
+  }
+
+  final alreadyAnchored = stops.any((s) => s.destinationId != null && s.destinationId == mainDestinationId);
+  if (stops.length < 2 &&
+      !alreadyAnchored &&
+      mainDestinationName != null &&
+      mainDestinationLatitude != null &&
+      mainDestinationLongitude != null) {
+    stops.add(
+      RouteStop(
+        time: 'Overview',
+        name: mainDestinationName,
+        latitude: mainDestinationLatitude,
+        longitude: mainDestinationLongitude,
+        destinationId: mainDestinationId,
+      ),
+    );
   }
   return stops;
 }

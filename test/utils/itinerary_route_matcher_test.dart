@@ -56,6 +56,37 @@ void main() {
     expect(stops[1].destinationId, isNull);
   });
 
+  test('matches a Places API recommendation (accommodation/attraction) with no Firestore id', () {
+    const place = PlaceRecommendation(
+      placeId: 'places/abc123',
+      name: 'Cagsawa Ruins',
+      latitude: 13.1391,
+      longitude: 123.6864,
+      mapsUri: 'https://maps.google.com/?cid=123',
+    );
+    final day = const ItineraryDay(
+      dayNumber: 1,
+      dateLabel: 'Day 1',
+      activities: [
+        ItineraryActivity(
+          time: 'Morning',
+          title: 'Cagsawa Ruins Visit',
+          description: 'See the iconic ruins framed by Mayon Volcano.',
+          iconKey: 'landscape',
+          location: 'Cagsawa, Albay',
+        ),
+      ],
+    );
+
+    final stops = matchDayToRoute(day, restaurants: const [], destinations: const [], placeRecommendations: const [place]);
+
+    expect(stops, hasLength(1));
+    expect(stops[0].name, 'Cagsawa Ruins');
+    expect(stops[0].placeMapsUri, 'https://maps.google.com/?cid=123');
+    expect(stops[0].destinationId, isNull);
+    expect(stops[0].restaurantId, isNull);
+  });
+
   test('matches activities describing the trip\'s own destination, which is never in `destinations`', () {
     final day = const ItineraryDay(
       dayNumber: 1,
@@ -141,6 +172,112 @@ void main() {
     expect(stops, hasLength(1));
     expect(stops[0].name, destination.name);
     expect(stops[0].destinationId, destination.id);
+  });
+
+  test('anchors to the main destination when a day has no specific matches at all', () {
+    final day = const ItineraryDay(
+      dayNumber: 2,
+      dateLabel: 'Day 2',
+      activities: [
+        ItineraryActivity(
+          time: 'Morning',
+          title: 'Beach Relaxation',
+          description: 'Relax at a nearby beach.',
+          iconKey: 'beach_access',
+          location: 'A nearby beach',
+        ),
+        ItineraryActivity(
+          time: 'Afternoon',
+          title: 'Island Hopping',
+          description: 'Explore the nearby islands.',
+          iconKey: 'directions_boat',
+          location: 'Nearby islands',
+        ),
+      ],
+    );
+
+    final stops = matchDayToRoute(
+      day,
+      restaurants: const [],
+      destinations: const [],
+      mainDestinationId: 'panglao',
+      mainDestinationName: 'Panglao',
+      mainDestinationLatitude: 9.5885,
+      mainDestinationLongitude: 123.7521,
+    );
+
+    expect(stops, hasLength(1));
+    expect(stops[0].time, 'Overview');
+    expect(stops[0].destinationId, 'panglao');
+    expect(stops[0].latitude, 9.5885);
+  });
+
+  test('adds the main-destination anchor alongside a single specific match', () {
+    final day = ItineraryDay(
+      dayNumber: 1,
+      dateLabel: 'Day 1',
+      activities: [
+        ItineraryActivity(
+          time: 'Morning',
+          title: 'Lunch at ${restaurant.name}',
+          description: '',
+          iconKey: 'restaurant',
+          location: '',
+        ),
+        const ItineraryActivity(time: 'Afternoon', title: 'Free time', description: '', iconKey: 'hotel', location: ''),
+      ],
+    );
+
+    final stops = matchDayToRoute(
+      day,
+      restaurants: [restaurant],
+      destinations: const [],
+      mainDestinationId: 'panglao',
+      mainDestinationName: 'Panglao',
+      mainDestinationLatitude: 9.5885,
+      mainDestinationLongitude: 123.7521,
+    );
+
+    expect(stops, hasLength(2));
+    expect(stops[0].restaurantId, restaurant.id);
+    expect(stops[1].time, 'Overview');
+    expect(stops[1].destinationId, 'panglao');
+  });
+
+  test('does not add an anchor on top of a day that already has 2+ specific matches', () {
+    final day = ItineraryDay(
+      dayNumber: 1,
+      dateLabel: 'Day 1',
+      activities: [
+        ItineraryActivity(
+          time: 'Morning',
+          title: 'Visit ${destination.name}',
+          description: '',
+          iconKey: 'landscape',
+          location: '',
+        ),
+        ItineraryActivity(
+          time: 'Afternoon',
+          title: 'Lunch at ${restaurant.name}',
+          description: '',
+          iconKey: 'restaurant',
+          location: '',
+        ),
+      ],
+    );
+
+    final stops = matchDayToRoute(
+      day,
+      restaurants: [restaurant],
+      destinations: [destination],
+      mainDestinationId: 'panglao',
+      mainDestinationName: 'Panglao',
+      mainDestinationLatitude: 9.5885,
+      mainDestinationLongitude: 123.7521,
+    );
+
+    expect(stops, hasLength(2));
+    expect(stops.any((s) => s.time == 'Overview'), isFalse);
   });
 
   test('does not match activities that mention no known place', () {

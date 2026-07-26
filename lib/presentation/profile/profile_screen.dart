@@ -349,6 +349,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 icon: Symbols.logout_rounded,
                 label: 'Log Out',
                 iconColor: AppColors.error,
+                showChevron: false,
                 onTap: () => _confirmSignOut(context),
               ),
             ],
@@ -423,12 +424,14 @@ class _MenuTile extends StatelessWidget {
     required this.label,
     required this.onTap,
     this.iconColor,
+    this.showChevron = true,
   });
 
   final IconData icon;
   final String label;
   final VoidCallback onTap;
   final Color? iconColor;
+  final bool showChevron;
 
   @override
   Widget build(BuildContext context) {
@@ -450,10 +453,11 @@ class _MenuTile extends StatelessWidget {
                 ),
               ),
             ),
-            const Icon(
-              Symbols.chevron_right_rounded,
-              color: AppColors.textTertiary,
-            ),
+            if (showChevron)
+              const Icon(
+                Symbols.chevron_right_rounded,
+                color: AppColors.textTertiary,
+              ),
           ],
         ),
       ),

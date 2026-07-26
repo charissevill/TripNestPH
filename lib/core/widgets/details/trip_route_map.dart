@@ -8,14 +8,15 @@ import '../../theme/app_spacing.dart';
 import '../../utils/itinerary_route_matcher.dart';
 import '../../utils/maps_launcher.dart';
 
-/// A small, embedded map showing one day's real, coordinate-resolved stops
-/// (see [matchDayToRoute]) connected by a route line, plus a link to open
-/// the same route for real turn-by-turn directions. Scroll gestures stay
-/// disabled since this sits inside a scrolling itinerary day card — same
-/// "embedded, not full-screen" reasoning as `MapPreview`, unlike
-/// `ExploreMapView`'s full-screen browsing map.
-class DayRouteMap extends StatelessWidget {
-  const DayRouteMap({super.key, required this.stops});
+/// A small, embedded map showing every real, coordinate-resolved stop across
+/// a whole trip (see [matchDayToRoute], called once per day and flattened
+/// into one list by the caller) connected by a single route line, plus a
+/// link to open the same route for real turn-by-turn directions. Scroll
+/// gestures stay disabled since this sits inside the itinerary's scrolling
+/// page — same "embedded, not full-screen" reasoning as `MapPreview`,
+/// unlike `ExploreMapView`'s full-screen browsing map.
+class TripRouteMap extends StatelessWidget {
+  const TripRouteMap({super.key, required this.stops});
 
   final List<RouteStop> stops;
 
@@ -45,9 +46,9 @@ class DayRouteMap extends StatelessWidget {
         ClipRRect(
           borderRadius: BorderRadius.circular(AppRadius.lg),
           child: SizedBox(
-            height: 180,
+            height: 220,
             child: GoogleMap(
-              initialCameraPosition: CameraPosition(target: centroid, zoom: 13),
+              initialCameraPosition: CameraPosition(target: centroid, zoom: 12),
               markers: {
                 for (final stop in stops)
                   Marker(

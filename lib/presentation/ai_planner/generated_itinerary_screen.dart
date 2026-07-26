@@ -29,7 +29,7 @@ import '../../core/widgets/dialogs/confirmation_dialog.dart';
 import '../../core/widgets/cards/restaurant_card.dart';
 import '../../core/widgets/cards/destination_card.dart';
 import '../../core/widgets/cards/travel_image_frame.dart';
-import '../../core/widgets/details/day_route_map.dart';
+import '../../core/widgets/details/trip_route_map.dart';
 import '../../core/widgets/indicators/rating_widget.dart';
 import '../../core/widgets/layout/section_header.dart';
 import '../../data/mock/mock_itinerary.dart';
@@ -781,6 +781,41 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
                     onLeave: _leaveTrip,
                   ),
                 ],
+                Builder(
+                  builder: (context) {
+                    final tripStops = <RouteStop>[
+                      for (final day in itinerary.days)
+                        ...matchDayToRoute(
+                          day,
+                          restaurants: restaurants,
+                          destinations: attractions,
+                          mainDestinationId: itinerary.destinationId,
+                          mainDestinationName: itinerary.destinationName,
+                          mainDestinationLatitude: itinerary.destinationLatitude,
+                          mainDestinationLongitude: itinerary.destinationLongitude,
+                        ).map(
+                          (stop) => RouteStop(
+                            time: 'Day ${day.dayNumber} - ${stop.time}',
+                            name: stop.name,
+                            latitude: stop.latitude,
+                            longitude: stop.longitude,
+                            destinationId: stop.destinationId,
+                            restaurantId: stop.restaurantId,
+                          ),
+                        ),
+                    ];
+                    if (tripStops.length < 2) return const SizedBox.shrink();
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SizedBox(height: AppSpacing.xxl),
+                        Text('Trip Route', style: theme.textTheme.titleLarge),
+                        const SizedBox(height: AppSpacing.md),
+                        TripRouteMap(stops: tripStops),
+                      ],
+                    );
+                  },
+                ),
                 const SizedBox(height: AppSpacing.xxl),
                 Text('Day-by-Day Plan', style: theme.textTheme.titleLarge),
                 const SizedBox(height: AppSpacing.md),
@@ -789,12 +824,6 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
                       child: _DayCard(
                         day: day,
                         date: _savedItinerary?.dateForDay(day.dayNumber),
-                        restaurants: restaurants,
-                        destinations: attractions,
-                        mainDestinationId: itinerary.destinationId,
-                        mainDestinationName: itinerary.destinationName,
-                        mainDestinationLatitude: itinerary.destinationLatitude,
-                        mainDestinationLongitude: itinerary.destinationLongitude,
                       ),
                     )),
                 if (restaurants.isNotEmpty) ...[
@@ -1498,16 +1527,7 @@ class _TripDatesCard extends StatelessWidget {
 }
 
 class _DayCard extends StatelessWidget {
-  const _DayCard({
-    required this.day,
-    this.date,
-    required this.restaurants,
-    required this.destinations,
-    this.mainDestinationId,
-    this.mainDestinationName,
-    this.mainDestinationLatitude,
-    this.mainDestinationLongitude,
-  });
+  const _DayCard({required this.day, this.date});
 
   final ItineraryDay day;
 
@@ -1516,32 +1536,9 @@ class _DayCard extends StatelessWidget {
   /// "Day 1" label rather than replacing it.
   final DateTime? date;
 
-  /// The trip's already-resolved, real-coordinate recommendations — used to
-  /// match this day's activities to a real place for [DayRouteMap] (see
-  /// `matchDayToRoute`). Never re-fetched here; just what the parent screen
-  /// already loaded.
-  final List<Restaurant> restaurants;
-  final List<Destination> destinations;
-
-  /// The trip's own destination — see `matchDayToRoute`'s doc comment for
-  /// why this is checked separately from [destinations].
-  final String? mainDestinationId;
-  final String? mainDestinationName;
-  final double? mainDestinationLatitude;
-  final double? mainDestinationLongitude;
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final routeStops = matchDayToRoute(
-      day,
-      restaurants: restaurants,
-      destinations: destinations,
-      mainDestinationId: mainDestinationId,
-      mainDestinationName: mainDestinationName,
-      mainDestinationLatitude: mainDestinationLatitude,
-      mainDestinationLongitude: mainDestinationLongitude,
-    );
     return Container(
       padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
@@ -1583,18 +1580,6 @@ class _DayCard extends StatelessWidget {
             final isLast = i == day.activities.length - 1;
             return _TimelineActivity(activity: activity, isLast: isLast);
           }),
-          if (routeStops.length >= 2)
-            Padding(
-              padding: const EdgeInsets.only(top: AppSpacing.lg),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Today\'s Route', style: theme.textTheme.titleSmall),
-                  const SizedBox(height: AppSpacing.sm),
-                  DayRouteMap(stops: routeStops),
-                ],
-              ),
-            ),
         ],
       ),
     );

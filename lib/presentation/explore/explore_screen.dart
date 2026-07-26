@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
 import '../../core/routes/route_paths.dart';
@@ -12,6 +13,7 @@ import '../../core/widgets/cards/category_card.dart';
 import '../../core/widgets/cards/destination_card.dart';
 import '../../core/widgets/cards/festival_card.dart';
 import '../../core/widgets/cards/restaurant_card.dart';
+import '../../core/widgets/details/explore_map_view.dart';
 import '../../core/widgets/dialogs/active_filter_chips.dart';
 import '../../core/widgets/dialogs/search_filter_sheet.dart';
 import '../../core/widgets/inputs/search_bar_widget.dart';
@@ -58,6 +60,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
 
   _ExploreTab _tab = _ExploreTab.destinations;
   String? _selectedCategory;
+  bool _mapMode = false;
 
   String? _regionId;
   String? _provinceId;
@@ -225,12 +228,12 @@ class _ExploreScreenState extends State<ExploreScreen> {
       List<Destination> page;
       DocumentSnapshot<Map<String, dynamic>>? cursor;
       bool hasMore;
-      if (_selectedCategory != null || _hasFilters) {
+      if (_selectedCategory != null || _hasFilters || _mapMode) {
         page = await _destinationRepository.filter(
           categoryId: _selectedCategory,
           provinceId: _provinceId,
           minRating: _minRating,
-          limit: 60,
+          limit: 150,
         );
         cursor = null;
         hasMore = false;
@@ -274,11 +277,11 @@ class _ExploreScreenState extends State<ExploreScreen> {
       List<Restaurant> page;
       DocumentSnapshot<Map<String, dynamic>>? cursor;
       bool hasMore;
-      if (_hasFilters) {
+      if (_hasFilters || _mapMode) {
         page = await _restaurantRepository.filter(
           provinceId: _provinceId,
           minRating: _minRating,
-          limit: 60,
+          limit: 150,
         );
         cursor = null;
         hasMore = false;
@@ -322,11 +325,11 @@ class _ExploreScreenState extends State<ExploreScreen> {
       List<Festival> page;
       DocumentSnapshot<Map<String, dynamic>>? cursor;
       bool hasMore;
-      if (_hasFilters) {
+      if (_hasFilters || _mapMode) {
         page = await _festivalRepository.filter(
           provinceId: _provinceId,
           minRating: _minRating,
-          limit: 60,
+          limit: 150,
         );
         cursor = null;
         hasMore = false;
@@ -398,30 +401,47 @@ class _ExploreScreenState extends State<ExploreScreen> {
                 ],
               ),
             ),
-            SizedBox(
-              height: 40,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-                itemCount: _ExploreTab.values.length,
-                separatorBuilder: (_, _) =>
-                    const SizedBox(width: AppSpacing.sm),
-                itemBuilder: (context, i) {
-                  final tab = _ExploreTab.values[i];
-                  return _TabChip(
-                    label: switch (tab) {
-                      _ExploreTab.destinations => 'Destinations',
-                      _ExploreTab.restaurants => 'Restaurants',
-                      _ExploreTab.festivals => 'Festivals',
+            Row(
+              children: [
+                Expanded(
+                  child: SizedBox(
+                    height: 40,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+                      itemCount: _ExploreTab.values.length,
+                      separatorBuilder: (_, _) =>
+                          const SizedBox(width: AppSpacing.sm),
+                      itemBuilder: (context, i) {
+                        final tab = _ExploreTab.values[i];
+                        return _TabChip(
+                          label: switch (tab) {
+                            _ExploreTab.destinations => 'Destinations',
+                            _ExploreTab.restaurants => 'Restaurants',
+                            _ExploreTab.festivals => 'Festivals',
+                          },
+                          selected: _tab == tab,
+                          onTap: () {
+                            setState(() => _tab = tab);
+                            _ensureLoaded(tab);
+                          },
+                        );
+                      },
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.only(right: AppSpacing.lg),
+                  child: IconButton(
+                    icon: Icon(_mapMode ? Symbols.view_list_rounded : Symbols.map_rounded),
+                    tooltip: _mapMode ? 'Show as list' : 'Show as map',
+                    onPressed: () {
+                      setState(() => _mapMode = !_mapMode);
+                      _invalidateAllTabsAndReload();
                     },
-                    selected: _tab == tab,
-                    onTap: () {
-                      setState(() => _tab = tab);
-                      _ensureLoaded(tab);
-                    },
-                  );
-                },
-              ),
+                  ),
+                ),
+              ],
             ),
             if (_tab == _ExploreTab.destinations) ...[
               const SizedBox(height: AppSpacing.md),
@@ -456,65 +476,125 @@ class _ExploreScreenState extends State<ExploreScreen> {
             ],
             const SizedBox(height: AppSpacing.md),
             Expanded(
-              child: switch (_tab) {
-                _ExploreTab.destinations => _buildGrid(
-                  items: _destinations,
-                  isLoading: _loadingDestinations,
-                  error: _destinationsError,
-                  hasMore: _destinationsHasMore,
-                  onLoadMore: _loadDestinations,
-                  onRetry: () => _loadDestinations(reset: true),
-                  onRefresh: () => _loadDestinations(reset: true),
-                  emptyMessage: _hasFilters
-                      ? 'No destinations match your filters — try widening them.'
-                      : 'No destinations in this category yet — try another one.',
-                  itemBuilder: (context, width, item) => DestinationCard(
-                    destination: item,
-                    width: width,
-                    imageHeight: _gridImageHeight,
-                    onTap: () =>
-                        context.push(RoutePaths.destinationDetails(item.id)),
-                  ),
-                ),
-                _ExploreTab.restaurants => _buildGrid(
-                  items: _restaurants,
-                  isLoading: _loadingRestaurants,
-                  error: _restaurantsError,
-                  hasMore: _restaurantsHasMore,
-                  onLoadMore: _loadRestaurants,
-                  onRetry: () => _loadRestaurants(reset: true),
-                  onRefresh: () => _loadRestaurants(reset: true),
-                  emptyMessage: _hasFilters
-                      ? 'No restaurants match your filters — try widening them.'
-                      : 'No restaurants found.',
-                  itemBuilder: (context, width, item) => RestaurantCard(
-                    restaurant: item,
-                    width: width,
-                    imageHeight: _gridImageHeight,
-                    onTap: () =>
-                        context.push(RoutePaths.restaurantDetails(item.id)),
-                  ),
-                ),
-                _ExploreTab.festivals => _buildGrid(
-                  items: _festivals,
-                  isLoading: _loadingFestivals,
-                  error: _festivalsError,
-                  hasMore: _festivalsHasMore,
-                  onLoadMore: _loadFestivals,
-                  onRetry: () => _loadFestivals(reset: true),
-                  onRefresh: () => _loadFestivals(reset: true),
-                  emptyMessage: _hasFilters
-                      ? 'No festivals match your filters — try widening them.'
-                      : 'No festivals found.',
-                  itemBuilder: (context, width, item) => FestivalCard(
-                    festival: item,
-                    width: width,
-                    imageHeight: _gridImageHeight,
-                    onTap: () =>
-                        context.push(RoutePaths.festivalDetails(item.id)),
-                  ),
-                ),
-              },
+              child: _mapMode
+                  ? switch (_tab) {
+                      _ExploreTab.destinations => _buildMap(
+                        items: _destinations,
+                        isLoading: _loadingDestinations,
+                        error: _destinationsError,
+                        onRetry: () => _loadDestinations(reset: true),
+                        emptyMessage: _hasFilters
+                            ? 'No destinations match your filters — try widening them.'
+                            : 'No mapped destinations yet.',
+                        markerFor: (item) => !item.hasCoordinates
+                            ? null
+                            : Marker(
+                                markerId: MarkerId('destination-${item.id}'),
+                                position: LatLng(item.latitude!, item.longitude!),
+                                infoWindow: InfoWindow(
+                                  title: item.name,
+                                  onTap: () => context.push(RoutePaths.destinationDetails(item.id)),
+                                ),
+                              ),
+                      ),
+                      _ExploreTab.restaurants => _buildMap(
+                        items: _restaurants,
+                        isLoading: _loadingRestaurants,
+                        error: _restaurantsError,
+                        onRetry: () => _loadRestaurants(reset: true),
+                        emptyMessage: _hasFilters
+                            ? 'No restaurants match your filters — try widening them.'
+                            : 'No mapped restaurants yet.',
+                        markerFor: (item) => !item.hasCoordinates
+                            ? null
+                            : Marker(
+                                markerId: MarkerId('restaurant-${item.id}'),
+                                position: LatLng(item.latitude!, item.longitude!),
+                                infoWindow: InfoWindow(
+                                  title: item.name,
+                                  onTap: () => context.push(RoutePaths.restaurantDetails(item.id)),
+                                ),
+                              ),
+                      ),
+                      _ExploreTab.festivals => _buildMap(
+                        items: _festivals,
+                        isLoading: _loadingFestivals,
+                        error: _festivalsError,
+                        onRetry: () => _loadFestivals(reset: true),
+                        emptyMessage: _hasFilters
+                            ? 'No festivals match your filters — try widening them.'
+                            : 'No mapped festivals yet.',
+                        markerFor: (item) => !item.hasCoordinates
+                            ? null
+                            : Marker(
+                                markerId: MarkerId('festival-${item.id}'),
+                                position: LatLng(item.latitude!, item.longitude!),
+                                infoWindow: InfoWindow(
+                                  title: item.name,
+                                  onTap: () => context.push(RoutePaths.festivalDetails(item.id)),
+                                ),
+                              ),
+                      ),
+                    }
+                  : switch (_tab) {
+                      _ExploreTab.destinations => _buildGrid(
+                        items: _destinations,
+                        isLoading: _loadingDestinations,
+                        error: _destinationsError,
+                        hasMore: _destinationsHasMore,
+                        onLoadMore: _loadDestinations,
+                        onRetry: () => _loadDestinations(reset: true),
+                        onRefresh: () => _loadDestinations(reset: true),
+                        emptyMessage: _hasFilters
+                            ? 'No destinations match your filters — try widening them.'
+                            : 'No destinations in this category yet — try another one.',
+                        itemBuilder: (context, width, item) => DestinationCard(
+                          destination: item,
+                          width: width,
+                          imageHeight: _gridImageHeight,
+                          onTap: () =>
+                              context.push(RoutePaths.destinationDetails(item.id)),
+                        ),
+                      ),
+                      _ExploreTab.restaurants => _buildGrid(
+                        items: _restaurants,
+                        isLoading: _loadingRestaurants,
+                        error: _restaurantsError,
+                        hasMore: _restaurantsHasMore,
+                        onLoadMore: _loadRestaurants,
+                        onRetry: () => _loadRestaurants(reset: true),
+                        onRefresh: () => _loadRestaurants(reset: true),
+                        emptyMessage: _hasFilters
+                            ? 'No restaurants match your filters — try widening them.'
+                            : 'No restaurants found.',
+                        itemBuilder: (context, width, item) => RestaurantCard(
+                          restaurant: item,
+                          width: width,
+                          imageHeight: _gridImageHeight,
+                          onTap: () =>
+                              context.push(RoutePaths.restaurantDetails(item.id)),
+                        ),
+                      ),
+                      _ExploreTab.festivals => _buildGrid(
+                        items: _festivals,
+                        isLoading: _loadingFestivals,
+                        error: _festivalsError,
+                        hasMore: _festivalsHasMore,
+                        onLoadMore: _loadFestivals,
+                        onRetry: () => _loadFestivals(reset: true),
+                        onRefresh: () => _loadFestivals(reset: true),
+                        emptyMessage: _hasFilters
+                            ? 'No festivals match your filters — try widening them.'
+                            : 'No festivals found.',
+                        itemBuilder: (context, width, item) => FestivalCard(
+                          festival: item,
+                          width: width,
+                          imageHeight: _gridImageHeight,
+                          onTap: () =>
+                              context.push(RoutePaths.festivalDetails(item.id)),
+                        ),
+                      ),
+                    },
             ),
           ],
         ),
@@ -605,6 +685,35 @@ class _ExploreScreenState extends State<ExploreScreen> {
         },
       ),
     );
+  }
+
+  /// Mirrors [_buildGrid]'s loading/error handling, but renders every
+  /// coordinate-bearing item as a pin on one [ExploreMapView] instead of a
+  /// paginated grid — [items] here is the map-mode batch loaded by
+  /// `_load*`'s `_mapMode` branch (see those methods), not the paginated
+  /// list-mode one.
+  Widget _buildMap<T>({
+    required List<T>? items,
+    required bool isLoading,
+    required Object? error,
+    required VoidCallback onRetry,
+    required String emptyMessage,
+    required Marker? Function(T item) markerFor,
+  }) {
+    if (items == null && isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (items == null && error != null) {
+      return EmptyStateWidget(
+        icon: Symbols.error_outline_rounded,
+        title: 'Couldn\'t load this',
+        message: AppException.from(error).message,
+        actionLabel: 'Retry',
+        onActionTap: onRetry,
+      );
+    }
+    final markers = (items ?? const []).map(markerFor).whereType<Marker>().toSet();
+    return ExploreMapView(markers: markers, emptyMessage: emptyMessage);
   }
 }
 

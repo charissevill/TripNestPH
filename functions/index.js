@@ -220,6 +220,76 @@ exports.placesSearchText = onCall({ region: 'asia-southeast1', secrets: [googleP
 });
 
 /**
+ * Proxies Routes API `computeRoutes` so the Trip Route map can draw a real,
+ * road-following path (plus per-leg travel time) instead of a straight line
+ * between stops. Same key-exposure reasoning as the Places functions above
+ * — bills under the same Maps Platform project/key, but needs "Routes API"
+ * separately enabled there. Best-effort: any upstream failure returns a
+ * "no route" result rather than throwing, since the client always has a
+ * straight-line fallback and this is a pure enhancement, never worth
+ * failing the itinerary screen over.
+ */
+exports.computeTripRoute = onCall({ region: 'asia-southeast1', secrets: [googlePlacesApiKey] }, async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.');
+  const apiKey = googlePlacesApiKey.value();
+  if (!apiKey) return { encodedPolyline: null, legs: [] };
+
+  const { waypoints } = request.data ?? {};
+  if (!Array.isArray(waypoints) || waypoints.length < 2) {
+    throw new HttpsError('invalid-argument', 'At least 2 waypoints are required.');
+  }
+  if (waypoints.length > 25) {
+    throw new HttpsError('invalid-argument', 'Too many waypoints for a single route.');
+  }
+  for (const w of waypoints) {
+    if (typeof w?.latitude !== 'number' || typeof w?.longitude !== 'number') {
+      throw new HttpsError('invalid-argument', 'Each waypoint needs latitude and longitude.');
+    }
+  }
+
+  const toWaypoint = (w) => ({ location: { latLng: { latitude: w.latitude, longitude: w.longitude } } });
+
+  try {
+    const response = await fetch('https://routes.googleapis.com/directions/v2:computeRoutes', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Goog-Api-Key': apiKey,
+        'X-Goog-FieldMask': 'routes.polyline.encodedPolyline,routes.legs.duration,routes.legs.distanceMeters',
+      },
+      body: JSON.stringify({
+        origin: toWaypoint(waypoints[0]),
+        destination: toWaypoint(waypoints[waypoints.length - 1]),
+        intermediates: waypoints.slice(1, -1).map(toWaypoint),
+        travelMode: 'DRIVE',
+        polylineQuality: 'OVERVIEW',
+      }),
+    });
+    if (response.status !== 200) {
+      const errorBody = await response.text().catch(() => '');
+      console.error('computeTripRoute: Routes API returned', response.status, errorBody);
+      return { encodedPolyline: null, legs: [] };
+    }
+    const json = await response.json().catch(() => null);
+    const route = json?.routes?.[0];
+    if (!route) {
+      console.error('computeTripRoute: no route in Routes API response', JSON.stringify(json));
+      return { encodedPolyline: null, legs: [] };
+    }
+
+    const legs = (route.legs ?? []).map((leg) => ({
+      // Duration comes back as a string like "1234s".
+      durationSeconds: parseInt(leg.duration ?? '0', 10) || 0,
+      distanceMeters: leg.distanceMeters ?? 0,
+    }));
+    return { encodedPolyline: route.polyline?.encodedPolyline ?? null, legs };
+  } catch (e) {
+    console.error('computeTripRoute: request failed', e);
+    return { encodedPolyline: null, legs: [] };
+  }
+});
+
+/**
  * Proxies a single Places photo's bytes so `photoUrl()` never has to embed
  * the raw API key in a URL handed to `CachedNetworkImage` (which can't
  * attach a Firebase Auth header the way the callable functions above use).

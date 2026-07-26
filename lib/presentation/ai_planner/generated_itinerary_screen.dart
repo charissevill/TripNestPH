@@ -1590,13 +1590,13 @@ class _DayCard extends StatelessWidget {
             final isLast = i == day.activities.length - 1;
             return _TimelineActivity(activity: activity, isLast: isLast);
           }),
-          if (routeStops.length >= 2)
+          if (routeStops.isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(top: AppSpacing.lg),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Today\'s Route', style: theme.textTheme.titleSmall),
+                  Text('Day\'s Route', style: theme.textTheme.titleSmall),
                   const SizedBox(height: AppSpacing.sm),
                   TripRouteMap(stops: routeStops),
                 ],

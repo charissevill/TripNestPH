@@ -12,6 +12,8 @@ import 'package:share_plus/share_plus.dart';
 
 import '../../core/providers/auth_provider.dart';
 import '../../core/routes/route_paths.dart';
+import '../../core/services/itinerary_offline_service.dart';
+import '../../core/services/local_preferences_service.dart';
 import '../../core/services/notification_service.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_shadows.dart';
@@ -63,8 +65,12 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
   final RestaurantRepository _restaurantRepository = RestaurantRepository();
   final DestinationRepository _destinationRepository = DestinationRepository();
   final ExpenseRepository _expenseRepository = ExpenseRepository();
+  final ItineraryOfflineService _offlineService = ItineraryOfflineService();
+  final LocalPreferencesService _preferencesService = LocalPreferencesService();
   bool _busy = false;
   bool _exportingPdf = false;
+  bool _offlineBusy = false;
+  bool _isAvailableOffline = false;
   List<Restaurant> _recommendedRestaurants = [];
   List<Destination> _nearbyAttractions = [];
   SavedItinerary? _savedItinerary;
@@ -84,7 +90,34 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
   void initState() {
     super.initState();
     _loadRecommendations();
-    if (widget.savedItineraryId != null) _loadSavedItinerary();
+    if (widget.savedItineraryId != null) {
+      _loadSavedItinerary();
+      _loadOfflineStatus();
+    }
+  }
+
+  Future<void> _loadOfflineStatus() async {
+    final ids = await _preferencesService.getOfflineItineraryIds();
+    if (mounted) setState(() => _isAvailableOffline = ids.contains(widget.savedItineraryId));
+  }
+
+  Future<void> _saveOffline() async {
+    setState(() => _offlineBusy = true);
+    try {
+      await _offlineService.makeAvailableOffline(
+        context: context,
+        itineraryId: widget.savedItineraryId!,
+        itinerary: widget.itinerary,
+      );
+      if (mounted) {
+        setState(() => _isAvailableOffline = true);
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('This trip is now available offline.')));
+      }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(AppException.from(e).message)));
+    } finally {
+      if (mounted) setState(() => _offlineBusy = false);
+    }
   }
 
   Future<void> _loadSavedItinerary() async {
@@ -615,6 +648,15 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
                     if (_isSaved) ...[
                       const SizedBox(width: AppSpacing.sm),
                       Expanded(child: _ActionButton(icon: Symbols.notifications_active_rounded, label: 'Remind', onTap: _setReminder)),
+                      const SizedBox(width: AppSpacing.sm),
+                      Expanded(
+                        child: _ActionButton(
+                          icon: _isAvailableOffline ? Symbols.offline_pin_rounded : Symbols.download_for_offline_rounded,
+                          label: _isAvailableOffline ? 'Downloaded' : 'Offline',
+                          busy: _offlineBusy,
+                          onTap: _saveOffline,
+                        ),
+                      ),
                     ],
                     const SizedBox(width: AppSpacing.sm),
                     Expanded(

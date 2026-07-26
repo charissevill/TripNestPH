@@ -12,6 +12,7 @@ class LocalPreferencesService {
   static const _themePresetKey = 'pref_theme_preset';
   static const _fontFamilyKey = 'pref_font_family';
   static const _fontScaleKey = 'pref_font_scale';
+  static const _offlineItineraryIdsKey = 'pref_offline_itinerary_ids';
 
   /// Whether the traveler has already been shown the first-run onboarding
   /// carousel — so it only ever appears once per install, not on every
@@ -123,5 +124,20 @@ class LocalPreferencesService {
     final disabled = (prefs.getStringList(_disabledCategoriesKey) ?? const []).toSet();
     enabled ? disabled.remove(categoryName) : disabled.add(categoryName);
     await prefs.setStringList(_disabledCategoriesKey, disabled.toList());
+  }
+
+  /// Saved-itinerary ids the traveler has explicitly downloaded for offline
+  /// use (see `ItineraryOfflineService`) — purely a local UI flag, not proof
+  /// the data is still cached (Firestore's cache can still evict it).
+  Future<Set<String>> getOfflineItineraryIds() async {
+    final prefs = await SharedPreferences.getInstance();
+    return (prefs.getStringList(_offlineItineraryIdsKey) ?? const []).toSet();
+  }
+
+  Future<void> setItineraryAvailableOffline(String itineraryId, bool available) async {
+    final prefs = await SharedPreferences.getInstance();
+    final ids = (prefs.getStringList(_offlineItineraryIdsKey) ?? const []).toSet();
+    available ? ids.add(itineraryId) : ids.remove(itineraryId);
+    await prefs.setStringList(_offlineItineraryIdsKey, ids.toList());
   }
 }

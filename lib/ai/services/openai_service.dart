@@ -30,13 +30,16 @@ class AiRequestCancelled implements Exception {
   const AiRequestCancelled();
 }
 
-/// Thin wrapper around the `aiComplete` Cloud Function, which itself proxies
-/// OpenAI's Chat Completions REST API. Holds no conversation or app state —
-/// that's the repository/provider layers' job.
+/// Thin wrapper around the `aiComplete` Cloud Function, which proxies an
+/// OpenAI-compatible Chat Completions REST API (currently Groq — see
+/// `groqApiKey`/`GROQ_MODEL` in `functions/index.js`; the wire format is
+/// identical to OpenAI's, so nothing here needed to change to switch
+/// providers). Holds no conversation or app state — that's the
+/// repository/provider layers' job.
 ///
-/// Deliberately routed through a Cloud Function rather than calling OpenAI
-/// directly from the client: `flutter_dotenv` loads `.env` as a plain app
-/// asset, so a client-embedded `OPENAI_API_KEY` would ship inside the
+/// Deliberately routed through a Cloud Function rather than calling the AI
+/// provider directly from the client: `flutter_dotenv` loads `.env` as a
+/// plain app asset, so a client-embedded API key would ship inside the
 /// APK/web build in cleartext — extractable by anyone who unzips it. The
 /// Cloud Function holds the real key in Secret Manager instead; the client
 /// only ever holds a signed-in user's Firebase Auth token, which is exactly

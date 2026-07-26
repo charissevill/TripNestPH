@@ -65,7 +65,7 @@ class AiRepository {
   /// ever hallucinated and every recommendation is something that actually
   /// exists in Firestore today.
   ///
-  /// No OpenAI key configured server-side (see `aiComplete` in
+  /// No AI provider key configured server-side (see `aiComplete` in
   /// `functions/index.js`) surfaces as an [AiException] with
   /// [AiException.isConfigError] set — caught here and turned into a
   /// clearly-labeled sample itinerary instead, so "Generate Itinerary"
@@ -99,7 +99,7 @@ class AiRepository {
     final candidatePlaceAttractions = candidateResults[3] as List<PlaceRecommendation>;
     final province = candidateResults[4] as Province?;
 
-    // Runs alongside the (often slower) OpenAI call below rather than
+    // Runs alongside the (often slower) AI completion call below rather than
     // after it, so a real forecast never adds extra wait time.
     final weatherFuture = request.latitude != null && request.longitude != null
         ? _weather.getForecast(latitude: request.latitude!, longitude: request.longitude!, days: request.days)
@@ -158,7 +158,7 @@ class AiRepository {
   }
 
   /// A self-contained sample trip (same content the pre-AI planner used to
-  /// show) for when no OpenAI key is configured. Ignores [request] entirely
+  /// show) for when no AI provider key is configured. Ignores [request] entirely
   /// rather than half-personalizing it — mixing a real destination/cover
   /// photo with canned El Nido day activities would look more broken than a
   /// clearly-labeled sample.
@@ -333,7 +333,7 @@ class AiRepository {
         ...history.map((m) => {'role': m.apiRole, 'content': m.content}),
       ],
       temperature: 0.8,
-      maxTokens: 800,
+      maxTokens: 450,
     );
   }
 

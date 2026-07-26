@@ -14,7 +14,7 @@ const auth = getAuth();
 
 // Both read via Secret Manager (`firebase functions:secrets:set NAME`), never
 // from a client-readable source — see `aiComplete`/`placesSearch*` below.
-const openaiApiKey = defineSecret('OPENAI_API_KEY');
+const groqApiKey = defineSecret('GROQ_API_KEY');
 const googlePlacesApiKey = defineSecret('GOOGLE_PLACES_API_KEY');
 
 /**
@@ -62,26 +62,32 @@ exports.syncMyAdminClaims = onCall({ region: 'asia-southeast1' }, async (request
 });
 
 /**
- * Proxies OpenAI's chat-completions endpoint so the raw API key never has
- * to ship inside the mobile/web client bundle. `flutter_dotenv` loads
- * `.env` as a plain app asset — anyone who unzips the APK/web build can
+ * Proxies Groq's OpenAI-compatible chat-completions endpoint so the raw API
+ * key never has to ship inside the mobile/web client bundle. `flutter_dotenv`
+ * loads `.env` as a plain app asset — anyone who unzips the APK/web build can
  * read it verbatim, which is a real exposure for a billed-per-token key.
  * Requires sign-in (same as every screen that can reach this — the app's
  * router redirects unauthenticated users to Login before they can open the
  * AI Planner or Trip Assistant at all, so this adds no new restriction).
+ *
+ * Swapped from OpenAI to Groq (temporary — see `groqApiKey` above); the
+ * request/response shape is identical (`choices[0].message.content`,
+ * `response_format: { type: 'json_object' }`), so nothing on the client
+ * (`OpenAiService`) needed to change to point at a different provider.
  */
 // The itinerary planner's own request (the biggest legitimate caller, see
 // ItineraryPrompts) tops out well under these — generous enough for real
 // usage, but enough of a ceiling that a scripted client can't run up
-// OpenAI billing by requesting huge completions or huge input payloads.
+// billing by requesting huge completions or huge input payloads.
 const AI_MAX_TOKENS_CEILING = 3000;
 const AI_MAX_MESSAGES = 40;
 const AI_MAX_MESSAGE_CHARS = 6000;
+const GROQ_MODEL = 'llama-3.3-70b-versatile';
 
-exports.aiComplete = onCall({ region: 'asia-southeast1', secrets: [openaiApiKey], timeoutSeconds: 60 }, async (request) => {
+exports.aiComplete = onCall({ region: 'asia-southeast1', secrets: [groqApiKey], timeoutSeconds: 60 }, async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.');
 
-  const apiKey = openaiApiKey.value();
+  const apiKey = groqApiKey.value();
   if (!apiKey) throw new HttpsError('failed-precondition', 'AI features aren\'t set up yet.');
 
   const { messages, temperature, maxTokens, jsonMode } = request.data ?? {};
@@ -99,14 +105,14 @@ exports.aiComplete = onCall({ region: 'asia-southeast1', secrets: [openaiApiKey]
 
   const boundedMaxTokens = typeof maxTokens === 'number' ? Math.min(Math.max(Math.trunc(maxTokens), 1), AI_MAX_TOKENS_CEILING) : 1200;
   const body = {
-    model: 'gpt-4o',
+    model: GROQ_MODEL,
     messages,
     temperature: typeof temperature === 'number' ? temperature : 0.7,
     max_tokens: boundedMaxTokens,
   };
   if (jsonMode) body.response_format = { type: 'json_object' };
 
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+  const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
     body: JSON.stringify(body),
@@ -119,7 +125,7 @@ exports.aiComplete = onCall({ region: 'asia-southeast1', secrets: [openaiApiKey]
     return { content };
   }
   const apiMessage = json?.error?.message;
-  if (response.status === 401) throw new HttpsError('failed-precondition', apiMessage || 'The OpenAI API key is invalid.');
+  if (response.status === 401) throw new HttpsError('failed-precondition', apiMessage || 'The Groq API key is invalid.');
   if (response.status === 429) throw new HttpsError('resource-exhausted', 'Too many requests right now. Please wait a moment and try again.');
   if (response.status === 400) throw new HttpsError('invalid-argument', apiMessage || 'The AI could not process that request.');
   if (response.status >= 500) throw new HttpsError('unavailable', 'The AI service is temporarily unavailable. Please try again shortly.');

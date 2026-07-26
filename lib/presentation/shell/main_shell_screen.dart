@@ -24,7 +24,13 @@ class MainShellScreen extends StatelessWidget {
           Expanded(child: navigationShell),
         ],
       ),
-      floatingActionButton: _AiChatFab(onTap: () => context.push(RoutePaths.aiChat)),
+      // Hidden on the AI Planner tab: it already has its own prominent
+      // "AI Trip Planner" CTA, so a second floating entry point into AI
+      // features is redundant there — and was the exact thing colliding
+      // with that tab's pinned "Generate Itinerary" button.
+      floatingActionButton: navigationShell.currentIndex == 2
+          ? null
+          : _AiChatFab(onTap: () => context.push(RoutePaths.aiChat)),
       bottomNavigationBar: AppBottomNav(
         currentIndex: navigationShell.currentIndex,
         onTap: (index) => navigationShell.goBranch(

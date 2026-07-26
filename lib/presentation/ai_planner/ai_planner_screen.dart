@@ -221,7 +221,32 @@ class _AiPlannerScreenState extends State<AiPlannerScreen> {
             AppSpacing.huge,
           ),
           children: [
-            Text('Planner', style: theme.textTheme.displayMedium),
+            Row(
+              children: [
+                Expanded(
+                  child: Text('Planner', style: theme.textTheme.displayMedium),
+                ),
+                InkWell(
+                  onTap: () => context.push(RoutePaths.aiChat),
+                  borderRadius: BorderRadius.circular(AppRadius.pill),
+                  child: Container(
+                    padding: const EdgeInsets.all(AppSpacing.xs),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.surface,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.06),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Icon(Symbols.chat_rounded, color: theme.colorScheme.primary),
+                  ),
+                ),
+              ],
+            ),
             const SizedBox(height: 2),
             Text(
               'Plan your next Philippine adventure with AI',

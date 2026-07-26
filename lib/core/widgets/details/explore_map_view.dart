@@ -31,6 +31,9 @@ class ExploreMapView extends StatelessWidget {
     return GoogleMap(
       initialCameraPosition: CameraPosition(target: centroid, zoom: 6),
       markers: markers,
+      // Keeps Google's own bottom-right zoom controls clear of the app's
+      // persistent AI chat FAB, which sits in that same corner on every tab.
+      padding: const EdgeInsets.only(bottom: 90),
       onMapCreated: (controller) {
         if (positions.length < 2) {
           controller.animateCamera(CameraUpdate.newLatLngZoom(centroid, 13));

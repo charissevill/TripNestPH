@@ -21,6 +21,7 @@ import '../../core/theme/app_spacing.dart';
 import '../../core/utils/app_exception.dart';
 import '../../core/utils/expense_split.dart';
 import '../../core/utils/itinerary_export.dart';
+import '../../core/utils/itinerary_route_matcher.dart';
 import '../../core/utils/maps_launcher.dart';
 import '../../core/utils/reminder_picker.dart';
 import '../../core/widgets/banners/offline_banner.dart';
@@ -28,6 +29,7 @@ import '../../core/widgets/dialogs/confirmation_dialog.dart';
 import '../../core/widgets/cards/restaurant_card.dart';
 import '../../core/widgets/cards/destination_card.dart';
 import '../../core/widgets/cards/travel_image_frame.dart';
+import '../../core/widgets/details/day_route_map.dart';
 import '../../core/widgets/indicators/rating_widget.dart';
 import '../../core/widgets/layout/section_header.dart';
 import '../../data/mock/mock_itinerary.dart';
@@ -620,6 +622,11 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
                           '${itinerary.totalDays} days · ${itinerary.travelers} travelers',
                           style: theme.textTheme.bodySmall?.copyWith(color: Colors.white.withValues(alpha: 0.9)),
                         ),
+                        if (itinerary.accommodationName.isNotEmpty)
+                          Text(
+                            'Optimized for your stay near ${itinerary.accommodationName}',
+                            style: theme.textTheme.bodySmall?.copyWith(color: Colors.white.withValues(alpha: 0.9)),
+                          ),
                       ],
                     ),
                   ),
@@ -779,7 +786,12 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
                 const SizedBox(height: AppSpacing.md),
                 ...itinerary.days.map((day) => Padding(
                       padding: const EdgeInsets.only(bottom: AppSpacing.lg),
-                      child: _DayCard(day: day, date: _savedItinerary?.dateForDay(day.dayNumber)),
+                      child: _DayCard(
+                        day: day,
+                        date: _savedItinerary?.dateForDay(day.dayNumber),
+                        restaurants: restaurants,
+                        destinations: attractions,
+                      ),
                     )),
                 if (restaurants.isNotEmpty) ...[
                   const SizedBox(height: AppSpacing.md),
@@ -1482,7 +1494,7 @@ class _TripDatesCard extends StatelessWidget {
 }
 
 class _DayCard extends StatelessWidget {
-  const _DayCard({required this.day, this.date});
+  const _DayCard({required this.day, this.date, required this.restaurants, required this.destinations});
 
   final ItineraryDay day;
 
@@ -1491,9 +1503,17 @@ class _DayCard extends StatelessWidget {
   /// "Day 1" label rather than replacing it.
   final DateTime? date;
 
+  /// The trip's already-resolved, real-coordinate recommendations — used to
+  /// match this day's activities to a real place for [DayRouteMap] (see
+  /// `matchDayToRoute`). Never re-fetched here; just what the parent screen
+  /// already loaded.
+  final List<Restaurant> restaurants;
+  final List<Destination> destinations;
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final routeStops = matchDayToRoute(day, restaurants: restaurants, destinations: destinations);
     return Container(
       padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
@@ -1535,6 +1555,18 @@ class _DayCard extends StatelessWidget {
             final isLast = i == day.activities.length - 1;
             return _TimelineActivity(activity: activity, isLast: isLast);
           }),
+          if (routeStops.length >= 2)
+            Padding(
+              padding: const EdgeInsets.only(top: AppSpacing.lg),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Today\'s Route', style: theme.textTheme.titleSmall),
+                  const SizedBox(height: AppSpacing.sm),
+                  DayRouteMap(stops: routeStops),
+                ],
+              ),
+            ),
         ],
       ),
     );

@@ -19,9 +19,10 @@ import 'package:tripnest_ph/data/repositories/restaurant_repository.dart';
 /// so [OpenAiService] parses it exactly like a real callable-function
 /// result, without touching the real `cloud_functions` plugin (which needs
 /// a platform channel `flutter test` doesn't provide).
-FunctionCaller _fakeAiComplete(Map<String, dynamic> itineraryJson) {
+FunctionCaller _fakeAiComplete(Map<String, dynamic> itineraryJson, {void Function(Map<String, dynamic> data)? onCall}) {
   return (name, data) async {
     expect(name, 'aiComplete');
+    onCall?.call(data);
     return {'content': jsonEncode(itineraryJson)};
   };
 }
@@ -289,5 +290,92 @@ void main() {
 
     expect(itinerary.weather, isEmpty);
     expect(weatherClientCalled, isFalse);
+  });
+
+  test('generateItinerary() sorts candidate restaurants by distance from the accommodation', () async {
+    final firestore = FakeFirebaseFirestore();
+    // Seeded far-then-near on purpose — if sorting works, the near one
+    // appears first in the prompt regardless of Firestore read order.
+    await firestore.collection('restaurants').doc('far-restaurant').set({
+      'name': 'Far Away Diner',
+      'cuisine': 'Filipino',
+      'provinceId': 'palawan',
+      'provinceName': 'Palawan',
+      'heroImageUrl': '',
+      'galleryImageUrls': <String>[],
+      'rating': 4.0,
+      'reviewCount': 5,
+      'priceRange': '₱',
+      'description': '',
+      'openingHours': '',
+      'menuHighlights': <String>[],
+      'status': 'published',
+      'latitude': 10.5,
+      'longitude': 119.5,
+    });
+    await firestore.collection('restaurants').doc('near-restaurant').set({
+      'name': 'Near Bistro',
+      'cuisine': 'Filipino',
+      'provinceId': 'palawan',
+      'provinceName': 'Palawan',
+      'heroImageUrl': '',
+      'galleryImageUrls': <String>[],
+      'rating': 4.0,
+      'reviewCount': 5,
+      'priceRange': '₱',
+      'description': '',
+      'openingHours': '',
+      'menuHighlights': <String>[],
+      'status': 'published',
+      'latitude': 9.7392,
+      'longitude': 118.7353,
+    });
+
+    Map<String, dynamic>? capturedData;
+    final caller = _fakeAiComplete(
+      {
+        'days': [
+          {'dayNumber': 1, 'dateLabel': 'Day 1', 'activities': <Map<String, dynamic>>[]},
+        ],
+        'budgetBreakdown': <Map<String, dynamic>>[],
+        'travelTips': <String>[],
+        'totalBudget': 0,
+        'recommendedRestaurantNames': <String>[],
+        'nearbyAttractionNames': <String>[],
+      },
+      onCall: (data) => capturedData = data,
+    );
+
+    final repository = AiRepository(
+      openAiService: OpenAiService(caller: caller),
+      destinationRepository: DestinationRepository(firestore: firestore),
+      restaurantRepository: RestaurantRepository(firestore: firestore),
+      provinceRepository: ProvinceRepository(firestore: firestore),
+    );
+
+    await repository.generateItinerary(
+      const AiItineraryRequest(
+        destinationId: 'palawan-1',
+        destinationName: 'Palawan',
+        provinceId: 'palawan',
+        provinceName: 'Palawan',
+        budgetTierLabel: 'Budget',
+        budgetRange: '₱5k - ₱15k',
+        days: 1,
+        travelers: 1,
+        travelerType: 'Solo',
+        transportation: {'Flight'},
+        interests: {'Beaches'},
+        accommodationName: 'Test Resort',
+        accommodationLatitude: 9.7392,
+        accommodationLongitude: 118.7353,
+      ),
+      coverImageUrl: '',
+    );
+
+    final messages = capturedData!['messages'] as List;
+    final userContent = messages.last['content'] as String;
+    expect(userContent, contains('Test Resort'));
+    expect(userContent.indexOf('Near Bistro'), lessThan(userContent.indexOf('Far Away Diner')));
   });
 }

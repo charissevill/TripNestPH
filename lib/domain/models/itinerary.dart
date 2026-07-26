@@ -19,6 +19,7 @@ class Itinerary {
     required this.nearbyAttractionIds,
     this.recommendedAccommodations = const [],
     this.recommendedPlaceAttractions = const [],
+    this.accommodationName = '',
   });
 
   final String destinationName;
@@ -47,6 +48,13 @@ class Itinerary {
   /// existed.
   final List<PlaceRecommendation> recommendedPlaceAttractions;
 
+  /// The traveler's stated accommodation, if any — searched via
+  /// `PlacesService` on the AI Planner form, used to sort/prioritize this
+  /// trip's restaurant/attraction picks by distance. Empty when the
+  /// traveler skipped that (optional) field, or for itineraries saved
+  /// before this field existed.
+  final String accommodationName;
+
   factory Itinerary.fromMap(Map<String, dynamic> map) {
     return Itinerary(
       destinationName: map['destinationName'] as String? ?? '',
@@ -72,6 +80,7 @@ class Itinerary {
       recommendedPlaceAttractions: (map['recommendedPlaceAttractions'] as List? ?? const [])
           .map((e) => PlaceRecommendation.fromMap(Map<String, dynamic>.from(e as Map)))
           .toList(),
+      accommodationName: map['accommodationName'] as String? ?? '',
     );
   }
 
@@ -90,6 +99,7 @@ class Itinerary {
       'nearbyAttractionIds': nearbyAttractionIds,
       'recommendedAccommodations': recommendedAccommodations.map((p) => p.toMap()).toList(),
       'recommendedPlaceAttractions': recommendedPlaceAttractions.map((p) => p.toMap()).toList(),
+      'accommodationName': accommodationName,
     };
   }
 }

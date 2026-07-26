@@ -9,6 +9,7 @@ import 'package:provider/provider.dart';
 import '../../ai/models/itinerary_request.dart';
 import '../../ai/providers/ai_planner_provider.dart';
 import '../../core/routes/route_paths.dart';
+import '../../core/services/places_service.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/utils/app_exception.dart';
@@ -18,6 +19,7 @@ import '../../core/widgets/states/loading_widget.dart';
 import '../../data/repositories/destination_repository.dart';
 import '../../data/repositories/province_repository.dart';
 import '../../domain/models/destination.dart';
+import '../../domain/models/place.dart';
 import '../../domain/models/province.dart';
 
 class _BudgetTier {
@@ -81,6 +83,13 @@ class _AiPlannerScreenState extends State<AiPlannerScreen> {
   /// built around an entire province rather than one specific spot — the
   /// two are mutually exclusive, cleared whenever the other is picked.
   Province? _province;
+
+  /// Where the traveler said they're staying — optional, searched via
+  /// [PlacesService]. When set, [AiRepository] sorts candidate restaurants/
+  /// attractions by distance from here. Cleared whenever the destination
+  /// changes, since a hotel picked for one destination rarely makes sense
+  /// once a different one is chosen.
+  Place? _accommodation;
   int _budgetTierIndex = 1;
   int _days = 3;
   int _travelers = 2;
@@ -150,13 +159,28 @@ class _AiPlannerScreenState extends State<AiPlannerScreen> {
       setState(() {
         _destination = selected;
         _province = null;
+        _accommodation = null;
       });
     } else if (selected is Province) {
       setState(() {
         _province = selected;
         _destination = null;
+        _accommodation = null;
       });
     }
+  }
+
+  Future<void> _pickAccommodation() async {
+    final selected = await showModalBottomSheet<Place>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => _AccommodationPickerSheet(
+        destination: _destination,
+        province: _province,
+      ),
+    );
+    if (selected != null) setState(() => _accommodation = selected);
   }
 
   Future<void> _generate() async {
@@ -185,6 +209,9 @@ class _AiPlannerScreenState extends State<AiPlannerScreen> {
         // degradation as a destination with no coordinates on file.
         latitude: destination?.latitude,
         longitude: destination?.longitude,
+        accommodationName: _accommodation?.name,
+        accommodationLatitude: _accommodation?.latitude,
+        accommodationLongitude: _accommodation?.longitude,
       ),
       coverImageUrl: destination?.heroImageUrl ?? province!.heroImageUrl,
     );
@@ -333,6 +360,56 @@ class _AiPlannerScreenState extends State<AiPlannerScreen> {
                 ),
               ),
             ),
+            if (_destination != null || _province != null) ...[
+              const SizedBox(height: AppSpacing.xxl),
+              const _FieldLabel(
+                icon: Symbols.hotel_rounded,
+                label: 'Where are you staying? (optional)',
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              InkWell(
+                onTap: _pickAccommodation,
+                borderRadius: BorderRadius.circular(AppRadius.lg),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.md,
+                    vertical: AppSpacing.md,
+                  ),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surface,
+                    borderRadius: BorderRadius.circular(AppRadius.lg),
+                    border: Border.all(color: theme.colorScheme.outline),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          _accommodation?.name ?? 'Search for your hotel/accommodation',
+                          style: theme.textTheme.bodyLarge?.copyWith(
+                            color: _accommodation == null ? theme.colorScheme.onSurfaceVariant : theme.colorScheme.onSurface,
+                          ),
+                        ),
+                      ),
+                      if (_accommodation != null)
+                        IconButton(
+                          icon: const Icon(Symbols.close_rounded),
+                          onPressed: () => setState(() => _accommodation = null),
+                        )
+                      else
+                        Icon(Symbols.expand_more_rounded, color: theme.textTheme.bodyMedium?.color),
+                    ],
+                  ),
+                ),
+              ),
+              if (_accommodation != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4, left: AppSpacing.xs),
+                  child: Text(
+                    'Activities will be prioritized near this location.',
+                    style: theme.textTheme.bodySmall,
+                  ),
+                ),
+            ],
             const SizedBox(height: AppSpacing.xxl),
             const _FieldLabel(
               icon: Symbols.account_balance_wallet_rounded,
@@ -1115,6 +1192,157 @@ class _DestinationPickerSheetState extends State<_DestinationPickerSheet> {
                                     color: theme.colorScheme.primary,
                                   )
                                 : null,
+                          );
+                        },
+                      ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// Lets the traveler search for their real hotel/accommodation by name via
+/// [PlacesService] (same live Google Places search `NearbyPlacesScreen`
+/// uses) rather than a map pin-drop — an empty query browses nearby
+/// lodging around the picked destination, and typing searches by name,
+/// biased toward that same area when a single coordinate is available.
+class _AccommodationPickerSheet extends StatefulWidget {
+  const _AccommodationPickerSheet({this.destination, this.province});
+
+  final Destination? destination;
+  final Province? province;
+
+  @override
+  State<_AccommodationPickerSheet> createState() => _AccommodationPickerSheetState();
+}
+
+class _AccommodationPickerSheetState extends State<_AccommodationPickerSheet> {
+  final PlacesService _places = PlacesService();
+  final TextEditingController _searchController = TextEditingController();
+  Timer? _debounce;
+
+  List<Place>? _results;
+  Object? _error;
+
+  bool get _hasCoordinates => widget.destination?.latitude != null && widget.destination?.longitude != null;
+
+  @override
+  void initState() {
+    super.initState();
+    _search('');
+  }
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _search(String query) async {
+    setState(() => _error = null);
+    try {
+      List<Place> results;
+      if (query.trim().isEmpty) {
+        if (_hasCoordinates) {
+          results = await _places.searchNearby(
+            latitude: widget.destination!.latitude!,
+            longitude: widget.destination!.longitude!,
+            includedTypes: PlaceCategory.lodging,
+          );
+        } else {
+          final areaName = widget.destination?.name ?? widget.province?.name ?? '';
+          results = await _places.searchText(textQuery: 'hotels in $areaName, Philippines');
+        }
+      } else {
+        results = await _places.searchText(
+          textQuery: query,
+          biasLatitude: _hasCoordinates ? widget.destination!.latitude : null,
+          biasLongitude: _hasCoordinates ? widget.destination!.longitude : null,
+        );
+      }
+      if (mounted) setState(() => _results = results);
+    } catch (e) {
+      if (mounted) setState(() => _error = e);
+    }
+  }
+
+  void _onSearchChanged(String value) {
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 350), () => _search(value));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return DraggableScrollableSheet(
+      initialChildSize: 0.7,
+      minChildSize: 0.4,
+      maxChildSize: 0.9,
+      expand: false,
+      builder: (context, scrollController) {
+        return Material(
+          color: theme.colorScheme.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadius.xxl)),
+          child: Column(
+            children: [
+              const SizedBox(height: AppSpacing.sm),
+              Container(
+                width: 44,
+                height: 5,
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.outline,
+                  borderRadius: BorderRadius.circular(AppRadius.pill),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.lg, AppSpacing.lg, AppSpacing.md),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text('Search your accommodation', style: theme.textTheme.headlineSmall),
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    SearchBarWidget(
+                      controller: _searchController,
+                      hintText: 'Hotel or resort name...',
+                      onChanged: _onSearchChanged,
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: _error != null
+                    ? Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(AppSpacing.lg),
+                          child: Text(AppException.from(_error!).message, textAlign: TextAlign.center),
+                        ),
+                      )
+                    : _results == null
+                    ? ListView(children: List.generate(6, (_) => LoadingWidget.textTile(leadingCircle: true)))
+                    : _results!.isEmpty
+                    ? const Center(child: Text('No accommodations found'))
+                    : ListView.builder(
+                        controller: scrollController,
+                        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+                        itemCount: _results!.length,
+                        itemBuilder: (context, i) {
+                          final place = _results![i];
+                          return ListTile(
+                            onTap: () => Navigator.of(context).pop(place),
+                            contentPadding: EdgeInsets.zero,
+                            leading: CircleAvatar(
+                              backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.12),
+                              child: Icon(Symbols.hotel_rounded, color: theme.colorScheme.primary),
+                            ),
+                            title: Text(place.name),
+                            subtitle: place.address.isNotEmpty ? Text(place.address) : null,
                           );
                         },
                       ),

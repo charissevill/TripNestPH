@@ -16,6 +16,9 @@ class AiItineraryRequest {
     required this.interests,
     this.latitude,
     this.longitude,
+    this.accommodationName,
+    this.accommodationLatitude,
+    this.accommodationLongitude,
   });
 
   final String destinationId;
@@ -35,4 +38,13 @@ class AiItineraryRequest {
   /// still generates, it just has no "Weather Outlook" section.
   final double? latitude;
   final double? longitude;
+
+  /// Optional — where the traveler said they're staying (searched via
+  /// [PlacesService], not a stored destination/restaurant). When set,
+  /// [AiRepository] sorts candidate restaurants/attractions by distance
+  /// from here before they're shown to the AI. Null just means "no
+  /// preference," generating exactly as it did before this existed.
+  final String? accommodationName;
+  final double? accommodationLatitude;
+  final double? accommodationLongitude;
 }

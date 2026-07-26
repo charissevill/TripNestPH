@@ -74,6 +74,7 @@ Rules:
     List<String> provinceTravelTips = const [],
     double? provinceBudgetMin,
     double? provinceBudgetMax,
+    String? accommodationName,
   }) {
     return '''
 Plan a trip with these details:
@@ -90,6 +91,7 @@ Restaurants available near this destination (pick from these only, if relevant):
 Other attractions available near this destination (pick from these only, if relevant): ${candidateAttractionNames.isEmpty ? 'none provided' : candidateAttractionNames.join(', ')}
 
 Top-rated hotels near this destination, already chosen and shown to the traveler separately as "Recommended Accommodations" — do not repeat them in "recommendedRestaurantNames"/"nearbyAttractionNames", but feel free to reference one by name in a travel tip if genuinely useful (e.g. proximity to a planned activity): ${candidateHotelNames.isEmpty ? 'none available' : candidateHotelNames.join(', ')}
+${accommodationName != null && accommodationName.isNotEmpty ? '\nThe traveler is staying near $accommodationName. The restaurant/attraction lists above are already sorted by distance from there — prefer picks near the top of each list when they still fit the traveler\'s interests and budget.\n' : ''}
 
 Real safety/budget facts on file for ${request.provinceName} — use these instead of inventing generic ones:
 - Emergency hotlines: ${emergencyHotlines.isEmpty ? 'none on file — give general Philippines emergency guidance (e.g. 911) and note that the traveler should confirm the local hotline on arrival' : emergencyHotlines.map((h) => '${h.label}: ${h.number}').join(', ')}

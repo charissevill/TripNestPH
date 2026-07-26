@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import '../../core/services/places_service.dart';
 import '../../core/services/weather_service.dart';
+import '../../core/utils/geo_distance.dart';
 import '../../data/mock/mock_itinerary.dart';
 import '../../data/repositories/destination_repository.dart';
 import '../../data/repositories/province_repository.dart';
@@ -99,6 +100,14 @@ class AiRepository {
     final candidatePlaceAttractions = candidateResults[3] as List<PlaceRecommendation>;
     final province = candidateResults[4] as Province?;
 
+    // When the traveler said where they're staying, closer candidates lead
+    // each list — combined with the explicit prompt instruction below, this
+    // gives the AI both a ranking signal and an instruction, since it can't
+    // reliably reason about real-world distance from a bare coordinate.
+    _sortByDistanceFromAccommodation(candidateRestaurants, request, (r) => r.latitude, (r) => r.longitude);
+    _sortByDistanceFromAccommodation(candidateAttractions, request, (d) => d.latitude, (d) => d.longitude);
+    _sortByDistanceFromAccommodation(candidatePlaceAttractions, request, (p) => p.latitude, (p) => p.longitude);
+
     // Runs alongside the (often slower) AI completion call below rather than
     // after it, so a real forecast never adds extra wait time.
     final weatherFuture = request.latitude != null && request.longitude != null
@@ -113,6 +122,7 @@ class AiRepository {
       'budget': request.budgetTierLabel,
       'transportation': request.transportation.toList()..sort(),
       'interests': request.interests.toList()..sort(),
+      'accommodationName': request.accommodationName,
     });
 
     var raw = await _cache.get('itinerary', signature);
@@ -134,6 +144,7 @@ class AiRepository {
               provinceTravelTips: province?.travelTips ?? const [],
               provinceBudgetMin: province?.estimatedDailyBudgetMin,
               provinceBudgetMax: province?.estimatedDailyBudgetMax,
+              accommodationName: request.accommodationName,
             ),
           },
         ],
@@ -155,6 +166,33 @@ class AiRepository {
       accommodations: accommodations,
       weather: weather,
     );
+  }
+
+  /// Sorts [items] ascending by distance from [request]'s accommodation
+  /// coordinate, in place — a no-op if the traveler didn't specify one.
+  /// An item with no coordinates of its own sorts last (never excluded),
+  /// so it can still be picked, just without a ranking boost.
+  void _sortByDistanceFromAccommodation<T>(
+    List<T> items,
+    AiItineraryRequest request,
+    double? Function(T) latitudeOf,
+    double? Function(T) longitudeOf,
+  ) {
+    final accommodationLat = request.accommodationLatitude;
+    final accommodationLng = request.accommodationLongitude;
+    // Also covers the empty-list case: `_fetchAccommodations`/
+    // `_fetchPlaceAttractions` return a `const []` when the destination has
+    // no coordinates, and sorting an unmodifiable list throws.
+    if (accommodationLat == null || accommodationLng == null || items.isEmpty) return;
+
+    double distanceOf(T item) {
+      final lat = latitudeOf(item);
+      final lng = longitudeOf(item);
+      if (lat == null || lng == null) return double.infinity;
+      return haversineKm(accommodationLat, accommodationLng, lat, lng);
+    }
+
+    items.sort((a, b) => distanceOf(a).compareTo(distanceOf(b)));
   }
 
   /// A self-contained sample trip (same content the pre-AI planner used to
@@ -315,6 +353,7 @@ class AiRepository {
         nearbyAttractionIds: attractionIds,
         recommendedAccommodations: accommodations,
         recommendedPlaceAttractions: placeAttractionRecs,
+        accommodationName: request.accommodationName ?? '',
       );
     } on AiException {
       rethrow;

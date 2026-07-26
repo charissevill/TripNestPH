@@ -81,7 +81,13 @@ exports.syncMyAdminClaims = onCall({ region: 'asia-southeast1' }, async (request
 // billing by requesting huge completions or huge input payloads.
 const AI_MAX_TOKENS_CEILING = 3000;
 const AI_MAX_MESSAGES = 40;
-const AI_MAX_MESSAGE_CHARS = 6000;
+// The Trip Assistant's system prompt alone runs ~3000 chars, plus a
+// real-data grounding context (featured destinations/restaurants/province
+// guides with links, hotlines, tips, budgets) that can legitimately push
+// well past a smaller ceiling — this is trusted, app-authored content, not
+// attacker-controlled input, so the cap here just needs to stop a truly
+// runaway payload, not squeeze normal usage.
+const AI_MAX_MESSAGE_CHARS = 16000;
 const GROQ_MODEL = 'llama-3.3-70b-versatile';
 
 exports.aiComplete = onCall({ region: 'asia-southeast1', secrets: [groqApiKey], timeoutSeconds: 60 }, async (request) => {

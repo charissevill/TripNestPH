@@ -169,6 +169,13 @@ class _AiChatScreenState extends State<AiChatScreen> {
     });
   }
 
+  /// Keeps the system prompt (this context plus ~3000 chars of fixed
+  /// instructions) safely under the server's per-message ceiling
+  /// (`AI_MAX_MESSAGE_CHARS` in `functions/index.js`) even as the catalog
+  /// this context is grounded in — featured destinations/restaurants,
+  /// province guides — keeps growing over time.
+  static const int _maxContextChars = 8000;
+
   String? _buildUserContext() {
     final user = context.read<AuthProvider>().currentUser;
     final parts = <String>[];
@@ -177,7 +184,9 @@ class _AiChatScreenState extends State<AiChatScreen> {
       if (user.favoriteCategories.isNotEmpty) parts.add('Favorite categories: ${user.favoriteCategories.join(', ')}.');
     }
     if (_realDataContext != null) parts.add(_realDataContext!);
-    return parts.isEmpty ? null : parts.join(' ');
+    if (parts.isEmpty) return null;
+    final joined = parts.join(' ');
+    return joined.length > _maxContextChars ? joined.substring(0, _maxContextChars) : joined;
   }
 
   Future<void> _send(String text) async {

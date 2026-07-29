@@ -24,7 +24,19 @@ service cloud.firestore {
         && request.resource.data.targetId is string && request.resource.data.targetId.size() > 0
         && request.resource.data.targetType in ['destination', 'restaurant', 'festival']
         && request.resource.data.rating is number && request.resource.data.rating >= 1 && request.resource.data.rating <= 5
-        && request.resource.data.comment is string && request.resource.data.comment.size() <= 2000;
+        && request.resource.data.comment is string && request.resource.data.comment.size() <= 2000
+        && isValidVerifiedClaim();
+    }
+
+    // A review's "Verified Visit" badge (`verified: true`) must be backed by
+    // a real `visited` record for that exact listing — otherwise a direct
+    // Firestore SDK write (bypassing the app UI, which only ever sets this
+    // from a genuine `UserRepository.hasVisited()` check) could forge the
+    // badge on any review for any listing the writer never actually opened.
+    function isValidVerifiedClaim() {
+      return request.resource.data.verified == false
+        || (request.resource.data.verified == true
+            && exists(/databases/$(database)/documents/users/$(request.auth.uid)/visited/$(request.resource.data.targetType + '_' + request.resource.data.targetId)));
     }
 
     // A traveler's client-side aggregate-recalculation write (see
@@ -38,6 +50,26 @@ service cloud.firestore {
         && request.resource.data.rating >= 0 && request.resource.data.rating <= 5
         && request.resource.data.reviewCount is int
         && request.resource.data.reviewCount >= 0;
+    }
+
+    // A brand-new search_trends/{term} doc must start at count == 1 (the
+    // first search of that term) — anything else would let a client seed
+    // a fake term straight to the top of "Trending Searches".
+    function isValidSearchTrendCreate() {
+      return request.resource.data.term is string && request.resource.data.term.size() > 0 && request.resource.data.term.size() <= 100
+        && request.resource.data.count == 1
+        && request.resource.data.updatedAt is timestamp;
+    }
+
+    // A repeat search of an existing term may only bump `count` by exactly
+    // 1 per write (never set it directly to an arbitrary number), same
+    // "trust the shape, not the client's arithmetic" reasoning as
+    // isValidAggregateUpdate above.
+    function isValidSearchTrendIncrement() {
+      return onlyChangedFields(['count', 'updatedAt'])
+        && request.resource.data.count is int
+        && request.resource.data.count == resource.data.count + 1
+        && request.resource.data.updatedAt is timestamp;
     }
 
     // ---- Admin Portal role helpers ---------------------------------------
@@ -232,6 +264,14 @@ service cloud.firestore {
       allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
     }
 
+    // ---- trip_photos/{id} — private "My Photos" travel journal -----------
+    // Same shape as favorites above, minus the admin-read exception: no
+    // admin/dashboard use case for a personal photo journal.
+    match /trip_photos/{photoId} {
+      allow read, delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+    }
+
     // ---- saved_itineraries/{id} — owner + shared-trip collaborators ------
     // Admin Portal accounts get read access too, for the Analytics
     // "Saved Trips" trend — never write.
@@ -380,6 +420,28 @@ service cloud.firestore {
                     || hasAdminRole(['admin', 'lgu']);
       allow create: if hasAdminRole(['admin', 'lgu']) && request.resource.data.userId == '';
       allow delete: if hasAdminRole(['admin', 'lgu']);
+    }
+
+    // ---- rate_limits/{id} --------------------------------------------------
+    // Written only by Cloud Functions via the Admin SDK, which bypasses
+    // these rules entirely — this is just an explicit deny so no client
+    // (not even a signed-in one) can read its own counter to figure out how
+    // close it is to a cap, or write to it directly to reset one.
+    match /rate_limits/{id} {
+      allow read, write: if false;
+    }
+
+    // ---- search_trends/{term} ----------------------------------------------
+    // One doc per normalized search term, incremented directly by the
+    // client (via SearchTrendRepository) every time someone searches it —
+    // same trust model as isValidAggregateUpdate above: a signed-in
+    // traveler can nudge a real term's count, but never forge the shape of
+    // the write itself (see isValidSearchTrendCreate/Increment).
+    match /search_trends/{term} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidSearchTrendCreate();
+      allow update: if isSignedIn() && isValidSearchTrendIncrement();
+      allow delete: if hasAdminRole(['admin']);
     }
   }
 }

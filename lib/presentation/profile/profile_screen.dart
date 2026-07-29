@@ -333,6 +333,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 onTap: () => context.push(RoutePaths.savedItineraries),
               ),
               _MenuTile(
+                icon: Symbols.photo_library_rounded,
+                label: 'My Photos',
+                onTap: () => context.push(RoutePaths.myPhotos),
+              ),
+              _MenuTile(
                 icon: Symbols.notifications_rounded,
                 label: 'Notifications',
                 onTap: () => context.push(RoutePaths.notifications),

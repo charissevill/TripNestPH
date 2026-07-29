@@ -9,22 +9,38 @@ import '../utils/app_exception.dart';
 /// review photos. Destination photos are admin-managed and uploaded the
 /// same way once an admin console exists.
 class StorageService {
-  StorageService({FirebaseStorage? storage}) : _storage = storage ?? FirebaseStorage.instance;
+  StorageService({FirebaseStorage? storage}) : _storageOverride = storage;
 
-  final FirebaseStorage _storage;
+  // Resolved lazily (not in the initializer list) so a test subclass that
+  // overrides every method touching `_storage` never forces a real
+  // `FirebaseStorage.instance` lookup, which throws without a registered
+  // Firebase app.
+  final FirebaseStorage? _storageOverride;
+  FirebaseStorage get _storage => _storageOverride ?? FirebaseStorage.instance;
   static const Uuid _uuid = Uuid();
 
-  Future<String> uploadFile({required String folder, required String ownerId, required File file}) async {
+  Future<String> uploadFile({
+    required String folder,
+    required String ownerId,
+    required File file,
+  }) async {
     try {
       final extension = file.path.split('.').last;
-      final ref = _storage.ref().child(folder).child(ownerId).child('${_uuid.v4()}.$extension');
+      final ref = _storage
+          .ref()
+          .child(folder)
+          .child(ownerId)
+          .child('${_uuid.v4()}.$extension');
       // Explicit, not inferred: image_picker's compressed/resized temp files
       // don't always carry an extension Firebase Storage's own contentType
       // auto-detection can resolve, and every write rule in storage.rules
       // requires `contentType.matches('image/.*')` — an unset/undetected
       // contentType silently fails that check and denies the whole upload,
       // surfacing as a generic "unauthorized" error with nothing to point at.
-      final task = await ref.putFile(file, SettableMetadata(contentType: _contentTypeFor(extension)));
+      final task = await ref.putFile(
+        file,
+        SettableMetadata(contentType: _contentTypeFor(extension)),
+      );
       return await task.ref.getDownloadURL();
     } catch (e) {
       throw AppException.from(e);
@@ -50,7 +66,11 @@ class StorageService {
     }
   }
 
-  Future<List<String>> uploadFiles({required String folder, required String ownerId, required List<File> files}) async {
+  Future<List<String>> uploadFiles({
+    required String folder,
+    required String ownerId,
+    required List<File> files,
+  }) async {
     final urls = <String>[];
     for (final file in files) {
       urls.add(await uploadFile(folder: folder, ownerId: ownerId, file: file));

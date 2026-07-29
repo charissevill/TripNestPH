@@ -75,6 +75,7 @@ dependencies:
   # Media & device
   image_picker: ^1.1.2
   image_cropper: ^8.0.2
+  exif: ^3.3.0
   flutter_local_notifications: ^18.0.1
   timezone: ^0.9.4
   connectivity_plus: ^6.1.0

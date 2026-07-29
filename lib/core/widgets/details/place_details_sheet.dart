@@ -12,6 +12,7 @@ import '../../utils/auto_advance_gallery_mixin.dart';
 import '../../utils/maps_launcher.dart';
 import '../buttons/animated_button.dart';
 import '../indicators/rating_widget.dart';
+import 'map_preview.dart';
 
 /// Opens the fuller Places API field set for [place] as a modal bottom
 /// sheet — deliberately not a full route, since this is always reached from
@@ -92,6 +93,8 @@ class PlaceDetailsSheet extends StatelessWidget {
                       ],
                     ),
                   ],
+                  const SizedBox(height: AppSpacing.lg),
+                  MapPreview(latitude: place.latitude, longitude: place.longitude, label: place.name),
                   if (place.phoneNumber.isNotEmpty) ...[
                     const SizedBox(height: AppSpacing.sm),
                     InkWell(

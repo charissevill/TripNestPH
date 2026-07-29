@@ -2,12 +2,12 @@
   "name": "tripnest-ph-functions",
   "description": "Cloud Functions for TripNest PH — sends a real FCM push notification whenever a `notifications` document is created (personal or broadcast).",
   "engines": {
-    "node": "20"
+    "node": "22"
   },
   "main": "index.js",
   "dependencies": {
-    "firebase-admin": "^12.6.0",
-    "firebase-functions": "^6.0.1"
+    "firebase-admin": "^14.2.0",
+    "firebase-functions": "^7.3.2"
   },
   "private": true
 }

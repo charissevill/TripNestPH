@@ -35,4 +35,32 @@ class Validators {
     if ((value ?? '').trim().isEmpty) return '$label is required';
     return null;
   }
+
+  /// Lenient on purpose — this only guards against obviously-broken input
+  /// (no scheme, no host), not a strict RFC check, since a real business's
+  /// website URL can otherwise take many valid shapes.
+  static String? url(String? value, {bool required = false}) {
+    final v = value?.trim() ?? '';
+    if (v.isEmpty) return required ? 'This field is required' : null;
+    final uri = Uri.tryParse(v);
+    if (uri == null || !uri.hasScheme || !(uri.isScheme('http') || uri.isScheme('https')) || uri.host.isEmpty) {
+      return 'Enter a valid URL (starting with http:// or https://)';
+    }
+    return null;
+  }
+
+  /// Tolerant of spaces/dashes/parens/a leading `+` — just checks there's a
+  /// plausible run of digits, not a strict per-country phone format.
+  static String? phone(String? value, {bool required = false}) {
+    final v = value?.trim() ?? '';
+    if (v.isEmpty) return required ? 'This field is required' : null;
+    final digitsOnly = v.replaceAll(RegExp(r'[\s\-\(\)]'), '');
+    if (!RegExp(r'^\+?\d{7,15}$').hasMatch(digitsOnly)) return 'Enter a valid phone number';
+    return null;
+  }
+
+  static String? maxLength(String? value, int max, {String label = 'This field'}) {
+    if ((value ?? '').length > max) return '$label must be $max characters or fewer';
+    return null;
+  }
 }

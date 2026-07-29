@@ -16,6 +16,7 @@ import '../../core/utils/app_exception.dart';
 import '../../core/utils/validators.dart';
 import '../../core/widgets/buttons/animated_button.dart';
 import '../../core/widgets/dialogs/credential_dialog.dart';
+import '../../core/widgets/dialogs/discard_changes_scope.dart';
 import '../../core/widgets/media/avatar_preview.dart';
 import '../../data/mock/mock_categories.dart';
 
@@ -49,13 +50,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   late Set<String> _categories;
   bool _saving = false;
   bool _uploadingPhoto = false;
+  bool _dirty = false;
   String? _error;
 
   @override
   void initState() {
     super.initState();
     final user = context.read<AuthProvider>().currentUser;
-    _nameController = TextEditingController(text: user?.name ?? '');
+    _nameController = TextEditingController(text: user?.name ?? '')
+      ..addListener(() => setState(() => _dirty = true));
     _preferences = {...(user?.travelPreferences ?? const [])};
     _categories = {...(user?.favoriteCategories ?? const [])};
   }
@@ -107,6 +110,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     if (!mounted) return;
     setState(() => _saving = false);
     if (ok) {
+      _dirty = false;
       context.pop();
     } else {
       setState(() => _error = auth.errorMessage);
@@ -118,161 +122,166 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     final theme = Theme.of(context);
     final user = context.watch<AuthProvider>().currentUser;
 
-    return Scaffold(
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Symbols.arrow_back_rounded),
-          onPressed: () => context.pop(),
-        ),
-        title: const Text('Edit Profile'),
-      ),
-      body: Form(
-        key: _formKey,
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(
-            AppSpacing.lg,
-            AppSpacing.md,
-            AppSpacing.lg,
-            AppSpacing.huge,
+    return DiscardChangesScope(
+      isDirty: _dirty,
+      child: Scaffold(
+        appBar: AppBar(
+          leading: IconButton(
+            icon: const Icon(Symbols.arrow_back_rounded),
+            onPressed: () => context.pop(),
           ),
-          children: [
-            Center(
-              child: Stack(
-                children: [
-                  AvatarPreview(
-                    photoUrl: user?.photoUrl,
-                    child: Container(
-                      width: 96,
-                      height: 96,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: theme.colorScheme.primary,
-                          width: 2,
-                        ),
-                      ),
-                      padding: const EdgeInsets.all(3),
-                      child: ClipOval(
-                        child: user?.photoUrl.isNotEmpty == true
-                            ? CachedNetworkImage(
-                                imageUrl: user!.photoUrl,
-                                fit: BoxFit.cover,
-                              )
-                            : Container(
-                                color: theme.colorScheme.primary.withValues(
-                                  alpha: 0.12,
-                                ),
-                                child: Icon(
-                                  Symbols.person_rounded,
-                                  size: 48,
-                                  color: theme.colorScheme.primary,
-                                ),
-                              ),
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    right: 0,
-                    bottom: 0,
-                    child: InkWell(
-                      onTap: _uploadingPhoto ? null : _pickPhoto,
-                      borderRadius: BorderRadius.circular(AppRadius.pill),
+          title: const Text('Edit Profile'),
+        ),
+        body: Form(
+          key: _formKey,
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.lg,
+              AppSpacing.md,
+              AppSpacing.lg,
+              AppSpacing.huge,
+            ),
+            children: [
+              Center(
+                child: Stack(
+                  children: [
+                    AvatarPreview(
+                      photoUrl: user?.photoUrl,
                       child: Container(
-                        width: 32,
-                        height: 32,
+                        width: 96,
+                        height: 96,
                         decoration: BoxDecoration(
-                          color: theme.colorScheme.primary,
                           shape: BoxShape.circle,
+                          border: Border.all(
+                            color: theme.colorScheme.primary,
+                            width: 2,
+                          ),
                         ),
-                        alignment: Alignment.center,
-                        child: _uploadingPhoto
-                            ? const SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
+                        padding: const EdgeInsets.all(3),
+                        child: ClipOval(
+                          child: user?.photoUrl.isNotEmpty == true
+                              ? CachedNetworkImage(
+                                  imageUrl: user!.photoUrl,
+                                  fit: BoxFit.cover,
+                                )
+                              : Container(
+                                  color: theme.colorScheme.primary.withValues(
+                                    alpha: 0.12,
+                                  ),
+                                  child: Icon(
+                                    Symbols.person_rounded,
+                                    size: 48,
+                                    color: theme.colorScheme.primary,
+                                  ),
                                 ),
-                              )
-                            : const Icon(
-                                Symbols.photo_camera_rounded,
-                                color: Colors.white,
-                                size: 16,
-                              ),
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                    Positioned(
+                      right: 0,
+                      bottom: 0,
+                      child: InkWell(
+                        onTap: _uploadingPhoto ? null : _pickPhoto,
+                        borderRadius: BorderRadius.circular(AppRadius.pill),
+                        child: Container(
+                          width: 32,
+                          height: 32,
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.primary,
+                            shape: BoxShape.circle,
+                          ),
+                          alignment: Alignment.center,
+                          child: _uploadingPhoto
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Icon(
+                                  Symbols.photo_camera_rounded,
+                                  color: Colors.white,
+                                  size: 16,
+                                ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(height: AppSpacing.xxl),
-            TextFormField(
-              controller: _nameController,
-              validator: Validators.name,
-              decoration: const InputDecoration(
-                labelText: 'Full Name',
-                floatingLabelBehavior: FloatingLabelBehavior.auto,
+              const SizedBox(height: AppSpacing.xxl),
+              TextFormField(
+                controller: _nameController,
+                validator: Validators.name,
+                decoration: const InputDecoration(
+                  labelText: 'Full Name',
+                  floatingLabelBehavior: FloatingLabelBehavior.auto,
+                ),
               ),
-            ),
-            const SizedBox(height: AppSpacing.xl),
-            Text('Travel Preferences', style: theme.textTheme.titleLarge),
-            const SizedBox(height: AppSpacing.sm),
-            Wrap(
-              spacing: AppSpacing.sm,
-              runSpacing: AppSpacing.sm,
-              children: _travelPreferenceOptions
-                  .map(
-                    (p) => _SelectableChip(
-                      label: p,
-                      selected: _preferences.contains(p),
-                      onTap: () => setState(
-                        () => _preferences.contains(p)
-                            ? _preferences.remove(p)
-                            : _preferences.add(p),
+              const SizedBox(height: AppSpacing.xl),
+              Text('Travel Preferences', style: theme.textTheme.titleLarge),
+              const SizedBox(height: AppSpacing.sm),
+              Wrap(
+                spacing: AppSpacing.sm,
+                runSpacing: AppSpacing.sm,
+                children: _travelPreferenceOptions
+                    .map(
+                      (p) => _SelectableChip(
+                        label: p,
+                        selected: _preferences.contains(p),
+                        onTap: () => setState(() {
+                          _dirty = true;
+                          _preferences.contains(p)
+                              ? _preferences.remove(p)
+                              : _preferences.add(p);
+                        }),
                       ),
-                    ),
-                  )
-                  .toList(),
-            ),
-            const SizedBox(height: AppSpacing.xl),
-            Text('Favorite Categories', style: theme.textTheme.titleLarge),
-            const SizedBox(height: AppSpacing.sm),
-            Wrap(
-              spacing: AppSpacing.sm,
-              runSpacing: AppSpacing.sm,
-              children: mockCategories
-                  .map(
-                    (c) => _SelectableChip(
-                      label: c.label,
-                      selected: _categories.contains(c.id),
-                      onTap: () => setState(
-                        () => _categories.contains(c.id)
-                            ? _categories.remove(c.id)
-                            : _categories.add(c.id),
+                    )
+                    .toList(),
+              ),
+              const SizedBox(height: AppSpacing.xl),
+              Text('Favorite Categories', style: theme.textTheme.titleLarge),
+              const SizedBox(height: AppSpacing.sm),
+              Wrap(
+                spacing: AppSpacing.sm,
+                runSpacing: AppSpacing.sm,
+                children: mockCategories
+                    .map(
+                      (c) => _SelectableChip(
+                        label: c.label,
+                        selected: _categories.contains(c.id),
+                        onTap: () => setState(() {
+                          _dirty = true;
+                          _categories.contains(c.id)
+                              ? _categories.remove(c.id)
+                              : _categories.add(c.id);
+                        }),
                       ),
-                    ),
-                  )
-                  .toList(),
-            ),
-            const SizedBox(height: AppSpacing.xl),
-            Text('Security', style: theme.textTheme.titleLarge),
-            const SizedBox(height: AppSpacing.sm),
-            _SecurityRow(
-              icon: Symbols.mail_rounded,
-              label: 'Update Email',
-              onTap: _showChangeEmailDialog,
-            ),
-            if (_error != null) ...[
-              const SizedBox(height: AppSpacing.md),
-              Text(_error!, style: const TextStyle(color: AppColors.error)),
+                    )
+                    .toList(),
+              ),
+              const SizedBox(height: AppSpacing.xl),
+              Text('Security', style: theme.textTheme.titleLarge),
+              const SizedBox(height: AppSpacing.sm),
+              _SecurityRow(
+                icon: Symbols.mail_rounded,
+                label: 'Update Email',
+                onTap: _showChangeEmailDialog,
+              ),
+              if (_error != null) ...[
+                const SizedBox(height: AppSpacing.md),
+                Text(_error!, style: const TextStyle(color: AppColors.error)),
+              ],
+              const SizedBox(height: AppSpacing.xxl),
+              AnimatedButton(
+                label: 'Save Changes',
+                isLoading: _saving,
+                onPressed: _saving ? null : _save,
+              ),
             ],
-            const SizedBox(height: AppSpacing.xxl),
-            AnimatedButton(
-              label: 'Save Changes',
-              isLoading: _saving,
-              onPressed: _saving ? null : _save,
-            ),
-          ],
+          ),
         ),
       ),
     );

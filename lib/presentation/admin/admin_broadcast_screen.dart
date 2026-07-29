@@ -6,6 +6,7 @@ import '../../core/theme/app_spacing.dart';
 import '../../core/utils/app_exception.dart';
 import '../../core/widgets/buttons/animated_button.dart';
 import '../../core/widgets/dialogs/confirmation_dialog.dart';
+import '../../core/widgets/dialogs/discard_changes_scope.dart';
 import '../../data/repositories/notification_repository.dart';
 import '../../domain/models/app_notification.dart';
 
@@ -28,6 +29,15 @@ class _AdminBroadcastScreenState extends State<AdminBroadcastScreen> {
   final _bodyController = TextEditingController();
   NotificationCategory _category = NotificationCategory.general;
   bool _sending = false;
+  bool _dirty = false;
+
+  @override
+  void initState() {
+    super.initState();
+    for (final c in [_titleController, _bodyController]) {
+      c.addListener(() => setState(() => _dirty = true));
+    }
+  }
 
   @override
   void dispose() {
@@ -40,13 +50,16 @@ class _AdminBroadcastScreenState extends State<AdminBroadcastScreen> {
     final title = _titleController.text.trim();
     final body = _bodyController.text.trim();
     if (title.isEmpty || body.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Title and message are both required.')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Title and message are both required.')),
+      );
       return;
     }
     final confirmed = await showConfirmationDialog(
       context,
       title: 'Send this announcement?',
-      message: 'It goes out to every traveler right away and can\'t be recalled.',
+      message:
+          'It goes out to every traveler right away and can\'t be recalled.',
       confirmLabel: 'Send',
       isDestructive: true,
     );
@@ -54,13 +67,23 @@ class _AdminBroadcastScreenState extends State<AdminBroadcastScreen> {
 
     setState(() => _sending = true);
     try {
-      await _repository.createBroadcast(title: title, body: body, category: _category);
+      await _repository.createBroadcast(
+        title: title,
+        body: body,
+        category: _category,
+      );
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Announcement sent.')));
+        _dirty = false;
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Announcement sent.')));
         context.pop();
       }
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(AppException.from(e).message)));
+      if (mounted)
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(AppException.from(e).message)));
     } finally {
       if (mounted) setState(() => _sending = false);
     }
@@ -68,28 +91,62 @@ class _AdminBroadcastScreenState extends State<AdminBroadcastScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        leading: IconButton(icon: const Icon(Symbols.arrow_back_rounded), onPressed: () => context.pop()),
-        title: const Text('Announcement'),
-      ),
-      body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.md, AppSpacing.lg, AppSpacing.huge),
-          children: [
-            TextField(controller: _titleController, decoration: const InputDecoration(labelText: 'Title')),
-            const SizedBox(height: AppSpacing.md),
-            TextField(controller: _bodyController, maxLines: 4, maxLength: 500, decoration: const InputDecoration(labelText: 'Message', alignLabelWithHint: true)),
-            const SizedBox(height: AppSpacing.md),
-            DropdownButtonFormField<NotificationCategory>(
-              initialValue: _category,
-              decoration: const InputDecoration(labelText: 'Category'),
-              items: NotificationCategory.values.map((c) => DropdownMenuItem(value: c, child: Text(c.label))).toList(),
-              onChanged: (value) => setState(() => _category = value ?? _category),
+    return DiscardChangesScope(
+      isDirty: _dirty,
+      child: Scaffold(
+        appBar: AppBar(
+          leading: IconButton(
+            icon: const Icon(Symbols.arrow_back_rounded),
+            onPressed: () => context.pop(),
+          ),
+          title: const Text('Announcement'),
+        ),
+        body: SafeArea(
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.lg,
+              AppSpacing.md,
+              AppSpacing.lg,
+              AppSpacing.huge,
             ),
-            const SizedBox(height: AppSpacing.xxl),
-            AnimatedButton(label: 'Send to Every Traveler', isLoading: _sending, onPressed: _send),
-          ],
+            children: [
+              TextField(
+                controller: _titleController,
+                maxLength: 100,
+                decoration: const InputDecoration(labelText: 'Title'),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              TextField(
+                controller: _bodyController,
+                maxLines: 4,
+                maxLength: 500,
+                decoration: const InputDecoration(
+                  labelText: 'Message',
+                  alignLabelWithHint: true,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              DropdownButtonFormField<NotificationCategory>(
+                initialValue: _category,
+                decoration: const InputDecoration(labelText: 'Category'),
+                items: NotificationCategory.values
+                    .map(
+                      (c) => DropdownMenuItem(value: c, child: Text(c.label)),
+                    )
+                    .toList(),
+                onChanged: (value) => setState(() {
+                  _category = value ?? _category;
+                  _dirty = true;
+                }),
+              ),
+              const SizedBox(height: AppSpacing.xxl),
+              AnimatedButton(
+                label: 'Send to Every Traveler',
+                isLoading: _sending,
+                onPressed: _send,
+              ),
+            ],
+          ),
         ),
       ),
     );

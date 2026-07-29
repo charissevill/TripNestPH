@@ -8,7 +8,9 @@ import '../../core/constants/firestore_paths.dart';
 import '../../core/providers/auth_provider.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/utils/app_exception.dart';
+import '../../core/utils/validators.dart';
 import '../../core/widgets/buttons/animated_button.dart';
+import '../../core/widgets/dialogs/discard_changes_scope.dart';
 import '../../core/widgets/inputs/gallery_image_picker.dart';
 import '../../core/widgets/inputs/hero_image_picker.dart';
 import '../../core/widgets/states/loading_widget.dart';
@@ -31,6 +33,7 @@ class AdminFestivalFormScreen extends StatefulWidget {
 
 class _AdminFestivalFormScreenState extends State<AdminFestivalFormScreen> {
   final FestivalRepository _repository = FestivalRepository();
+  final _formKey = GlobalKey<FormState>();
 
   late final _nameController = TextEditingController(
     text: widget.existing?.name ?? '',
@@ -60,6 +63,7 @@ class _AdminFestivalFormScreenState extends State<AdminFestivalFormScreen> {
   Province? _selectedProvince;
   late Future<List<Province>> _provincesFuture;
   bool _saving = false;
+  bool _dirty = false;
 
   bool get _isEditing => widget.existing != null;
 
@@ -68,6 +72,9 @@ class _AdminFestivalFormScreenState extends State<AdminFestivalFormScreen> {
     super.initState();
     _startDate = widget.existing?.startDate;
     _endDate = widget.existing?.endDate;
+    for (final c in [_nameController, _descController]) {
+      c.addListener(() => setState(() => _dirty = true));
+    }
     _provincesFuture = ProvinceRepository().getAll().then((provinces) {
       final existingId = widget.existing?.provinceId;
       if (existingId != null) {
@@ -138,17 +145,13 @@ class _AdminFestivalFormScreenState extends State<AdminFestivalFormScreen> {
       _endDate = DateUtils.isSameDay(picked.start, picked.end)
           ? null
           : picked.end;
+      _dirty = true;
     });
   }
 
   Future<void> _save() async {
+    if (!_formKey.currentState!.validate()) return;
     final province = _selectedProvince;
-    if (_nameController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Name is required.')));
-      return;
-    }
     if (province == null) {
       ScaffoldMessenger.of(
         context,
@@ -208,6 +211,7 @@ class _AdminFestivalFormScreenState extends State<AdminFestivalFormScreen> {
         await _repository.create(festival);
       }
       if (mounted) {
+        _dirty = false;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
@@ -230,146 +234,169 @@ class _AdminFestivalFormScreenState extends State<AdminFestivalFormScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Scaffold(
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Symbols.arrow_back_rounded),
-          onPressed: () => context.pop(),
+    return DiscardChangesScope(
+      isDirty: _dirty,
+      child: Scaffold(
+        appBar: AppBar(
+          leading: IconButton(
+            icon: const Icon(Symbols.arrow_back_rounded),
+            onPressed: () => context.pop(),
+          ),
+          title: Text(_isEditing ? 'Edit Festival' : 'New Festival'),
         ),
-        title: Text(_isEditing ? 'Edit Festival' : 'New Festival'),
-      ),
-      body: SafeArea(
-        child: FutureBuilder<List<Province>>(
-          future: _provincesFuture,
-          builder: (context, snapshot) {
-            if (snapshot.connectionState != ConnectionState.done) {
-              return LoadingWidget.block(height: 400);
-            }
-            final provinces = snapshot.data ?? const [];
-            return ListView(
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.lg,
-                AppSpacing.md,
-                AppSpacing.lg,
-                AppSpacing.huge,
-              ),
-              children: [
-                TextField(
-                  controller: _nameController,
-                  decoration: const InputDecoration(labelText: 'Name'),
-                ),
-                const SizedBox(height: AppSpacing.md),
-                DropdownButtonFormField<Province>(
-                  initialValue: _selectedProvince,
-                  decoration: const InputDecoration(labelText: 'Province'),
-                  isExpanded: true,
-                  items: provinces
-                      .map(
-                        (p) => DropdownMenuItem(value: p, child: Text(p.name)),
-                      )
-                      .toList(),
-                  onChanged: (value) =>
-                      setState(() => _selectedProvince = value),
-                ),
-                const SizedBox(height: AppSpacing.md),
-                HeroImagePicker(
-                  imageUrl: _heroImageUrl,
-                  label: 'Cover Photo',
-                  folder: FirestorePaths.storageDestinationPhotos,
-                  ownerId:
-                      context.read<AuthProvider>().firebaseUser?.uid ?? 'admin',
-                  onChanged: (url) => setState(() => _heroImageUrl = url),
-                ),
-                const SizedBox(height: AppSpacing.md),
-                GalleryImagePicker(
-                  imageUrls: _additionalGalleryUrls,
-                  label:
-                      'More Photos (for the swipeable gallery on the details page)',
-                  folder: FirestorePaths.storageDestinationPhotos,
-                  ownerId:
-                      context.read<AuthProvider>().firebaseUser?.uid ?? 'admin',
-                  onChanged: (urls) =>
-                      setState(() => _additionalGalleryUrls = urls),
-                ),
-                const SizedBox(height: AppSpacing.md),
-                InkWell(
-                  borderRadius: BorderRadius.circular(12),
-                  onTap: _pickDate,
-                  child: InputDecorator(
-                    decoration: const InputDecoration(
-                      labelText: 'Date',
-                      prefixIcon: Icon(Symbols.calendar_month_rounded),
+        body: SafeArea(
+          child: FutureBuilder<List<Province>>(
+            future: _provincesFuture,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState != ConnectionState.done) {
+                return LoadingWidget.block(height: 400);
+              }
+              final provinces = snapshot.data ?? const [];
+              return Form(
+                key: _formKey,
+                child: ListView(
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.lg,
+                    AppSpacing.md,
+                    AppSpacing.lg,
+                    AppSpacing.huge,
+                  ),
+                  children: [
+                    TextFormField(
+                      controller: _nameController,
+                      decoration: const InputDecoration(labelText: 'Name'),
+                      validator: Validators.name,
                     ),
-                    child: Text(_dateDisplayText),
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.md),
-                TextField(
-                  controller: _descController,
-                  maxLines: 4,
-                  decoration: const InputDecoration(
-                    labelText: 'Description',
-                    alignLabelWithHint: true,
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.md),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Upcoming'),
-                  value: _isUpcoming,
-                  onChanged: (value) => setState(() => _isUpcoming = value),
-                ),
-                const SizedBox(height: AppSpacing.lg),
-                Text('Highlights', style: theme.textTheme.titleMedium),
-                const SizedBox(height: AppSpacing.sm),
-                ..._highlights.asMap().entries.map(
-                  (entry) => ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: Text(entry.value),
-                    trailing: IconButton(
-                      icon: const Icon(Symbols.close_rounded, size: 18),
-                      onPressed: () => setState(
-                        () =>
-                            _highlights = [..._highlights]..removeAt(entry.key),
+                    const SizedBox(height: AppSpacing.md),
+                    DropdownButtonFormField<Province>(
+                      initialValue: _selectedProvince,
+                      decoration: const InputDecoration(labelText: 'Province'),
+                      isExpanded: true,
+                      items: provinces
+                          .map(
+                            (p) =>
+                                DropdownMenuItem(value: p, child: Text(p.name)),
+                          )
+                          .toList(),
+                      onChanged: (value) => setState(() {
+                        _selectedProvince = value;
+                        _dirty = true;
+                      }),
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    HeroImagePicker(
+                      imageUrl: _heroImageUrl,
+                      label: 'Cover Photo',
+                      folder: FirestorePaths.storageDestinationPhotos,
+                      ownerId:
+                          context.read<AuthProvider>().firebaseUser?.uid ??
+                          'admin',
+                      onChanged: (url) => setState(() {
+                        _heroImageUrl = url;
+                        _dirty = true;
+                      }),
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    GalleryImagePicker(
+                      imageUrls: _additionalGalleryUrls,
+                      label:
+                          'More Photos (for the swipeable gallery on the details page)',
+                      folder: FirestorePaths.storageDestinationPhotos,
+                      ownerId:
+                          context.read<AuthProvider>().firebaseUser?.uid ??
+                          'admin',
+                      onChanged: (urls) => setState(() {
+                        _additionalGalleryUrls = urls;
+                        _dirty = true;
+                      }),
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    InkWell(
+                      borderRadius: BorderRadius.circular(12),
+                      onTap: _pickDate,
+                      child: InputDecorator(
+                        decoration: const InputDecoration(
+                          labelText: 'Date',
+                          prefixIcon: Icon(Symbols.calendar_month_rounded),
+                        ),
+                        child: Text(_dateDisplayText),
                       ),
                     ),
-                  ),
-                ),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _newHighlightController,
-                        decoration: const InputDecoration(
-                          hintText: 'Add a highlight...',
+                    const SizedBox(height: AppSpacing.md),
+                    TextFormField(
+                      controller: _descController,
+                      maxLines: 4,
+                      decoration: const InputDecoration(
+                        labelText: 'Description',
+                        alignLabelWithHint: true,
+                      ),
+                      validator: (v) =>
+                          Validators.maxLength(v, 3000, label: 'Description'),
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('Upcoming'),
+                      value: _isUpcoming,
+                      onChanged: (value) => setState(() {
+                        _isUpcoming = value;
+                        _dirty = true;
+                      }),
+                    ),
+                    const SizedBox(height: AppSpacing.lg),
+                    Text('Highlights', style: theme.textTheme.titleMedium),
+                    const SizedBox(height: AppSpacing.sm),
+                    ..._highlights.asMap().entries.map(
+                      (entry) => ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(entry.value),
+                        trailing: IconButton(
+                          icon: const Icon(Symbols.close_rounded, size: 18),
+                          onPressed: () => setState(() {
+                            _highlights = [..._highlights]..removeAt(entry.key);
+                            _dirty = true;
+                          }),
                         ),
                       ),
                     ),
-                    IconButton(
-                      icon: Icon(
-                        Symbols.add_circle_rounded,
-                        color: theme.colorScheme.primary,
-                      ),
-                      onPressed: () {
-                        final text = _newHighlightController.text.trim();
-                        if (text.isEmpty) return;
-                        setState(() {
-                          _highlights = [..._highlights, text];
-                          _newHighlightController.clear();
-                        });
-                      },
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _newHighlightController,
+                            decoration: const InputDecoration(
+                              hintText: 'Add a highlight...',
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          icon: Icon(
+                            Symbols.add_circle_rounded,
+                            color: theme.colorScheme.primary,
+                          ),
+                          onPressed: () {
+                            final text = _newHighlightController.text.trim();
+                            if (text.isEmpty) return;
+                            setState(() {
+                              _highlights = [..._highlights, text];
+                              _newHighlightController.clear();
+                              _dirty = true;
+                            });
+                          },
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.xxl),
+                    AnimatedButton(
+                      label: _isEditing ? 'Save Changes' : 'Create',
+                      isLoading: _saving,
+                      onPressed: _save,
                     ),
                   ],
                 ),
-                const SizedBox(height: AppSpacing.xxl),
-                AnimatedButton(
-                  label: _isEditing ? 'Save Changes' : 'Create',
-                  isLoading: _saving,
-                  onPressed: _save,
-                ),
-              ],
-            );
-          },
+              );
+            },
+          ),
         ),
       ),
     );

@@ -6,7 +6,9 @@ import '../../core/constants/firestore_paths.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/utils/app_exception.dart';
+import '../../core/utils/validators.dart';
 import '../../core/widgets/buttons/animated_button.dart';
+import '../../core/widgets/dialogs/discard_changes_scope.dart';
 import '../../core/widgets/inputs/hero_image_picker.dart';
 import '../../core/widgets/states/loading_widget.dart';
 import '../../data/repositories/business_repository.dart';
@@ -75,6 +77,7 @@ class _BusinessForm extends StatefulWidget {
 class _BusinessFormState extends State<_BusinessForm> {
   final BusinessRepository _repository = BusinessRepository();
   final RestaurantRepository _restaurantRepository = RestaurantRepository();
+  final _formKey = GlobalKey<FormState>();
 
   late final _nameController = TextEditingController(
     text: widget.existing?.name ?? '',
@@ -107,10 +110,22 @@ class _BusinessFormState extends State<_BusinessForm> {
   Province? _selectedProvince;
   late Future<List<Province>> _provincesFuture;
   bool _saving = false;
+  bool _dirty = false;
 
   @override
   void initState() {
     super.initState();
+    for (final c in [
+      _nameController,
+      _descController,
+      _addressController,
+      _contactController,
+      _websiteController,
+      _cuisineController,
+      _openingHoursController,
+    ]) {
+      c.addListener(() => setState(() => _dirty = true));
+    }
     _provincesFuture = ProvinceRepository().getAll().then((provinces) {
       final existingId = widget.existing?.provinceId;
       if (existingId != null) {
@@ -142,23 +157,12 @@ class _BusinessFormState extends State<_BusinessForm> {
   }
 
   Future<void> _save({bool resubmit = false}) async {
+    if (!_formKey.currentState!.validate()) return;
     final province = _selectedProvince;
-    if (_nameController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Business name is required.')),
-      );
-      return;
-    }
     if (province == null) {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('Province is required.')));
-      return;
-    }
-    if (_descController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('A short description is required.')),
-      );
       return;
     }
 
@@ -203,6 +207,7 @@ class _BusinessFormState extends State<_BusinessForm> {
         }
       }
       if (mounted) {
+        _dirty = false;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
@@ -267,115 +272,143 @@ class _BusinessFormState extends State<_BusinessForm> {
         }
         final provinces = snapshot.data ?? const [];
         final existing = widget.existing;
-        return ListView(
-          padding: const EdgeInsets.fromLTRB(
-            AppSpacing.lg,
-            AppSpacing.md,
-            AppSpacing.lg,
-            AppSpacing.huge,
-          ),
-          children: [
-            if (existing != null) ...[
-              _statusBanner(existing),
-              const SizedBox(height: AppSpacing.lg),
-            ],
-            TextField(
-              controller: _nameController,
-              decoration: const InputDecoration(labelText: 'Business Name'),
-            ),
-            const SizedBox(height: AppSpacing.md),
-            DropdownButtonFormField<String>(
-              initialValue: _category,
-              decoration: const InputDecoration(labelText: 'Category'),
-              items: BusinessCategory.all
-                  .map(
-                    (c) => DropdownMenuItem(
-                      value: c,
-                      child: Text(BusinessCategory.label(c)),
+        return DiscardChangesScope(
+          isDirty: _dirty,
+          child: Form(
+            key: _formKey,
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.lg,
+                AppSpacing.md,
+                AppSpacing.lg,
+                AppSpacing.huge,
+              ),
+              children: [
+                if (existing != null) ...[
+                  _statusBanner(existing),
+                  const SizedBox(height: AppSpacing.lg),
+                ],
+                TextFormField(
+                  controller: _nameController,
+                  decoration: const InputDecoration(labelText: 'Business Name'),
+                  validator: Validators.name,
+                ),
+                const SizedBox(height: AppSpacing.md),
+                DropdownButtonFormField<String>(
+                  initialValue: _category,
+                  decoration: const InputDecoration(labelText: 'Category'),
+                  items: BusinessCategory.all
+                      .map(
+                        (c) => DropdownMenuItem(
+                          value: c,
+                          child: Text(BusinessCategory.label(c)),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (value) => setState(() {
+                    _category = value ?? _category;
+                    _dirty = true;
+                  }),
+                ),
+                if (_category == BusinessCategory.foodAndDining) ...[
+                  const SizedBox(height: AppSpacing.md),
+                  TextField(
+                    controller: _cuisineController,
+                    decoration: const InputDecoration(
+                      labelText: 'Cuisine',
+                      hintText: 'e.g. Filipino, Seafood',
                     ),
-                  )
-                  .toList(),
-              onChanged: (value) =>
-                  setState(() => _category = value ?? _category),
-            ),
-            if (_category == BusinessCategory.foodAndDining) ...[
-              const SizedBox(height: AppSpacing.md),
-              TextField(
-                controller: _cuisineController,
-                decoration: const InputDecoration(
-                  labelText: 'Cuisine',
-                  hintText: 'e.g. Filipino, Seafood',
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  DropdownButtonFormField<String>(
+                    initialValue: _priceRange,
+                    decoration: const InputDecoration(labelText: 'Price Range'),
+                    items: _priceRanges
+                        .map((p) => DropdownMenuItem(value: p, child: Text(p)))
+                        .toList(),
+                    onChanged: (value) => setState(() {
+                      _priceRange = value ?? _priceRange;
+                      _dirty = true;
+                    }),
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  TextField(
+                    controller: _openingHoursController,
+                    decoration: const InputDecoration(
+                      labelText: 'Opening Hours',
+                      hintText: 'e.g. 10:00 AM – 9:00 PM daily',
+                    ),
+                  ),
+                ],
+                const SizedBox(height: AppSpacing.md),
+                DropdownButtonFormField<Province>(
+                  initialValue: _selectedProvince,
+                  decoration: const InputDecoration(labelText: 'Province'),
+                  isExpanded: true,
+                  items: provinces
+                      .map(
+                        (p) => DropdownMenuItem(value: p, child: Text(p.name)),
+                      )
+                      .toList(),
+                  onChanged: (value) => setState(() {
+                    _selectedProvince = value;
+                    _dirty = true;
+                  }),
                 ),
-              ),
-              const SizedBox(height: AppSpacing.md),
-              DropdownButtonFormField<String>(
-                initialValue: _priceRange,
-                decoration: const InputDecoration(labelText: 'Price Range'),
-                items: _priceRanges
-                    .map((p) => DropdownMenuItem(value: p, child: Text(p)))
-                    .toList(),
-                onChanged: (value) =>
-                    setState(() => _priceRange = value ?? _priceRange),
-              ),
-              const SizedBox(height: AppSpacing.md),
-              TextField(
-                controller: _openingHoursController,
-                decoration: const InputDecoration(
-                  labelText: 'Opening Hours',
-                  hintText: 'e.g. 10:00 AM – 9:00 PM daily',
+                const SizedBox(height: AppSpacing.md),
+                TextFormField(
+                  controller: _descController,
+                  maxLines: 4,
+                  decoration: const InputDecoration(
+                    labelText: 'Description',
+                    alignLabelWithHint: true,
+                  ),
+                  validator: (v) =>
+                      Validators.maxLength(v, 3000, label: 'Description'),
                 ),
-              ),
-            ],
-            const SizedBox(height: AppSpacing.md),
-            DropdownButtonFormField<Province>(
-              initialValue: _selectedProvince,
-              decoration: const InputDecoration(labelText: 'Province'),
-              isExpanded: true,
-              items: provinces
-                  .map((p) => DropdownMenuItem(value: p, child: Text(p.name)))
-                  .toList(),
-              onChanged: (value) => setState(() => _selectedProvince = value),
+                const SizedBox(height: AppSpacing.md),
+                TextField(
+                  controller: _addressController,
+                  decoration: const InputDecoration(labelText: 'Address'),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                TextFormField(
+                  controller: _contactController,
+                  decoration: const InputDecoration(
+                    labelText: 'Contact Number',
+                  ),
+                  validator: Validators.phone,
+                ),
+                const SizedBox(height: AppSpacing.md),
+                TextFormField(
+                  controller: _websiteController,
+                  decoration: const InputDecoration(labelText: 'Website URL'),
+                  validator: Validators.url,
+                ),
+                const SizedBox(height: AppSpacing.md),
+                HeroImagePicker(
+                  imageUrl: _heroImageUrl,
+                  folder: FirestorePaths.storageBusinessGallery,
+                  ownerId: widget.uid,
+                  onChanged: (url) => setState(() {
+                    _heroImageUrl = url;
+                    _dirty = true;
+                  }),
+                ),
+                const SizedBox(height: AppSpacing.xxl),
+                AnimatedButton(
+                  label: existing == null
+                      ? 'Submit for Review'
+                      : (existing.isRejected
+                            ? 'Edit & Resubmit'
+                            : 'Save Changes'),
+                  isLoading: _saving,
+                  onPressed: () =>
+                      _save(resubmit: existing?.isRejected ?? false),
+                ),
+              ],
             ),
-            const SizedBox(height: AppSpacing.md),
-            TextField(
-              controller: _descController,
-              maxLines: 4,
-              decoration: const InputDecoration(
-                labelText: 'Description',
-                alignLabelWithHint: true,
-              ),
-            ),
-            const SizedBox(height: AppSpacing.md),
-            TextField(
-              controller: _addressController,
-              decoration: const InputDecoration(labelText: 'Address'),
-            ),
-            const SizedBox(height: AppSpacing.md),
-            TextField(
-              controller: _contactController,
-              decoration: const InputDecoration(labelText: 'Contact Number'),
-            ),
-            const SizedBox(height: AppSpacing.md),
-            TextField(
-              controller: _websiteController,
-              decoration: const InputDecoration(labelText: 'Website URL'),
-            ),
-            const SizedBox(height: AppSpacing.md),
-            HeroImagePicker(
-              imageUrl: _heroImageUrl,
-              folder: FirestorePaths.storageBusinessGallery,
-              ownerId: widget.uid,
-              onChanged: (url) => setState(() => _heroImageUrl = url),
-            ),
-            const SizedBox(height: AppSpacing.xxl),
-            AnimatedButton(
-              label: existing == null
-                  ? 'Submit for Review'
-                  : (existing.isRejected ? 'Edit & Resubmit' : 'Save Changes'),
-              isLoading: _saving,
-              onPressed: () => _save(resubmit: existing?.isRejected ?? false),
-            ),
-          ],
+          ),
         );
       },
     );

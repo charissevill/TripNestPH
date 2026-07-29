@@ -5,6 +5,7 @@ import 'package:material_symbols_icons/symbols.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/utils/app_exception.dart';
+import '../../core/utils/validators.dart';
 import '../../core/widgets/dialogs/confirmation_dialog.dart';
 import '../../core/widgets/states/empty_state_widget.dart';
 import '../../core/widgets/states/loading_widget.dart';
@@ -37,46 +38,51 @@ class _AdminTeamScreenState extends State<AdminTeamScreen> {
 
   Future<void> _invite() async {
     final emailController = TextEditingController();
+    final dialogFormKey = GlobalKey<FormState>();
     String role = AdminRole.lgu;
     final result = await showDialog<bool>(
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
           title: const Text('Invite to Admin Portal'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: emailController,
-                autofocus: true,
-                keyboardType: TextInputType.emailAddress,
-                decoration: const InputDecoration(
-                  labelText: 'Email',
-                  hintText: 'Must already have a TripNest account',
+          content: Form(
+            key: dialogFormKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextFormField(
+                  controller: emailController,
+                  autofocus: true,
+                  keyboardType: TextInputType.emailAddress,
+                  decoration: const InputDecoration(
+                    labelText: 'Email',
+                    hintText: 'Must already have a TripNest account',
+                  ),
+                  validator: Validators.email,
                 ),
-              ),
-              const SizedBox(height: AppSpacing.md),
-              DropdownButtonFormField<String>(
-                initialValue: role,
-                decoration: const InputDecoration(labelText: 'Role'),
-                items: const [
-                  DropdownMenuItem(
-                    value: AdminRole.admin,
-                    child: Text('Admin'),
-                  ),
-                  DropdownMenuItem(
-                    value: AdminRole.lgu,
-                    child: Text('LGU Officer'),
-                  ),
-                  DropdownMenuItem(
-                    value: AdminRole.businessOwner,
-                    child: Text('Business Owner'),
-                  ),
-                ],
-                onChanged: (value) =>
-                    setDialogState(() => role = value ?? role),
-              ),
-            ],
+                const SizedBox(height: AppSpacing.md),
+                DropdownButtonFormField<String>(
+                  initialValue: role,
+                  decoration: const InputDecoration(labelText: 'Role'),
+                  items: const [
+                    DropdownMenuItem(
+                      value: AdminRole.admin,
+                      child: Text('Admin'),
+                    ),
+                    DropdownMenuItem(
+                      value: AdminRole.lgu,
+                      child: Text('LGU Officer'),
+                    ),
+                    DropdownMenuItem(
+                      value: AdminRole.businessOwner,
+                      child: Text('Business Owner'),
+                    ),
+                  ],
+                  onChanged: (value) =>
+                      setDialogState(() => role = value ?? role),
+                ),
+              ],
+            ),
           ),
           actions: [
             TextButton(
@@ -84,7 +90,10 @@ class _AdminTeamScreenState extends State<AdminTeamScreen> {
               child: const Text('Cancel'),
             ),
             FilledButton(
-              onPressed: () => Navigator.of(context).pop(true),
+              onPressed: () {
+                if (!dialogFormKey.currentState!.validate()) return;
+                Navigator.of(context).pop(true);
+              },
               child: const Text('Send Invite'),
             ),
           ],
@@ -94,12 +103,6 @@ class _AdminTeamScreenState extends State<AdminTeamScreen> {
     if (result != true || !mounted) return;
 
     final email = emailController.text.trim();
-    if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Enter a valid email address.')),
-      );
-      return;
-    }
     final confirmed = await showConfirmationDialog(
       context,
       title: 'Invite $email?',

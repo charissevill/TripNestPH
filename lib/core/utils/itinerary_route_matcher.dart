@@ -60,6 +60,14 @@ const int _minMatchableNameLength = 4;
 /// destination (they're just as specific as a curated destination, unlike
 /// the broader main-destination fallback).
 ///
+/// An activity with its own [ItineraryActivity.latitude]/`longitude` —
+/// resolved once at generation time by geocoding its stated location via a
+/// live Places search (see `AiRepository._geocodeActivities`) — is checked
+/// next, after the curated lists but before the main-destination fallback:
+/// this catches real places that were never in any pre-fetched candidate
+/// list (a beach, say — Places has no dedicated "beach" type, so one never
+/// appears in [placeRecommendations]).
+///
 /// [mainDestinationName]/[mainDestinationLatitude]/[mainDestinationLongitude]
 /// (and its id, [mainDestinationId], for tap-to-navigate) represent the
 /// trip's own destination — checked last, since it's by far the most common
@@ -128,6 +136,13 @@ List<RouteStop> matchDayToRoute(
           longitude: place.longitude!,
           placeMapsUri: place.mapsUri.isEmpty ? null : place.mapsUri,
         ),
+      );
+      continue;
+    }
+
+    if (activity.latitude != null && activity.longitude != null) {
+      stops.add(
+        RouteStop(time: activity.time, name: activity.title, latitude: activity.latitude!, longitude: activity.longitude!),
       );
       continue;
     }

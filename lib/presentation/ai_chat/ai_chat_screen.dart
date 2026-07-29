@@ -10,12 +10,14 @@ import '../../ai/widgets/prompt_suggestion_chips.dart';
 import '../../ai/widgets/suggestion_pill.dart';
 import '../../ai/widgets/typing_indicator.dart';
 import '../../core/providers/auth_provider.dart';
+import '../../core/services/places_service.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/widgets/branding/app_logo.dart';
 import '../../data/repositories/destination_repository.dart';
 import '../../data/repositories/province_repository.dart';
 import '../../data/repositories/restaurant_repository.dart';
 import '../../domain/models/destination.dart';
+import '../../domain/models/place.dart';
 import '../../domain/models/province.dart';
 import '../../domain/models/restaurant.dart';
 
@@ -33,6 +35,7 @@ class AiChatScreen extends StatefulWidget {
 
 class _AiChatScreenState extends State<AiChatScreen> {
   final ScrollController _scrollController = ScrollController();
+  final PlacesService _places = PlacesService();
 
   /// Real featured destinations + provinces with a full guide, loaded once
   /// per chat session — grounds "destination recommendations" answers in
@@ -51,7 +54,11 @@ class _AiChatScreenState extends State<AiChatScreen> {
   /// The same Google Maps search URL shape `MapsLauncher.openDirections`
   /// builds — inlined here (rather than launching anything) so it can be
   /// handed to the AI as literal markdown link text.
-  String _mapsSearchUrl({required double latitude, required double longitude, required String label}) {
+  String _mapsSearchUrl({
+    required double latitude,
+    required double longitude,
+    required String label,
+  }) {
     return 'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent('$latitude,$longitude($label)')}';
   }
 
@@ -63,7 +70,9 @@ class _AiChatScreenState extends State<AiChatScreen> {
         RestaurantRepository().getPopular(limit: 10),
       ]);
       final destinations = results[0] as List<Destination>;
-      final provinces = (results[1] as List<Province>).where((p) => p.hasContent).toList();
+      final provinces = (results[1] as List<Province>)
+          .where((p) => p.hasContent)
+          .toList();
       final restaurants = results[2] as List<Restaurant>;
 
       final parts = <String>[];
@@ -76,7 +85,11 @@ class _AiChatScreenState extends State<AiChatScreen> {
       }
 
       final destinationsWithLinks = destinations
-          .where((d) => d.websiteUrl.isNotEmpty || (d.latitude != null && d.longitude != null))
+          .where(
+            (d) =>
+                d.websiteUrl.isNotEmpty ||
+                (d.latitude != null && d.longitude != null),
+          )
           .toList();
       if (destinationsWithLinks.isNotEmpty) {
         parts.add(
@@ -92,6 +105,60 @@ class _AiChatScreenState extends State<AiChatScreen> {
         );
       }
 
+      // Bounded to a handful of featured destinations (not every one, and
+      // not a broad country-wide text search) so opening the chat costs at
+      // most a few `placesSearchNearby` calls, not one per destination —
+      // `PlacesCacheService`'s 24h cache makes repeat opens free anyway.
+      // Live, not curated: unlike destinations/restaurants above, this app
+      // has no vetted accommodation catalog, so real hotel names/links only
+      // exist via a live Places lookup (same `PlaceCategory.lodging` search
+      // `AiRepository._fetchAccommodations` already uses for itineraries).
+      final destinationsWithCoords = destinations
+          .where((d) => d.latitude != null && d.longitude != null)
+          .take(3)
+          .toList();
+      final accommodationResults = await Future.wait(
+        destinationsWithCoords.map(
+          (d) => _places.searchNearby(
+            latitude: d.latitude!,
+            longitude: d.longitude!,
+            includedTypes: PlaceCategory.lodging,
+            maxResultCount: 5,
+          ),
+        ),
+      );
+      final accommodationsByDestination = <Destination, List<Place>>{};
+      for (var i = 0; i < destinationsWithCoords.length; i++) {
+        final ranked = [...accommodationResults[i]]
+          ..sort((a, b) => (b.rating ?? 0).compareTo(a.rating ?? 0));
+        if (ranked.isNotEmpty)
+          accommodationsByDestination[destinationsWithCoords[i]] = ranked
+              .take(2)
+              .toList();
+      }
+      if (accommodationsByDestination.isNotEmpty) {
+        parts.add(
+          'Real accommodations (hotels/resorts) near some featured destinations you can recommend by name '
+          '(never invent a hotel/resort that isn\'t one of these): '
+          '${accommodationsByDestination.entries.map((e) => '${e.key.name}: ${e.value.map((p) => p.name).join(', ')}').join('; ')}.',
+        );
+        final accommodationLinks = accommodationsByDestination.values
+            .expand((places) => places)
+            .where((p) => p.websiteUri.isNotEmpty || p.googleMapsUri.isNotEmpty)
+            .toList();
+        if (accommodationLinks.isNotEmpty) {
+          parts.add(
+            'Real links on file for some of those accommodations — only use these exact URLs, never invent one: '
+            '${accommodationLinks.map((p) {
+              final links = <String>[];
+              if (p.websiteUri.isNotEmpty) links.add('website: ${p.websiteUri}');
+              if (p.googleMapsUri.isNotEmpty) links.add('map: ${p.googleMapsUri}');
+              return '${p.name} (${links.join(', ')})';
+            }).join('; ')}.',
+          );
+        }
+      }
+
       if (restaurants.isNotEmpty) {
         parts.add(
           'Real restaurants in the TripNest PH catalog you can recommend by name '
@@ -101,7 +168,11 @@ class _AiChatScreenState extends State<AiChatScreen> {
       }
 
       final restaurantsWithLinks = restaurants
-          .where((r) => r.websiteUrl.isNotEmpty || (r.latitude != null && r.longitude != null))
+          .where(
+            (r) =>
+                r.websiteUrl.isNotEmpty ||
+                (r.latitude != null && r.longitude != null),
+          )
           .toList();
       if (restaurantsWithLinks.isNotEmpty) {
         parts.add(
@@ -118,10 +189,14 @@ class _AiChatScreenState extends State<AiChatScreen> {
       }
 
       if (provinces.isNotEmpty) {
-        parts.add('Provinces with a full TripNest PH in-app travel guide: ${provinces.map((p) => p.name).join(', ')}.');
+        parts.add(
+          'Provinces with a full TripNest PH in-app travel guide: ${provinces.map((p) => p.name).join(', ')}.',
+        );
       }
 
-      final withHotlines = provinces.where((p) => p.emergencyHotlines.isNotEmpty).toList();
+      final withHotlines = provinces
+          .where((p) => p.emergencyHotlines.isNotEmpty)
+          .toList();
       if (withHotlines.isNotEmpty) {
         parts.add(
           'Real emergency hotlines on file per province (use these verbatim if the traveler asks about safety/emergencies in one of these provinces, instead of inventing generic numbers): '
@@ -137,7 +212,12 @@ class _AiChatScreenState extends State<AiChatScreen> {
         );
       }
 
-      final withBudget = provinces.where((p) => p.estimatedDailyBudgetMin > 0 && p.estimatedDailyBudgetMax > 0).toList();
+      final withBudget = provinces
+          .where(
+            (p) =>
+                p.estimatedDailyBudgetMin > 0 && p.estimatedDailyBudgetMax > 0,
+          )
+          .toList();
       if (withBudget.isNotEmpty) {
         parts.add(
           'Real typical daily budget guide on file per province: '
@@ -145,7 +225,8 @@ class _AiChatScreenState extends State<AiChatScreen> {
         );
       }
 
-      if (mounted && parts.isNotEmpty) setState(() => _realDataContext = parts.join(' '));
+      if (mounted && parts.isNotEmpty)
+        setState(() => _realDataContext = parts.join(' '));
     } catch (_) {
       // Best-effort — chat still works fine with just profile-based context.
     }
@@ -180,13 +261,19 @@ class _AiChatScreenState extends State<AiChatScreen> {
     final user = context.read<AuthProvider>().currentUser;
     final parts = <String>[];
     if (user != null) {
-      if (user.travelPreferences.isNotEmpty) parts.add('Travel preferences: ${user.travelPreferences.join(', ')}.');
-      if (user.favoriteCategories.isNotEmpty) parts.add('Favorite categories: ${user.favoriteCategories.join(', ')}.');
+      if (user.travelPreferences.isNotEmpty)
+        parts.add('Travel preferences: ${user.travelPreferences.join(', ')}.');
+      if (user.favoriteCategories.isNotEmpty)
+        parts.add(
+          'Favorite categories: ${user.favoriteCategories.join(', ')}.',
+        );
     }
     if (_realDataContext != null) parts.add(_realDataContext!);
     if (parts.isEmpty) return null;
     final joined = parts.join(' ');
-    return joined.length > _maxContextChars ? joined.substring(0, _maxContextChars) : joined;
+    return joined.length > _maxContextChars
+        ? joined.substring(0, _maxContextChars)
+        : joined;
   }
 
   Future<void> _send(String text) async {
@@ -202,7 +289,10 @@ class _AiChatScreenState extends State<AiChatScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(icon: const Icon(Symbols.arrow_back_rounded), onPressed: () => context.pop()),
+        leading: IconButton(
+          icon: const Icon(Symbols.arrow_back_rounded),
+          onPressed: () => context.pop(),
+        ),
         title: const Text('AI Travel Assistant'),
         actions: [
           if (chat.messages.isNotEmpty)
@@ -223,7 +313,8 @@ class _AiChatScreenState extends State<AiChatScreen> {
                     padding: const EdgeInsets.all(AppSpacing.md),
                     itemCount: chat.messages.length + (chat.isSending ? 1 : 0),
                     itemBuilder: (context, i) {
-                      if (i == chat.messages.length) return const TypingIndicator();
+                      if (i == chat.messages.length)
+                        return const TypingIndicator();
                       return ChatBubble(message: chat.messages[i]);
                     },
                   ),
@@ -236,12 +327,19 @@ class _AiChatScreenState extends State<AiChatScreen> {
                 child: ListView.separated(
                   scrollDirection: Axis.horizontal,
                   itemCount: 3,
-                  separatorBuilder: (_, _) => const SizedBox(width: AppSpacing.sm),
+                  separatorBuilder: (_, _) =>
+                      const SizedBox(width: AppSpacing.sm),
                   itemBuilder: (context, i) {
-                    const quickFollowUps = ['Estimate my budget', 'Any hidden gems?', 'Safety tips'];
+                    const quickFollowUps = [
+                      'Estimate my budget',
+                      'Any hidden gems?',
+                      'Safety tips',
+                    ];
                     return SuggestionPill(
                       label: quickFollowUps[i],
-                      onTap: chat.isSending ? null : () => _send(quickFollowUps[i]),
+                      onTap: chat.isSending
+                          ? null
+                          : () => _send(quickFollowUps[i]),
                     );
                   },
                 ),
@@ -269,7 +367,11 @@ class _EmptyState extends StatelessWidget {
           const SizedBox(height: AppSpacing.xl),
           const AppLogo(size: 88),
           const SizedBox(height: AppSpacing.lg),
-          Text('Hi, I\'m your TripNest PH travel assistant!', style: theme.textTheme.headlineSmall, textAlign: TextAlign.center),
+          Text(
+            'Hi, I\'m your TripNest PH travel assistant!',
+            style: theme.textTheme.headlineSmall,
+            textAlign: TextAlign.center,
+          ),
           const SizedBox(height: AppSpacing.sm),
           Text(
             'Ask me to plan a trip, find hidden gems, estimate a budget, or recommend food — anywhere in the Philippines.',

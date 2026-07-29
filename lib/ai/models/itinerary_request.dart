@@ -33,9 +33,12 @@ class AiItineraryRequest {
   final Set<String> transportation;
   final Set<String> interests;
 
-  /// The destination's coordinates, used to fetch a real weather forecast.
-  /// Null for destinations without coordinates on file — the itinerary
-  /// still generates, it just has no "Weather Outlook" section.
+  /// The destination's coordinates, used to fetch a real weather forecast
+  /// and to anchor the day route map. Null for a "whole province" trip (no
+  /// single destination picked) — [AiRepository] falls back to geocoding
+  /// [provinceName] itself in that case (see `_resolveDestinationCoordinates`),
+  /// so those features degrade to "centered on the province" rather than
+  /// not working at all.
   final double? latitude;
   final double? longitude;
 

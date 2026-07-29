@@ -4,6 +4,7 @@ import '../../core/services/places_service.dart';
 import '../../core/services/weather_service.dart';
 import '../../core/utils/geo_distance.dart';
 import '../../data/mock/mock_itinerary.dart';
+import '../../domain/models/place.dart';
 import '../../data/repositories/destination_repository.dart';
 import '../../data/repositories/province_repository.dart';
 import '../../data/repositories/restaurant_repository.dart';
@@ -18,6 +19,11 @@ import '../prompts/itinerary_prompts.dart';
 import '../services/ai_cache_service.dart';
 import '../services/openai_service.dart';
 
+/// Locations shorter than this are skipped by [AiRepository._geocodeActivities]
+/// — a search this generic (e.g. "Hotel") risks matching an unrelated,
+/// same-named business rather than the specific place the activity means.
+const int _minGeocodableLocationLength = 4;
+
 /// The only layer that talks to [OpenAiService] directly. Providers call
 /// into here; nothing above this layer knows a REST API is involved.
 class AiRepository {
@@ -29,13 +35,13 @@ class AiRepository {
     ProvinceRepository? provinceRepository,
     WeatherService? weatherService,
     PlacesService? placesService,
-  })  : _openAi = openAiService ?? OpenAiService(),
-        _cache = cacheService ?? AiCacheService(),
-        _weather = weatherService ?? WeatherService(),
-        _places = placesService ?? PlacesService(),
-        _destinationRepositoryOverride = destinationRepository,
-        _restaurantRepositoryOverride = restaurantRepository,
-        _provinceRepositoryOverride = provinceRepository;
+  }) : _openAi = openAiService ?? OpenAiService(),
+       _cache = cacheService ?? AiCacheService(),
+       _weather = weatherService ?? WeatherService(),
+       _places = placesService ?? PlacesService(),
+       _destinationRepositoryOverride = destinationRepository,
+       _restaurantRepositoryOverride = restaurantRepository,
+       _provinceRepositoryOverride = provinceRepository;
 
   final OpenAiService _openAi;
   final AiCacheService _cache;
@@ -54,11 +60,14 @@ class AiRepository {
   RestaurantRepository? _restaurantRepositoryInstance;
   ProvinceRepository? _provinceRepositoryInstance;
   DestinationRepository get _destinationRepository =>
-      _destinationRepositoryOverride ?? (_destinationRepositoryInstance ??= DestinationRepository());
+      _destinationRepositoryOverride ??
+      (_destinationRepositoryInstance ??= DestinationRepository());
   RestaurantRepository get _restaurantRepository =>
-      _restaurantRepositoryOverride ?? (_restaurantRepositoryInstance ??= RestaurantRepository());
+      _restaurantRepositoryOverride ??
+      (_restaurantRepositoryInstance ??= RestaurantRepository());
   ProvinceRepository get _provinceRepository =>
-      _provinceRepositoryOverride ?? (_provinceRepositoryInstance ??= ProvinceRepository());
+      _provinceRepositoryOverride ??
+      (_provinceRepositoryInstance ??= ProvinceRepository());
 
   /// Generates a full itinerary for [request] and maps it into the app's
   /// existing [Itinerary] model, grounding restaurant/attraction picks
@@ -71,16 +80,25 @@ class AiRepository {
   /// [AiException.isConfigError] set — caught here and turned into a
   /// clearly-labeled sample itinerary instead, so "Generate Itinerary"
   /// always leads somewhere even before a real key is set up.
-  Future<Itinerary> generateItinerary(AiItineraryRequest request, {required String coverImageUrl}) async {
+  Future<Itinerary> generateItinerary(
+    AiItineraryRequest request, {
+    required String coverImageUrl,
+  }) async {
     try {
-      return await _generateItineraryViaAi(request, coverImageUrl: coverImageUrl);
+      return await _generateItineraryViaAi(
+        request,
+        coverImageUrl: coverImageUrl,
+      );
     } on AiException catch (e) {
       if (e.isConfigError) return _demoItinerary();
       rethrow;
     }
   }
 
-  Future<Itinerary> _generateItineraryViaAi(AiItineraryRequest request, {required String coverImageUrl}) async {
+  Future<Itinerary> _generateItineraryViaAi(
+    AiItineraryRequest request, {
+    required String coverImageUrl,
+  }) async {
     // Restaurants/attractions come from the curated Firestore catalog;
     // accommodations and Places-sourced attractions come live from Places
     // API; province facts (emergency hotlines/travel tips/budget guide) come
@@ -92,26 +110,52 @@ class AiRepository {
       _fetchAccommodations(request),
       _fetchPlaceAttractions(request),
       _provinceRepository.getById(request.provinceId),
+      _resolveDestinationCoordinates(request),
     ]);
     final candidateRestaurants = candidateResults[0] as List<Restaurant>;
-    final candidateAttractions =
-        (candidateResults[1] as List<Destination>).where((d) => d.id != request.destinationId).toList();
+    final candidateAttractions = (candidateResults[1] as List<Destination>)
+        .where((d) => d.id != request.destinationId)
+        .toList();
     final accommodations = candidateResults[2] as List<PlaceRecommendation>;
-    final candidatePlaceAttractions = candidateResults[3] as List<PlaceRecommendation>;
+    final candidatePlaceAttractions =
+        candidateResults[3] as List<PlaceRecommendation>;
     final province = candidateResults[4] as Province?;
+    final destinationCoordinates =
+        candidateResults[5] as ({double? latitude, double? longitude});
 
     // When the traveler said where they're staying, closer candidates lead
     // each list — combined with the explicit prompt instruction below, this
     // gives the AI both a ranking signal and an instruction, since it can't
     // reliably reason about real-world distance from a bare coordinate.
-    _sortByDistanceFromAccommodation(candidateRestaurants, request, (r) => r.latitude, (r) => r.longitude);
-    _sortByDistanceFromAccommodation(candidateAttractions, request, (d) => d.latitude, (d) => d.longitude);
-    _sortByDistanceFromAccommodation(candidatePlaceAttractions, request, (p) => p.latitude, (p) => p.longitude);
+    _sortByDistanceFromAccommodation(
+      candidateRestaurants,
+      request,
+      (r) => r.latitude,
+      (r) => r.longitude,
+    );
+    _sortByDistanceFromAccommodation(
+      candidateAttractions,
+      request,
+      (d) => d.latitude,
+      (d) => d.longitude,
+    );
+    _sortByDistanceFromAccommodation(
+      candidatePlaceAttractions,
+      request,
+      (p) => p.latitude,
+      (p) => p.longitude,
+    );
 
     // Runs alongside the (often slower) AI completion call below rather than
     // after it, so a real forecast never adds extra wait time.
-    final weatherFuture = request.latitude != null && request.longitude != null
-        ? _weather.getForecast(latitude: request.latitude!, longitude: request.longitude!, days: request.days)
+    final weatherFuture =
+        destinationCoordinates.latitude != null &&
+            destinationCoordinates.longitude != null
+        ? _weather.getForecast(
+            latitude: destinationCoordinates.latitude!,
+            longitude: destinationCoordinates.longitude!,
+            days: request.days,
+          )
         : Future.value(<WeatherForecast>[]);
 
     final signature = jsonEncode({
@@ -134,7 +178,9 @@ class AiRepository {
             'role': 'user',
             'content': ItineraryPrompts.user(
               request: request,
-              candidateRestaurantNames: candidateRestaurants.map((r) => r.name).toList(),
+              candidateRestaurantNames: candidateRestaurants
+                  .map((r) => r.name)
+                  .toList(),
               candidateAttractionNames: [
                 ...candidateAttractions.map((d) => d.name),
                 ...candidatePlaceAttractions.map((p) => p.name),
@@ -165,6 +211,35 @@ class AiRepository {
       candidatePlaceAttractions: candidatePlaceAttractions,
       accommodations: accommodations,
       weather: weather,
+      destinationLatitude: destinationCoordinates.latitude,
+      destinationLongitude: destinationCoordinates.longitude,
+    );
+  }
+
+  /// [AiItineraryRequest.latitude]/`longitude` are only ever set for a
+  /// specific-destination trip (see `ai_planner_screen.dart`'s `_generate()`)
+  /// — a "whole province" trip has no single stored coordinate, which used
+  /// to mean no weather forecast, no live accommodations/attractions bias,
+  /// and no main-destination anchor for the day route map. Falls back to
+  /// geocoding the province itself via the same live Places text search
+  /// [_geocodeActivities] uses, so those features degrade to "centered on
+  /// the province" instead of not working at all. Returns the request's own
+  /// coordinates unchanged when they're already set — no extra network call.
+  Future<({double? latitude, double? longitude})>
+  _resolveDestinationCoordinates(AiItineraryRequest request) async {
+    if (request.latitude != null && request.longitude != null) {
+      return (latitude: request.latitude, longitude: request.longitude);
+    }
+    final query = '${request.provinceName}, Philippines';
+    final results = await _places.searchText(
+      textQuery: query,
+      maxResultCount: 1,
+    );
+    if (results.isEmpty || !results.first.hasCoordinates)
+      return (latitude: null, longitude: null);
+    return (
+      latitude: results.first.latitude,
+      longitude: results.first.longitude,
     );
   }
 
@@ -183,7 +258,8 @@ class AiRepository {
     // Also covers the empty-list case: `_fetchAccommodations`/
     // `_fetchPlaceAttractions` return a `const []` when the destination has
     // no coordinates, and sorting an unmodifiable list throws.
-    if (accommodationLat == null || accommodationLng == null || items.isEmpty) return;
+    if (accommodationLat == null || accommodationLng == null || items.isEmpty)
+      return;
 
     double distanceOf(T item) {
       final lat = latitudeOf(item);
@@ -224,7 +300,9 @@ class AiRepository {
   /// surfaced directly from real results rather than routed through the
   /// LLM's own judgement, which would risk it hallucinating a
   /// plausible-sounding hotel name that isn't actually one of the results.
-  Future<List<PlaceRecommendation>> _fetchAccommodations(AiItineraryRequest request) async {
+  Future<List<PlaceRecommendation>> _fetchAccommodations(
+    AiItineraryRequest request,
+  ) async {
     if (request.latitude == null || request.longitude == null) return const [];
     final places = await _places.searchNearby(
       latitude: request.latitude!,
@@ -232,7 +310,8 @@ class AiRepository {
       includedTypes: PlaceCategory.lodging,
       maxResultCount: 10,
     );
-    final ranked = [...places]..sort((a, b) => (b.rating ?? 0).compareTo(a.rating ?? 0));
+    final ranked = [...places]
+      ..sort((a, b) => (b.rating ?? 0).compareTo(a.rating ?? 0));
     return ranked
         .take(3)
         .map(
@@ -242,11 +321,14 @@ class AiRepository {
             rating: p.rating,
             userRatingCount: p.userRatingCount,
             priceLevel: p.priceLevel,
-            photoUrl: p.photoNames.isNotEmpty ? _places.photoUrl(p.photoNames.first) : '',
+            photoUrl: p.photoNames.isNotEmpty
+                ? _places.photoUrl(p.photoNames.first)
+                : '',
             address: p.address,
             latitude: p.latitude,
             longitude: p.longitude,
             mapsUri: p.googleMapsUri,
+            websiteUri: p.websiteUri,
           ),
         )
         .toList();
@@ -256,7 +338,9 @@ class AiRepository {
   /// destination, offered as extra candidates alongside the curated
   /// Firestore `tourist_spots` list — same rating-ranked top-N pattern as
   /// [_fetchAccommodations].
-  Future<List<PlaceRecommendation>> _fetchPlaceAttractions(AiItineraryRequest request) async {
+  Future<List<PlaceRecommendation>> _fetchPlaceAttractions(
+    AiItineraryRequest request,
+  ) async {
     if (request.latitude == null || request.longitude == null) return const [];
     final places = await _places.searchNearby(
       latitude: request.latitude!,
@@ -264,7 +348,8 @@ class AiRepository {
       includedTypes: PlaceCategory.attractions,
       maxResultCount: 10,
     );
-    final ranked = [...places]..sort((a, b) => (b.rating ?? 0).compareTo(a.rating ?? 0));
+    final ranked = [...places]
+      ..sort((a, b) => (b.rating ?? 0).compareTo(a.rating ?? 0));
     return ranked
         .take(6)
         .map(
@@ -274,7 +359,9 @@ class AiRepository {
             rating: p.rating,
             userRatingCount: p.userRatingCount,
             priceLevel: p.priceLevel,
-            photoUrl: p.photoNames.isNotEmpty ? _places.photoUrl(p.photoNames.first) : '',
+            photoUrl: p.photoNames.isNotEmpty
+                ? _places.photoUrl(p.photoNames.first)
+                : '',
             address: p.address,
             latitude: p.latitude,
             longitude: p.longitude,
@@ -284,7 +371,76 @@ class AiRepository {
         .toList();
   }
 
-  Itinerary _parseItinerary(
+  /// Resolves each activity's own stated [ItineraryActivity.location] to a
+  /// real coordinate via a live Places API text search, so the day route map
+  /// (`itinerary_route_matcher.dart`) can plot places outside the trip's
+  /// pre-fetched restaurant/destination/attraction candidate lists — a
+  /// beach or river mentioned in an activity, say, which has no dedicated
+  /// Places category and so is never one of those candidates. Runs once at
+  /// generation time and gets saved with the itinerary, never re-searched on
+  /// later views. Best-effort: a location too short to search meaningfully,
+  /// or a search that finds nothing, just leaves that activity's coordinates
+  /// null — never fabricated, never blocks generation.
+  Future<List<ItineraryDay>> _geocodeActivities(
+    List<ItineraryDay> days, {
+    required String areaName,
+    double? biasLatitude,
+    double? biasLongitude,
+  }) async {
+    final uniqueLocations = <String>{};
+    for (final day in days) {
+      for (final activity in day.activities) {
+        final location = activity.location.trim();
+        if (location.length >= _minGeocodableLocationLength)
+          uniqueLocations.add(location);
+      }
+    }
+    if (uniqueLocations.isEmpty) return days;
+
+    final entries = await Future.wait(
+      uniqueLocations.map((location) async {
+        final results = await _places.searchText(
+          textQuery: '$location, $areaName',
+          maxResultCount: 1,
+          biasLatitude: biasLatitude,
+          biasLongitude: biasLongitude,
+        );
+        final match = results.isNotEmpty && results.first.hasCoordinates
+            ? results.first
+            : null;
+        return MapEntry(location, match);
+      }),
+    );
+    final resolved = <String, Place>{
+      for (final e in entries)
+        if (e.value != null) e.key: e.value!,
+    };
+    if (resolved.isEmpty) return days;
+
+    return days
+        .map(
+          (day) => ItineraryDay(
+            dayNumber: day.dayNumber,
+            dateLabel: day.dateLabel,
+            activities: day.activities.map((activity) {
+              final place = resolved[activity.location.trim()];
+              if (place == null) return activity;
+              return ItineraryActivity(
+                time: activity.time,
+                title: activity.title,
+                description: activity.description,
+                iconKey: activity.iconKey,
+                location: activity.location,
+                latitude: place.latitude,
+                longitude: place.longitude,
+              );
+            }).toList(),
+          ),
+        )
+        .toList();
+  }
+
+  Future<Itinerary> _parseItinerary(
     String raw, {
     required AiItineraryRequest request,
     required String coverImageUrl,
@@ -293,12 +449,16 @@ class AiRepository {
     required List<PlaceRecommendation> candidatePlaceAttractions,
     required List<PlaceRecommendation> accommodations,
     required List<WeatherForecast> weather,
-  }) {
+    required double? destinationLatitude,
+    required double? destinationLongitude,
+  }) async {
     Map<String, dynamic> json;
     try {
       json = jsonDecode(_stripCodeFences(raw)) as Map<String, dynamic>;
     } catch (_) {
-      throw const AiException('The AI returned an itinerary in an unexpected format. Please try again.');
+      throw const AiException(
+        'The AI returned an itinerary in an unexpected format. Please try again.',
+      );
     }
 
     try {
@@ -308,19 +468,34 @@ class AiRepository {
       final budgetBreakdown = (json['budgetBreakdown'] as List? ?? const [])
           .map((b) => BudgetItem.fromMap(Map<String, dynamic>.from(b as Map)))
           .toList();
-      final travelTips = List<String>.from(json['travelTips'] as List? ?? const []);
-      final totalBudget = (json['totalBudget'] as num?)?.toDouble() ??
+      final travelTips = List<String>.from(
+        json['travelTips'] as List? ?? const [],
+      );
+      final totalBudget =
+          (json['totalBudget'] as num?)?.toDouble() ??
           budgetBreakdown.fold<double>(0, (sum, b) => sum + b.amount);
 
-      final recommendedNames = List<String>.from(json['recommendedRestaurantNames'] as List? ?? const []);
-      final attractionNames = List<String>.from(json['nearbyAttractionNames'] as List? ?? const []);
+      final recommendedNames = List<String>.from(
+        json['recommendedRestaurantNames'] as List? ?? const [],
+      );
+      final attractionNames = List<String>.from(
+        json['nearbyAttractionNames'] as List? ?? const [],
+      );
 
       final restaurantIds = candidateRestaurants
-          .where((r) => recommendedNames.any((n) => n.toLowerCase() == r.name.toLowerCase()))
+          .where(
+            (r) => recommendedNames.any(
+              (n) => n.toLowerCase() == r.name.toLowerCase(),
+            ),
+          )
           .map((r) => r.id)
           .toList();
       final attractionIds = candidateAttractions
-          .where((d) => attractionNames.any((n) => n.toLowerCase() == d.name.toLowerCase()))
+          .where(
+            (d) => attractionNames.any(
+              (n) => n.toLowerCase() == d.name.toLowerCase(),
+            ),
+          )
           .map((d) => d.id)
           .toList();
       final matchedFirestoreAttractionNames = candidateAttractions
@@ -330,14 +505,25 @@ class AiRepository {
       final placeAttractionRecs = candidatePlaceAttractions
           .where(
             (p) => attractionNames.any(
-              (n) => n.toLowerCase() == p.name.toLowerCase() && !matchedFirestoreAttractionNames.contains(n.toLowerCase()),
+              (n) =>
+                  n.toLowerCase() == p.name.toLowerCase() &&
+                  !matchedFirestoreAttractionNames.contains(n.toLowerCase()),
             ),
           )
           .toList();
 
       if (days.isEmpty) {
-        throw const AiException('The AI returned an incomplete itinerary. Please try again.');
+        throw const AiException(
+          'The AI returned an incomplete itinerary. Please try again.',
+        );
       }
+
+      final geocodedDays = await _geocodeActivities(
+        days,
+        areaName: request.destinationName,
+        biasLatitude: destinationLatitude,
+        biasLongitude: destinationLongitude,
+      );
 
       return Itinerary(
         destinationName: request.destinationName,
@@ -345,7 +531,7 @@ class AiRepository {
         totalDays: request.days,
         travelers: request.travelers,
         totalBudget: totalBudget,
-        days: days,
+        days: geocodedDays,
         budgetBreakdown: budgetBreakdown,
         weather: weather,
         travelTips: travelTips,
@@ -356,24 +542,38 @@ class AiRepository {
         accommodationName: request.accommodationName ?? '',
         // Empty destinationId means a whole-province trip (see AiPlannerScreen's
         // _generate()) — no single destination to anchor day route maps to.
-        destinationId: request.destinationId.isEmpty ? null : request.destinationId,
-        destinationLatitude: request.latitude,
-        destinationLongitude: request.longitude,
+        destinationId: request.destinationId.isEmpty
+            ? null
+            : request.destinationId,
+        // A whole-province trip has [destinationLatitude]/[destinationLongitude]
+        // resolved by geocoding the province itself (see
+        // `_resolveDestinationCoordinates`), not `request.latitude`/`longitude`
+        // directly — those stay null for a whole-province request.
+        destinationLatitude: destinationLatitude,
+        destinationLongitude: destinationLongitude,
       );
     } on AiException {
       rethrow;
     } catch (_) {
-      throw const AiException('The AI returned an itinerary in an unexpected format. Please try again.');
+      throw const AiException(
+        'The AI returned an itinerary in an unexpected format. Please try again.',
+      );
     }
   }
 
   /// Sends the conversation so far to the assistant and returns its reply.
   /// [history] should already be capped to a reasonable window by the
   /// caller (see [AiChatProvider]) to bound token usage.
-  Future<String> sendChatMessage(List<AiChatMessage> history, {String? userContext}) {
+  Future<String> sendChatMessage(
+    List<AiChatMessage> history, {
+    String? userContext,
+  }) {
     return _openAi.complete(
       messages: [
-        {'role': 'system', 'content': ChatPrompts.systemPrompt(userContext: userContext)},
+        {
+          'role': 'system',
+          'content': ChatPrompts.systemPrompt(userContext: userContext),
+        },
         ...history.map((m) => {'role': m.apiRole, 'content': m.content}),
       ],
       temperature: 0.8,

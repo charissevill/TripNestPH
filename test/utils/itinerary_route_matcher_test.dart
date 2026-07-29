@@ -280,6 +280,57 @@ void main() {
     expect(stops.any((s) => s.time == 'Overview'), isFalse);
   });
 
+  test('uses an activity\'s own geocoded coordinates when no curated candidate matches', () {
+    final day = const ItineraryDay(
+      dayNumber: 1,
+      dateLabel: 'Day 1',
+      activities: [
+        ItineraryActivity(
+          time: 'Morning',
+          title: 'Beach Relaxation',
+          description: 'Relax at Alona Beach.',
+          iconKey: 'beach_access',
+          location: 'Alona Beach',
+          latitude: 9.5488,
+          longitude: 123.7729,
+        ),
+      ],
+    );
+
+    final stops = matchDayToRoute(day, restaurants: const [], destinations: const [], placeRecommendations: const []);
+
+    expect(stops, hasLength(1));
+    expect(stops[0].name, 'Beach Relaxation');
+    expect(stops[0].latitude, 9.5488);
+    expect(stops[0].longitude, 123.7729);
+    expect(stops[0].destinationId, isNull);
+    expect(stops[0].restaurantId, isNull);
+  });
+
+  test('prefers a curated restaurant match over an activity\'s own geocoded coordinates', () {
+    final day = ItineraryDay(
+      dayNumber: 1,
+      dateLabel: 'Day 1',
+      activities: [
+        ItineraryActivity(
+          time: 'Afternoon',
+          title: 'Lunch at ${restaurant.name}',
+          description: '',
+          iconKey: 'restaurant',
+          location: 'Panglao',
+          latitude: 1,
+          longitude: 1,
+        ),
+      ],
+    );
+
+    final stops = matchDayToRoute(day, restaurants: [restaurant], destinations: const []);
+
+    expect(stops, hasLength(1));
+    expect(stops[0].restaurantId, restaurant.id);
+    expect(stops[0].latitude, restaurant.latitude);
+  });
+
   test('does not match activities that mention no known place', () {
     final day = const ItineraryDay(
       dayNumber: 1,

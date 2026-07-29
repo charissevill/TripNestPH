@@ -9,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:tripnest_ph/ai/models/itinerary_request.dart';
 import 'package:tripnest_ph/ai/repositories/ai_repository.dart';
 import 'package:tripnest_ph/ai/services/openai_service.dart';
+import 'package:tripnest_ph/core/services/places_service.dart';
 import 'package:tripnest_ph/core/services/weather_service.dart';
 import 'package:tripnest_ph/core/utils/function_caller.dart';
 import 'package:tripnest_ph/data/repositories/destination_repository.dart';
@@ -24,6 +25,29 @@ FunctionCaller _fakeAiComplete(Map<String, dynamic> itineraryJson, {void Functio
     expect(name, 'aiComplete');
     onCall?.call(data);
     return {'content': jsonEncode(itineraryJson)};
+  };
+}
+
+/// Fakes the `placesSearchText` Cloud Function, keyed by exact `textQuery`,
+/// mirroring the real response shape [Place.fromJson] expects. A query with
+/// no entry in [responsesByQuery] resolves as "found nothing" (`places: []`),
+/// same as a real search with no results.
+FunctionCaller _fakePlacesSearchText(Map<String, List<Map<String, dynamic>>> responsesByQuery) {
+  return (name, data) async {
+    expect(name, 'placesSearchText');
+    final query = data['textQuery'] as String;
+    return {'places': responsesByQuery[query] ?? const []};
+  };
+}
+
+/// Fakes the `placesSearchNearby` Cloud Function with a single canned
+/// response list, regardless of query — used to test `_fetchAccommodations`/
+/// `_fetchPlaceAttractions` in isolation from the geocoding calls, which go
+/// through `placesSearchText` instead.
+FunctionCaller _fakePlacesSearchNearby(List<Map<String, dynamic>> places) {
+  return (name, data) async {
+    expect(name, 'placesSearchNearby');
+    return {'places': places};
   };
 }
 
@@ -377,5 +401,273 @@ void main() {
     final userContent = messages.last['content'] as String;
     expect(userContent, contains('Test Resort'));
     expect(userContent.indexOf('Near Bistro'), lessThan(userContent.indexOf('Far Away Diner')));
+  });
+
+  test(
+    'generateItinerary() geocodes an activity location that matches no candidate list, via a live Places search',
+    () async {
+      final firestore = FakeFirebaseFirestore();
+      final caller = _fakeAiComplete({
+        'days': [
+          {
+            'dayNumber': 1,
+            'dateLabel': 'Day 1',
+            'activities': [
+              {
+                'time': 'Morning',
+                'title': 'Beach Relaxation',
+                'description': 'Relax at the beach.',
+                'iconKey': 'beach_access',
+                'location': 'Alona Beach',
+              },
+            ],
+          },
+        ],
+        'budgetBreakdown': <Map<String, dynamic>>[],
+        'travelTips': <String>[],
+        'totalBudget': 0,
+        'recommendedRestaurantNames': <String>[],
+        'nearbyAttractionNames': <String>[],
+      });
+      final placesCaller = _fakePlacesSearchText({
+        'Alona Beach, Panglao': [
+          {
+            'id': 'places/alona-beach',
+            'displayName': {'text': 'Alona Beach'},
+            'location': {'latitude': 9.5488, 'longitude': 123.7729},
+          },
+        ],
+      });
+
+      final repository = AiRepository(
+        openAiService: OpenAiService(caller: caller),
+        placesService: PlacesService(caller: placesCaller),
+        destinationRepository: DestinationRepository(firestore: firestore),
+        restaurantRepository: RestaurantRepository(firestore: firestore),
+        provinceRepository: ProvinceRepository(firestore: firestore),
+      );
+
+      final itinerary = await repository.generateItinerary(
+        const AiItineraryRequest(
+          destinationId: 'panglao-1',
+          destinationName: 'Panglao',
+          provinceId: 'bohol',
+          provinceName: 'Bohol',
+          budgetTierLabel: 'Budget',
+          budgetRange: '₱5k - ₱15k',
+          days: 1,
+          travelers: 1,
+          travelerType: 'Solo',
+          transportation: {'Flight'},
+          interests: {'Beaches'},
+        ),
+        coverImageUrl: '',
+      );
+
+      final activity = itinerary.days.single.activities.single;
+      expect(activity.latitude, 9.5488);
+      expect(activity.longitude, 123.7729);
+    },
+  );
+
+  // Uses a distinct AiItineraryRequest signature from the test above — the
+  // AI response is keyed and cached by request signature (AiCacheService),
+  // so two tests with identical params would silently share one cached
+  // itinerary/Places result instead of exercising their own fakes.
+
+  test('generateItinerary() leaves an activity ungeocoded when the Places search finds nothing', () async {
+    final firestore = FakeFirebaseFirestore();
+    final caller = _fakeAiComplete({
+      'days': [
+        {
+          'dayNumber': 1,
+          'dateLabel': 'Day 1',
+          'activities': [
+            {
+              'time': 'Morning',
+              'title': 'Free time',
+              'description': 'Rest at the hotel.',
+              'iconKey': 'hotel',
+              'location': 'Somewhere vague',
+            },
+          ],
+        },
+      ],
+      'budgetBreakdown': <Map<String, dynamic>>[],
+      'travelTips': <String>[],
+      'totalBudget': 0,
+      'recommendedRestaurantNames': <String>[],
+      'nearbyAttractionNames': <String>[],
+    });
+
+    final repository = AiRepository(
+      openAiService: OpenAiService(caller: caller),
+      placesService: PlacesService(caller: _fakePlacesSearchText(const {})),
+      destinationRepository: DestinationRepository(firestore: firestore),
+      restaurantRepository: RestaurantRepository(firestore: firestore),
+      provinceRepository: ProvinceRepository(firestore: firestore),
+    );
+
+    final itinerary = await repository.generateItinerary(
+      const AiItineraryRequest(
+        destinationId: 'panglao-2',
+        destinationName: 'Panglao',
+        provinceId: 'bohol',
+        provinceName: 'Bohol',
+        budgetTierLabel: 'Budget',
+        budgetRange: '₱5k - ₱15k',
+        days: 1,
+        travelers: 1,
+        travelerType: 'Solo',
+        transportation: {'Flight'},
+        interests: {'Beaches'},
+      ),
+      coverImageUrl: '',
+    );
+
+    final activity = itinerary.days.single.activities.single;
+    expect(activity.latitude, isNull);
+    expect(activity.longitude, isNull);
+  });
+
+  test(
+    'generateItinerary() falls back to geocoding the province for a whole-province trip (no destinationId/coordinates)',
+    () async {
+      final firestore = FakeFirebaseFirestore();
+      final caller = _fakeAiComplete({
+        'days': [
+          {'dayNumber': 1, 'dateLabel': 'Day 1', 'activities': <Map<String, dynamic>>[]},
+        ],
+        'budgetBreakdown': <Map<String, dynamic>>[],
+        'travelTips': <String>[],
+        'totalBudget': 0,
+        'recommendedRestaurantNames': <String>[],
+        'nearbyAttractionNames': <String>[],
+      });
+      // A province name unused by any other test in this file — the Places
+      // search cache (PlacesCacheService, backed by the shared mock
+      // SharedPreferences store) persists across tests in the same run, so
+      // reusing a query another test already made (and cached the response
+      // of) would silently return that other test's cached result instead
+      // of hitting this test's own fake.
+      final placesCaller = _fakePlacesSearchText({
+        'Siargao, Philippines': [
+          {
+            'id': 'places/siargao',
+            'displayName': {'text': 'Siargao'},
+            'location': {'latitude': 9.8500, 'longitude': 126.0455},
+          },
+        ],
+      });
+      final weatherClient = MockClient((request) async {
+        expect(request.url.toString(), contains('latitude=9.85'));
+        expect(request.url.toString(), contains('longitude=126.0455'));
+        return http.Response(
+          jsonEncode({
+            'daily': {
+              'time': ['2026-08-01'],
+              'weathercode': [0],
+              'temperature_2m_max': [31.0],
+              'temperature_2m_min': [24.0],
+            },
+          }),
+          200,
+        );
+      });
+
+      final repository = AiRepository(
+        openAiService: OpenAiService(caller: caller),
+        placesService: PlacesService(caller: placesCaller),
+        weatherService: WeatherService(client: weatherClient),
+        destinationRepository: DestinationRepository(firestore: firestore),
+        restaurantRepository: RestaurantRepository(firestore: firestore),
+        provinceRepository: ProvinceRepository(firestore: firestore),
+      );
+
+      // No destinationId and no latitude/longitude — exactly what
+      // AiPlannerScreen sends for a "whole province" trip.
+      final itinerary = await repository.generateItinerary(
+        const AiItineraryRequest(
+          destinationId: '',
+          destinationName: 'Siargao',
+          provinceId: 'siargao',
+          provinceName: 'Siargao',
+          budgetTierLabel: 'Budget',
+          budgetRange: '₱5k - ₱15k',
+          days: 1,
+          travelers: 1,
+          travelerType: 'Solo',
+          transportation: {'Flight'},
+          interests: {'Beaches'},
+        ),
+        coverImageUrl: '',
+      );
+
+      expect(itinerary.weather, hasLength(1));
+      expect(itinerary.weather.single.highTemp, 31);
+      expect(itinerary.destinationId, isNull);
+      expect(itinerary.destinationLatitude, 9.85);
+      expect(itinerary.destinationLongitude, 126.0455);
+    },
+  );
+
+  test('generateItinerary() carries a recommended accommodation\'s real website through to PlaceRecommendation', () async {
+    final firestore = FakeFirebaseFirestore();
+    final caller = _fakeAiComplete({
+      'days': [
+        {'dayNumber': 1, 'dateLabel': 'Day 1', 'activities': <Map<String, dynamic>>[]},
+      ],
+      'budgetBreakdown': <Map<String, dynamic>>[],
+      'travelTips': <String>[],
+      'totalBudget': 0,
+      'recommendedRestaurantNames': <String>[],
+      'nearbyAttractionNames': <String>[],
+    });
+    // Same canned response for both `_fetchAccommodations` and
+    // `_fetchPlaceAttractions` (both hit `placesSearchNearby`) — only
+    // `recommendedAccommodations` is asserted below, so this is harmless.
+    final placesCaller = _fakePlacesSearchNearby([
+      {
+        'id': 'places/sample-resort',
+        'displayName': {'text': 'Sample Beach Resort'},
+        'location': {'latitude': 9.75, 'longitude': 118.75},
+        'websiteUri': 'https://samplebeachresort.example.com',
+      },
+    ]);
+
+    final repository = AiRepository(
+      openAiService: OpenAiService(caller: caller),
+      placesService: PlacesService(caller: placesCaller),
+      destinationRepository: DestinationRepository(firestore: firestore),
+      restaurantRepository: RestaurantRepository(firestore: firestore),
+      provinceRepository: ProvinceRepository(firestore: firestore),
+    );
+
+    // A coordinate not reused by any other test in this file — the
+    // `PlacesCacheService`/`AiCacheService` caches persist across tests
+    // sharing this file's single `setUpAll` mock SharedPreferences store,
+    // so reusing another test's lat/lng could silently return its cached
+    // (empty) Places result instead of hitting this test's own fake.
+    final itinerary = await repository.generateItinerary(
+      const AiItineraryRequest(
+        destinationId: 'palawan-99',
+        destinationName: 'Palawan',
+        provinceId: 'palawan',
+        provinceName: 'Palawan',
+        budgetTierLabel: 'Budget',
+        budgetRange: '₱5k - ₱15k',
+        days: 1,
+        travelers: 1,
+        travelerType: 'Solo',
+        transportation: {'Flight'},
+        interests: {'Beaches'},
+        latitude: 10.1234,
+        longitude: 119.5678,
+      ),
+      coverImageUrl: '',
+    );
+
+    expect(itinerary.recommendedAccommodations, hasLength(1));
+    expect(itinerary.recommendedAccommodations.single.websiteUri, 'https://samplebeachresort.example.com');
   });
 }

@@ -1,3 +1,4 @@
+const crypto = require('node:crypto');
 const { onDocumentCreated } = require('firebase-functions/v2/firestore');
 const { onCall, onRequest, HttpsError } = require('firebase-functions/v2/https');
 const { defineSecret } = require('firebase-functions/params');
@@ -16,6 +17,57 @@ const auth = getAuth();
 // from a client-readable source — see `aiComplete`/`placesSearch*` below.
 const groqApiKey = defineSecret('GROQ_API_KEY');
 const googlePlacesApiKey = defineSecret('GOOGLE_PLACES_API_KEY');
+
+/**
+ * Per-uid, per-function rolling-window request cap, backed by one small
+ * Firestore doc per (uid, key) pair — so a scripted or compromised client
+ * can't run up billing on Groq/Places/Routes under a single signed-in
+ * account. A rolling window (recent timestamps, not a fixed bucket) so a
+ * burst right at a bucket boundary can't double the effective limit; a
+ * transaction makes the read-check-write atomic against concurrent calls
+ * from the same user. Throws `resource-exhausted`, which every caller here
+ * already has to handle (it's the same code Groq's own 429 maps to above).
+ */
+const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000;
+
+async function enforceRateLimit(uid, key, limit) {
+  const ref = db.collection('rate_limits').doc(`${uid}_${key}`);
+  const now = Date.now();
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    const existing = Array.isArray(snap.data()?.timestamps) ? snap.data().timestamps : [];
+    const recent = existing.filter((t) => now - t < RATE_LIMIT_WINDOW_MS);
+    if (recent.length >= limit) {
+      throw new HttpsError('resource-exhausted', "You're doing that too often — please wait a bit and try again.");
+    }
+    recent.push(now);
+    tx.set(ref, { timestamps: recent, updatedAt: now });
+  });
+}
+
+/**
+ * Signs a real Google Places photo resource name (`places/{id}/photos/{id2}`)
+ * into an opaque token the client can round-trip unchanged through
+ * `PlacesService.photoUrl()` with zero Dart-side changes — see `placesPhoto`
+ * below for why this exists and why it never expires.
+ */
+function signPlacesPhotoName(photoName, apiKey) {
+  const encodedName = Buffer.from(photoName, 'utf8').toString('base64url');
+  const sig = crypto.createHmac('sha256', apiKey).update(photoName).digest('hex');
+  return `${encodedName}.${sig}`;
+}
+
+function attachPhotoSignatures(places, apiKey) {
+  for (const place of places ?? []) {
+    if (!Array.isArray(place.photos)) continue;
+    for (const photo of place.photos) {
+      if (typeof photo?.name === 'string') {
+        photo.name = signPlacesPhotoName(photo.name, apiKey);
+      }
+    }
+  }
+  return places;
+}
 
 /**
  * Mirrors the CALLER's OWN `admin_users/{uid}` doc into their Auth custom
@@ -92,6 +144,7 @@ const GROQ_MODEL = 'llama-3.3-70b-versatile';
 
 exports.aiComplete = onCall({ region: 'asia-southeast1', secrets: [groqApiKey], timeoutSeconds: 60 }, async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.');
+  await enforceRateLimit(request.auth.uid, 'aiComplete', 30);
 
   const apiKey = groqApiKey.value();
   if (!apiKey) throw new HttpsError('failed-precondition', 'AI features aren\'t set up yet.');
@@ -157,6 +210,7 @@ const PLACES_FIELD_MASK = 'places.id,places.displayName,places.types,places.phot
  */
 exports.placesSearchNearby = onCall({ region: 'asia-southeast1', secrets: [googlePlacesApiKey] }, async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.');
+  await enforceRateLimit(request.auth.uid, 'placesSearchNearby', 120);
   const apiKey = googlePlacesApiKey.value();
   if (!apiKey) return { places: [] };
 
@@ -176,10 +230,14 @@ exports.placesSearchNearby = onCall({ region: 'asia-southeast1', secrets: [googl
         locationRestriction: { circle: { center: { latitude, longitude }, radius: radiusMeters ?? 5000 } },
       }),
     });
-    if (response.status !== 200) return { places: [] };
+    if (response.status !== 200) {
+      console.error('placesSearchNearby: Places API returned', response.status, await response.text().catch(() => ''));
+      return { places: [] };
+    }
     const json = await response.json().catch(() => null);
-    return { places: json?.places ?? [] };
+    return { places: attachPhotoSignatures(json?.places ?? [], apiKey) };
   } catch (e) {
+    console.error('placesSearchNearby: request failed', e);
     return { places: [] };
   }
 });
@@ -192,6 +250,7 @@ exports.placesSearchNearby = onCall({ region: 'asia-southeast1', secrets: [googl
  */
 exports.placesSearchText = onCall({ region: 'asia-southeast1', secrets: [googlePlacesApiKey] }, async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.');
+  await enforceRateLimit(request.auth.uid, 'placesSearchText', 120);
   const apiKey = googlePlacesApiKey.value();
   if (!apiKey) return { places: [] };
 
@@ -211,10 +270,14 @@ exports.placesSearchText = onCall({ region: 'asia-southeast1', secrets: [googleP
       headers: { 'Content-Type': 'application/json', 'X-Goog-Api-Key': apiKey, 'X-Goog-FieldMask': PLACES_FIELD_MASK },
       body: JSON.stringify(body),
     });
-    if (response.status !== 200) return { places: [] };
+    if (response.status !== 200) {
+      console.error('placesSearchText: Places API returned', response.status, await response.text().catch(() => ''));
+      return { places: [] };
+    }
     const json = await response.json().catch(() => null);
-    return { places: json?.places ?? [] };
+    return { places: attachPhotoSignatures(json?.places ?? [], apiKey) };
   } catch (e) {
+    console.error('placesSearchText: request failed', e);
     return { places: [] };
   }
 });
@@ -231,6 +294,7 @@ exports.placesSearchText = onCall({ region: 'asia-southeast1', secrets: [googleP
  */
 exports.computeTripRoute = onCall({ region: 'asia-southeast1', secrets: [googlePlacesApiKey] }, async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.');
+  await enforceRateLimit(request.auth.uid, 'computeTripRoute', 60);
   const apiKey = googlePlacesApiKey.value();
   if (!apiKey) return { encodedPolyline: null, legs: [] };
 
@@ -293,21 +357,52 @@ exports.computeTripRoute = onCall({ region: 'asia-southeast1', secrets: [googleP
  * Proxies a single Places photo's bytes so `photoUrl()` never has to embed
  * the raw API key in a URL handed to `CachedNetworkImage` (which can't
  * attach a Firebase Auth header the way the callable functions above use).
- * Deliberately public/unauthenticated — the cost surface of a photo fetch
- * is small and bounded, unlike `aiComplete`/`placesSearch*`, and this way
- * the underlying key is still never extractable from the client either way.
+ * Deliberately public/unauthenticated (no Firebase Auth check) — but NOT a
+ * free-for-all forwarder: `photoName` must be one of the signed tokens
+ * `attachPhotoSignatures` mints inside the authenticated
+ * `placesSearchNearby`/`placesSearchText` calls above, so a request for an
+ * arbitrary Google Places photo this app never actually surfaced is
+ * rejected before it ever reaches (and bills) the upstream API. The
+ * signature never expires — this is a request-provenance check ("did our
+ * own search functions vouch for this exact name"), not a short-lived
+ * capability token — so a photoUrl already baked into a saved itinerary
+ * months ago keeps working.
  */
 // Google's own Places API (New) photo resource name shape:
-// places/{placeId}/photos/{photoId}. Rejecting anything else stops this
-// public, unauthenticated proxy from being used as a free-form forwarder
-// to arbitrary paths under places.googleapis.com with our billed API key.
+// places/{placeId}/photos/{photoId}.
 const PLACES_PHOTO_NAME_PATTERN = /^places\/[^/]+\/photos\/[^/]+$/;
+
+function verifySignedPlacesPhotoToken(token, apiKey) {
+  const lastDot = token.lastIndexOf('.');
+  if (lastDot === -1) return null;
+  const encodedName = token.slice(0, lastDot);
+  const sig = token.slice(lastDot + 1);
+
+  let photoName;
+  try {
+    photoName = Buffer.from(encodedName, 'base64url').toString('utf8');
+  } catch {
+    return null;
+  }
+  if (!PLACES_PHOTO_NAME_PATTERN.test(photoName)) return null;
+
+  const expected = crypto.createHmac('sha256', apiKey).update(photoName).digest();
+  let provided;
+  try {
+    provided = Buffer.from(sig, 'hex');
+  } catch {
+    return null;
+  }
+  if (provided.length !== expected.length || !crypto.timingSafeEqual(provided, expected)) return null;
+  return photoName;
+}
 
 exports.placesPhoto = onRequest({ region: 'asia-southeast1', secrets: [googlePlacesApiKey] }, async (req, res) => {
   const apiKey = googlePlacesApiKey.value();
-  const photoName = req.query.photoName;
-  if (!apiKey || typeof photoName !== 'string' || !PLACES_PHOTO_NAME_PATTERN.test(photoName)) {
-    res.status(400).send('Bad request');
+  const token = req.query.photoName;
+  const photoName = apiKey && typeof token === 'string' ? verifySignedPlacesPhotoToken(token, apiKey) : null;
+  if (!photoName) {
+    res.status(403).send('Forbidden');
     return;
   }
   // Clamped rather than passed through raw, so this can't be abused to

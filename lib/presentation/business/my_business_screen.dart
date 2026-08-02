@@ -9,13 +9,17 @@ import '../../core/utils/app_exception.dart';
 import '../../core/utils/validators.dart';
 import '../../core/widgets/buttons/animated_button.dart';
 import '../../core/widgets/dialogs/discard_changes_scope.dart';
+import '../../core/widgets/indicators/rating_widget.dart';
 import '../../core/widgets/inputs/hero_image_picker.dart';
 import '../../core/widgets/states/loading_widget.dart';
 import '../../data/repositories/business_repository.dart';
+import '../../data/repositories/favorites_repository.dart';
 import '../../data/repositories/province_repository.dart';
 import '../../data/repositories/restaurant_repository.dart';
+import '../../data/repositories/review_repository.dart';
 import '../../domain/models/business.dart';
 import '../../domain/models/province.dart';
+import '../../domain/models/review.dart';
 
 const List<String> _priceRanges = ['₱', '₱₱', '₱₱₱', '₱₱₱₱'];
 
@@ -287,6 +291,8 @@ class _BusinessFormState extends State<_BusinessForm> {
                 if (existing != null) ...[
                   _statusBanner(existing),
                   const SizedBox(height: AppSpacing.lg),
+                  _PerformanceSection(business: existing),
+                  const SizedBox(height: AppSpacing.xl),
                 ],
                 TextFormField(
                   controller: _nameController,
@@ -424,6 +430,151 @@ class _BusinessFormState extends State<_BusinessForm> {
           ),
         );
       },
+    );
+  }
+}
+
+/// Rating/review-count/favorite-count stats plus a recent-reviews list —
+/// only meaningful for a [BusinessCategory.foodAndDining] listing once
+/// approved and mirrored to `restaurants` (see [Business]'s class doc):
+/// that mirrored doc is the only thing travelers can ever review or
+/// favorite, since every other category has no public-facing counterpart
+/// in the app yet. `firestore.rules` already lets any signed-in user read
+/// `reviews`, and any active Admin Portal account (any role) read other
+/// travelers' `favorites` docs, so no rules changes were needed for this.
+class _PerformanceSection extends StatelessWidget {
+  const _PerformanceSection({required this.business});
+
+  final Business business;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!business.isFoodAndDining || business.restaurantId.isEmpty) {
+      return const _Banner(
+        color: AppColors.textTertiary,
+        icon: Symbols.info_rounded,
+        text: 'Performance stats and reviews show up here once this is an approved Food & Dining listing.',
+      );
+    }
+    return StreamBuilder<List<Review>>(
+      stream: ReviewRepository().streamForTarget(business.restaurantId, ReviewTargetType.restaurant),
+      builder: (context, snapshot) {
+        final reviews = snapshot.data ?? const <Review>[];
+        final rating = reviews.isEmpty
+            ? 0.0
+            : reviews.map((r) => r.rating).reduce((a, b) => a + b) / reviews.length;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: _MiniStatCard(
+                    icon: Symbols.star_rounded,
+                    label: 'Rating',
+                    value: reviews.isEmpty ? '—' : rating.toStringAsFixed(1),
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: _MiniStatCard(
+                    icon: Symbols.reviews_rounded,
+                    label: 'Reviews',
+                    value: '${reviews.length}',
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: FutureBuilder<int>(
+                    future: FavoritesRepository().countForItem(FavoriteType.restaurant, business.restaurantId),
+                    builder: (context, favSnapshot) => _MiniStatCard(
+                      icon: Symbols.favorite_rounded,
+                      label: 'Favorited',
+                      value: favSnapshot.hasData ? '${favSnapshot.data}' : '—',
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            if (reviews.isNotEmpty) ...[
+              const SizedBox(height: AppSpacing.lg),
+              Text('Recent Reviews', style: Theme.of(context).textTheme.titleSmall),
+              const SizedBox(height: AppSpacing.sm),
+              ...reviews.take(5).map((r) => _ReviewTile(review: r)),
+            ],
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _MiniStatCard extends StatelessWidget {
+  const _MiniStatCard({required this.icon, required this.label, required this.value});
+
+  final IconData icon;
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.sm),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(color: theme.colorScheme.outline),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 18, color: theme.colorScheme.primary),
+          const SizedBox(height: 4),
+          Text(value, style: theme.textTheme.titleMedium),
+          Text(label, style: theme.textTheme.bodySmall),
+        ],
+      ),
+    );
+  }
+}
+
+class _ReviewTile extends StatelessWidget {
+  const _ReviewTile({required this.review});
+
+  final Review review;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+      child: Container(
+        padding: const EdgeInsets.all(AppSpacing.sm),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surface,
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          border: Border.all(color: theme.colorScheme.outline),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(review.authorName, style: theme.textTheme.titleSmall),
+                RatingWidget(rating: review.rating),
+              ],
+            ),
+            const SizedBox(height: 2),
+            Text(review.date, style: theme.textTheme.bodySmall),
+            if (review.comment.isNotEmpty) ...[
+              const SizedBox(height: AppSpacing.xs),
+              Text(review.comment, style: theme.textTheme.bodyMedium),
+            ],
+          ],
+        ),
+      ),
     );
   }
 }

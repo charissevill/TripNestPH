@@ -79,6 +79,22 @@ class FavoritesRepository {
         .map((snapshot) => snapshot.docs.map((doc) => Place.fromCacheJson(doc.data())).toList());
   }
 
+  /// How many travelers have favorited [itemId] — requires reading other
+  /// users' favorite docs, which `firestore.rules` only grants to an
+  /// active Admin Portal account of any role (see the `favorites` match
+  /// block's `isActiveAdmin()` branch), not a plain traveler.
+  Future<int> countForItem(FavoriteType type, String itemId) async {
+    try {
+      final snapshot = await _collection
+          .where('itemType', isEqualTo: type.name)
+          .where('itemId', isEqualTo: itemId)
+          .get();
+      return snapshot.docs.length;
+    } catch (e) {
+      throw AppException.from(e);
+    }
+  }
+
   Future<void> remove(String userId, FavoriteType type, String itemId) async {
     try {
       await _collection.doc(_docId(userId, type, itemId)).delete();

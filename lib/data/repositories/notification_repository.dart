@@ -69,4 +69,32 @@ class NotificationRepository {
       throw AppException.from(e);
     }
   }
+
+  /// A notification aimed at exactly one traveler — e.g. "your business
+  /// listing was approved" — rather than [createBroadcast]'s every-user
+  /// send. `firestore.rules` only lets an 'admin' account write a non-empty
+  /// `userId` here (not 'lgu', which only ever sends broadcasts).
+  Future<void> createForUser({
+    required String userId,
+    required String title,
+    required String body,
+    required NotificationCategory category,
+    String? relatedId,
+  }) async {
+    try {
+      await _collection.add(
+        AppNotification(
+          id: '',
+          userId: userId,
+          title: title,
+          body: body,
+          category: category,
+          createdAt: DateTime.now(),
+          relatedId: relatedId,
+        ).toMap(),
+      );
+    } catch (e) {
+      throw AppException.from(e);
+    }
+  }
 }

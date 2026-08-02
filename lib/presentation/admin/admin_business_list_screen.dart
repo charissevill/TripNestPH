@@ -8,7 +8,9 @@ import '../../core/widgets/dialogs/confirmation_dialog.dart';
 import '../../core/widgets/states/empty_state_widget.dart';
 import '../../core/widgets/states/loading_widget.dart';
 import '../../data/repositories/business_repository.dart';
+import '../../data/repositories/notification_repository.dart';
 import '../../data/repositories/restaurant_repository.dart';
+import '../../domain/models/app_notification.dart';
 import '../../domain/models/business.dart';
 
 /// Admin-only approval queue for `businessOwner` self-service listings —
@@ -44,35 +46,45 @@ class _AdminBusinessListScreenState extends State<AdminBusinessListScreen> {
     }
   }
 
-  Future<void> _approve(Business business) async {
-    final confirmed = await showConfirmationDialog(
-      context,
-      title: 'Approve this listing?',
-      message:
-          '"${business.name}" will become visible to travelers on its province page.',
-      confirmLabel: 'Approve',
-    );
-    if (!confirmed || !mounted) return;
-    await _run(() async {
-      await _syncRestaurantBeforeApproval(business);
-      await _repository.setStatus(business.id, status: 'approved');
-    });
+  /// Best-effort — the status change itself already succeeded by the time
+  /// this is called, so a failed notification send is swallowed rather than
+  /// reported as if the whole action failed.
+  Future<void> _notifyOwner(
+    Business business, {
+    required String title,
+    required String body,
+  }) async {
+    try {
+      await NotificationRepository().createForUser(
+        userId: business.ownerId,
+        title: title,
+        body: body,
+        category: NotificationCategory.general,
+      );
+    } catch (_) {}
   }
 
-  Future<void> _reject(Business business) async {
+  /// Shared by [_reject] and [_suspend] — both need the admin to explain
+  /// why to the owner, who now sees that reason on "My Business" (see
+  /// [Business.rejectionReason]'s doc comment: reused for either status).
+  Future<String?> _promptReason({
+    required String title,
+    required String hint,
+    required String confirmLabel,
+  }) async {
     final reasonController = TextEditingController();
     final reason = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Reject this listing?'),
+        title: Text(title),
         content: TextField(
           controller: reasonController,
           maxLines: 3,
           autofocus: true,
-          decoration: const InputDecoration(
-            hintText: 'Tell the owner what to fix...',
+          decoration: InputDecoration(
+            hintText: hint,
             alignLabelWithHint: true,
-            prefixIcon: Icon(Symbols.edit_note_rounded, size: 20),
+            prefixIcon: const Icon(Symbols.edit_note_rounded, size: 20),
           ),
         ),
         actions: [
@@ -87,36 +99,76 @@ class _AdminBusinessListScreenState extends State<AdminBusinessListScreen> {
               if (text.isEmpty) return;
               Navigator.of(context).pop(text);
             },
-            child: const Text('Reject'),
+            child: Text(confirmLabel),
           ),
         ],
       ),
     );
-    if (reason == null || reason.isEmpty || !mounted) return;
-    await _run(
-      () => _repository.setStatus(
+    return (reason == null || reason.isEmpty) ? null : reason;
+  }
+
+  Future<void> _approve(Business business) async {
+    final confirmed = await showConfirmationDialog(
+      context,
+      title: 'Approve this listing?',
+      message:
+          '"${business.name}" will become visible to travelers on its province page.',
+      confirmLabel: 'Approve',
+    );
+    if (!confirmed || !mounted) return;
+    await _run(() async {
+      await _syncRestaurantBeforeApproval(business);
+      await _repository.setStatus(business.id, status: 'approved');
+      await _notifyOwner(
+        business,
+        title: 'Listing approved',
+        body: '"${business.name}" is now live for travelers to see.',
+      );
+    });
+  }
+
+  Future<void> _reject(Business business) async {
+    final reason = await _promptReason(
+      title: 'Reject this listing?',
+      hint: 'Tell the owner what to fix...',
+      confirmLabel: 'Reject',
+    );
+    if (reason == null || !mounted) return;
+    await _run(() async {
+      await _repository.setStatus(
         business.id,
         status: 'rejected',
         rejectionReason: reason,
-      ),
-    );
+      );
+      await _notifyOwner(
+        business,
+        title: 'Listing rejected',
+        body: '"${business.name}" needs changes: $reason',
+      );
+    });
   }
 
   Future<void> _suspend(Business business) async {
-    final confirmed = await showConfirmationDialog(
-      context,
+    final reason = await _promptReason(
       title: 'Suspend this listing?',
-      message:
-          '"${business.name}" will be hidden from travelers until reactivated.',
+      hint: 'Tell the owner why this is being suspended...',
       confirmLabel: 'Suspend',
-      isDestructive: true,
     );
-    if (!confirmed || !mounted) return;
+    if (reason == null || !mounted) return;
     await _run(() async {
       if (business.isFoodAndDining && business.restaurantId.isNotEmpty) {
         await _restaurantRepository.setPublished(business.restaurantId, false);
       }
-      await _repository.setStatus(business.id, status: 'suspended');
+      await _repository.setStatus(
+        business.id,
+        status: 'suspended',
+        rejectionReason: reason,
+      );
+      await _notifyOwner(
+        business,
+        title: 'Listing suspended',
+        body: '"${business.name}" was suspended: $reason',
+      );
     });
   }
 
@@ -132,6 +184,11 @@ class _AdminBusinessListScreenState extends State<AdminBusinessListScreen> {
     await _run(() async {
       await _syncRestaurantBeforeApproval(business);
       await _repository.setStatus(business.id, status: 'approved');
+      await _notifyOwner(
+        business,
+        title: 'Listing reactivated',
+        body: '"${business.name}" is visible to travelers again.',
+      );
     });
   }
 

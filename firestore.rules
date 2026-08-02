@@ -451,7 +451,12 @@ service cloud.firestore {
       // owner, so any signed-in traveler marking it read is expected.
       allow update: if (isSignedIn() && onlyChangedFields(['isRead']) && (resource.data.userId == request.auth.uid || resource.data.userId == ''))
                     || hasAdminRole(['admin', 'lgu']);
-      allow create: if hasAdminRole(['admin', 'lgu']) && request.resource.data.userId == '';
+      // Broadcasts (empty userId) stay admin+lgu, matching the "Send
+      // Announcement" tile both roles see. A personal notification (e.g.
+      // "your business listing was approved/rejected/suspended") is
+      // admin-only, since only admin ever changes a business's status.
+      allow create: if (hasAdminRole(['admin', 'lgu']) && request.resource.data.userId == '')
+                    || (hasAdminRole(['admin']) && request.resource.data.userId is string && request.resource.data.userId != '');
       allow delete: if hasAdminRole(['admin', 'lgu']);
     }
 

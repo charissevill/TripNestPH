@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/constants/firestore_paths.dart';
 import '../../core/theme/app_colors.dart';
@@ -232,6 +233,23 @@ class _BusinessFormState extends State<_BusinessForm> {
     }
   }
 
+  Future<void> _contactSupport(Business business) async {
+    final uri = Uri(
+      scheme: 'mailto',
+      path: 'support@tripnestph.app',
+      query:
+          'subject=${Uri.encodeComponent('Suspended listing: ${business.name}')}'
+          '&body=${Uri.encodeComponent('Listing: ${business.name} (${business.id})\n\n')}',
+    );
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri);
+    } else if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Email support@tripnestph.app for help with this listing.')),
+      );
+    }
+  }
+
   Widget _statusBanner(Business business) {
     final theme = Theme.of(context);
     switch (business.status) {
@@ -250,11 +268,12 @@ class _BusinessFormState extends State<_BusinessForm> {
               : 'Rejected: ${business.rejectionReason}\nEdit and resubmit below.',
         );
       case 'suspended':
-        return const _Banner(
+        return _Banner(
           color: AppColors.error,
           icon: Symbols.block_rounded,
-          text:
-              'Suspended by an admin — contact support if you believe this is a mistake.',
+          text: business.rejectionReason.isEmpty
+              ? 'Suspended by an admin — contact support if you believe this is a mistake.'
+              : 'Suspended: ${business.rejectionReason}\nContact support if you believe this is a mistake.',
         );
       default:
         return _Banner(
@@ -290,6 +309,14 @@ class _BusinessFormState extends State<_BusinessForm> {
               children: [
                 if (existing != null) ...[
                   _statusBanner(existing),
+                  if (existing.isSuspended) ...[
+                    const SizedBox(height: AppSpacing.sm),
+                    OutlinedButton.icon(
+                      onPressed: () => _contactSupport(existing),
+                      icon: const Icon(Symbols.mail_rounded, size: 18),
+                      label: const Text('Contact Support'),
+                    ),
+                  ],
                   const SizedBox(height: AppSpacing.lg),
                   _PerformanceSection(business: existing),
                   const SizedBox(height: AppSpacing.xl),

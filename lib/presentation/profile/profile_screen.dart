@@ -510,6 +510,8 @@ class _PendingInviteBannerState extends State<_PendingInviteBanner> {
         email: invite.email,
         role: invite.role,
         name: name,
+        provinceId: invite.provinceId,
+        provinceName: invite.provinceName,
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

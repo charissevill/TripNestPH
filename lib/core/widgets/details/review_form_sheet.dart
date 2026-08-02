@@ -151,6 +151,7 @@ class _ReviewFormSheetState extends State<_ReviewFormSheet> {
                     labelText: 'Comment',
                     hintText: 'Share your experience...',
                     floatingLabelBehavior: FloatingLabelBehavior.auto,
+                    prefixIcon: Icon(Symbols.rate_review_rounded, size: 20),
                   ),
                   validator: (v) => Validators.required(v, label: 'Comment'),
                 ),

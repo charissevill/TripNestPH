@@ -290,7 +290,10 @@ class _BusinessFormState extends State<_BusinessForm> {
                 ],
                 TextFormField(
                   controller: _nameController,
-                  decoration: const InputDecoration(labelText: 'Business Name'),
+                  decoration: const InputDecoration(
+                    labelText: 'Business Name',
+                    prefixIcon: Icon(Symbols.storefront_rounded, size: 20),
+                  ),
                   validator: Validators.name,
                 ),
                 const SizedBox(height: AppSpacing.md),
@@ -317,6 +320,7 @@ class _BusinessFormState extends State<_BusinessForm> {
                     decoration: const InputDecoration(
                       labelText: 'Cuisine',
                       hintText: 'e.g. Filipino, Seafood',
+                      prefixIcon: Icon(Symbols.restaurant_rounded, size: 20),
                     ),
                   ),
                   const SizedBox(height: AppSpacing.md),
@@ -337,6 +341,7 @@ class _BusinessFormState extends State<_BusinessForm> {
                     decoration: const InputDecoration(
                       labelText: 'Opening Hours',
                       hintText: 'e.g. 10:00 AM – 9:00 PM daily',
+                      prefixIcon: Icon(Symbols.schedule_rounded, size: 20),
                     ),
                   ),
                 ],
@@ -362,6 +367,7 @@ class _BusinessFormState extends State<_BusinessForm> {
                   decoration: const InputDecoration(
                     labelText: 'Description',
                     alignLabelWithHint: true,
+                    prefixIcon: Icon(Symbols.description_rounded, size: 20),
                   ),
                   validator: (v) =>
                       Validators.maxLength(v, 3000, label: 'Description'),
@@ -369,20 +375,27 @@ class _BusinessFormState extends State<_BusinessForm> {
                 const SizedBox(height: AppSpacing.md),
                 TextField(
                   controller: _addressController,
-                  decoration: const InputDecoration(labelText: 'Address'),
+                  decoration: const InputDecoration(
+                    labelText: 'Address',
+                    prefixIcon: Icon(Symbols.location_on_rounded, size: 20),
+                  ),
                 ),
                 const SizedBox(height: AppSpacing.md),
                 TextFormField(
                   controller: _contactController,
                   decoration: const InputDecoration(
                     labelText: 'Contact Number',
+                    prefixIcon: Icon(Symbols.call_rounded, size: 20),
                   ),
                   validator: Validators.phone,
                 ),
                 const SizedBox(height: AppSpacing.md),
                 TextFormField(
                   controller: _websiteController,
-                  decoration: const InputDecoration(labelText: 'Website URL'),
+                  decoration: const InputDecoration(
+                    labelText: 'Website URL',
+                    prefixIcon: Icon(Symbols.language_rounded, size: 20),
+                  ),
                   validator: Validators.url,
                 ),
                 const SizedBox(height: AppSpacing.md),

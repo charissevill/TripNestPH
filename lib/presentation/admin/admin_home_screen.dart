@@ -109,11 +109,13 @@ class AdminHomeScreen extends StatelessWidget {
                     'Submit or edit your business listing for admin approval',
                 onTap: () => context.push(RoutePaths.myBusiness),
               ),
-            if (isAdmin)
+            if (canManageContent)
               _AdminModuleTile(
                 icon: Symbols.analytics_rounded,
                 label: 'Analytics',
-                subtitle: 'Traveler, content, business and engagement stats',
+                subtitle: isAdmin
+                    ? 'Traveler, content, business and engagement stats'
+                    : 'Content and engagement stats for ${admin.provinceName ?? 'your province'}',
                 onTap: () => context.push(RoutePaths.adminAnalytics),
               ),
             if (isAdmin)
@@ -170,7 +172,9 @@ class AdminHomeScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  'Role: ${admin.role}',
+                  admin.provinceName != null
+                      ? 'Role: ${admin.role} · Managing ${admin.provinceName}'
+                      : 'Role: ${admin.role}',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: AppColors.textTertiary,
                   ),

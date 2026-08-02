@@ -72,6 +72,7 @@ class _AdminBusinessListScreenState extends State<AdminBusinessListScreen> {
           decoration: const InputDecoration(
             hintText: 'Tell the owner what to fix...',
             alignLabelWithHint: true,
+            prefixIcon: Icon(Symbols.edit_note_rounded, size: 20),
           ),
         ),
         actions: [

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
+import 'package:provider/provider.dart';
 
+import '../../core/providers/auth_provider.dart';
 import '../../core/routes/route_paths.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
@@ -9,7 +11,9 @@ import '../../core/utils/app_exception.dart';
 import '../../core/widgets/dialogs/confirmation_dialog.dart';
 import '../../core/widgets/states/empty_state_widget.dart';
 import '../../core/widgets/states/loading_widget.dart';
+import '../../data/repositories/admin_repository.dart';
 import '../../data/repositories/festival_repository.dart';
+import '../../domain/models/admin_user.dart';
 import '../../domain/models/festival.dart';
 
 enum _FestivalSort { name, date, province, upcoming }
@@ -45,10 +49,24 @@ class _AdminFestivalListScreenState extends State<AdminFestivalListScreen> {
   String _query = '';
   _FestivalSort _sort = _FestivalSort.name;
 
+  /// Re-fetched live rather than trusted from the caller, same reasoning as
+  /// `AdminProvinceListScreen._admin`.
+  AdminUser? _admin;
+
+  bool get _isLguScoped => _admin?.role == AdminRole.lgu && _admin?.provinceId != null;
+
   @override
   void initState() {
     super.initState();
     _load();
+    _loadAdmin();
+  }
+
+  Future<void> _loadAdmin() async {
+    final uid = context.read<AuthProvider>().firebaseUser?.uid;
+    if (uid == null) return;
+    final admin = await AdminRepository().getById(uid);
+    if (mounted) setState(() => _admin = admin);
   }
 
   void _load() {
@@ -260,6 +278,7 @@ class _AdminFestivalListScreenState extends State<AdminFestivalListScreen> {
                       );
                     }
                     final festivals = allFestivals
+                        .where((f) => !_isLguScoped || f.provinceId == _admin!.provinceId)
                         .where(
                           (f) => f.name.toLowerCase().contains(
                             _query.toLowerCase(),

@@ -105,7 +105,11 @@ class _SavedItinerariesScreenState extends State<SavedItinerariesScreen> {
         title: const Text('Join a Shared Trip'),
         content: TextField(
           controller: controller,
-          decoration: const InputDecoration(labelText: 'Trip code', hintText: 'Paste the code your friend shared'),
+          decoration: const InputDecoration(
+            labelText: 'Trip code',
+            hintText: 'Paste the code your friend shared',
+            prefixIcon: Icon(Symbols.key_rounded, size: 20),
+          ),
           autofocus: true,
         ),
         actions: [

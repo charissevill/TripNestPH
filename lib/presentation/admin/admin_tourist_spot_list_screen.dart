@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
+import 'package:provider/provider.dart';
 
+import '../../core/providers/auth_provider.dart';
 import '../../core/routes/route_paths.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
@@ -10,8 +12,10 @@ import '../../core/widgets/dialogs/confirmation_dialog.dart';
 import '../../core/widgets/states/empty_state_widget.dart';
 import '../../core/widgets/states/loading_widget.dart';
 import '../../data/mock/mock_categories.dart';
+import '../../data/repositories/admin_repository.dart';
 import '../../data/repositories/destination_repository.dart';
 import '../../data/repositories/province_repository.dart';
+import '../../domain/models/admin_user.dart';
 import '../../domain/models/destination.dart';
 import '../../domain/models/province.dart';
 
@@ -62,10 +66,34 @@ class _AdminTouristSpotListScreenState
   /// the keyboard — a fixed height there overflowed once the keyboard opened.
   final GlobalKey _provinceFieldKey = GlobalKey();
 
+  /// Re-fetched live rather than trusted from the caller, same reasoning as
+  /// `AdminProvinceListScreen._admin`. An 'lgu' account manages exactly one
+  /// province, so the picker below is replaced with that province already
+  /// selected instead of letting them search for a different one —
+  /// `firestore.rules`' `canManageProvince` would reject the write anyway,
+  /// this just avoids the traveler navigating into a dead end.
+  AdminUser? _admin;
+
+  bool get _isLguScoped => _admin?.role == AdminRole.lgu && _admin?.provinceId != null;
+
   @override
   void initState() {
     super.initState();
     _provincesFuture = _provinceRepository.getAll();
+    _loadAdmin();
+  }
+
+  Future<void> _loadAdmin() async {
+    final uid = context.read<AuthProvider>().firebaseUser?.uid;
+    if (uid == null) return;
+    final admin = await AdminRepository().getById(uid);
+    if (!mounted) return;
+    setState(() => _admin = admin);
+    if (admin?.role == AdminRole.lgu && admin?.provinceId != null) {
+      final provinces = await _provincesFuture;
+      final own = provinces.where((p) => p.id == admin!.provinceId).firstOrNull;
+      if (own != null) _selectProvince(own);
+    }
   }
 
   void _selectProvince(Province? province) {
@@ -181,6 +209,30 @@ class _AdminTouristSpotListScreenState
                 builder: (context, snapshot) {
                   final provinces = (snapshot.data ?? const [])
                     ..sort((a, b) => a.name.compareTo(b.name));
+                  if (_isLguScoped) {
+                    return Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.md,
+                        vertical: AppSpacing.md,
+                      ),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(AppRadius.md),
+                        border: Border.all(color: Theme.of(context).colorScheme.outline),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Symbols.public_rounded, color: AppColors.textTertiary),
+                          const SizedBox(width: AppSpacing.sm),
+                          Expanded(
+                            child: Text(
+                              _selectedProvince?.name ?? _admin?.provinceName ?? 'Loading your province...',
+                              style: Theme.of(context).textTheme.bodyLarge,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
                   return LayoutBuilder(
                     builder: (context, constraints) {
                       return Autocomplete<Province>(

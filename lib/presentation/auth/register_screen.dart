@@ -87,6 +87,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       child: AuthTextField(
                         label: 'Last Name',
                         controller: _lastNameController,
+                        icon: Symbols.person_rounded,
                         textInputAction: TextInputAction.next,
                         autofillHints: const [AutofillHints.familyName],
                         validator: Validators.name,

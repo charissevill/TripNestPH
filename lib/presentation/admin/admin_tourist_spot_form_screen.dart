@@ -283,7 +283,10 @@ class _AdminTouristSpotFormScreenState
                 const SizedBox(height: AppSpacing.sm),
                 TextFormField(
                   controller: _nameController,
-                  decoration: const InputDecoration(labelText: 'Name'),
+                  decoration: const InputDecoration(
+                    labelText: 'Name',
+                    prefixIcon: Icon(Symbols.title_rounded, size: 20),
+                  ),
                   validator: Validators.name,
                 ),
                 const SizedBox(height: AppSpacing.md),
@@ -333,6 +336,7 @@ class _AdminTouristSpotFormScreenState
                   decoration: const InputDecoration(
                     labelText: 'Short Description',
                     alignLabelWithHint: true,
+                    prefixIcon: Icon(Symbols.description_rounded, size: 20),
                   ),
                   validator: (v) =>
                       Validators.maxLength(v, 300, label: 'Short Description'),
@@ -344,6 +348,7 @@ class _AdminTouristSpotFormScreenState
                   decoration: const InputDecoration(
                     labelText: 'Long Description',
                     alignLabelWithHint: true,
+                    prefixIcon: Icon(Symbols.description_rounded, size: 20),
                   ),
                   validator: (v) =>
                       Validators.maxLength(v, 5000, label: 'Long Description'),
@@ -483,19 +488,28 @@ class _AdminTouristSpotFormScreenState
                 const SizedBox(height: AppSpacing.md),
                 TextFormField(
                   controller: _phoneController,
-                  decoration: const InputDecoration(labelText: 'Phone Number'),
+                  decoration: const InputDecoration(
+                    labelText: 'Phone Number',
+                    prefixIcon: Icon(Symbols.call_rounded, size: 20),
+                  ),
                   validator: Validators.phone,
                 ),
                 const SizedBox(height: AppSpacing.md),
                 TextFormField(
                   controller: _websiteController,
-                  decoration: const InputDecoration(labelText: 'Website URL'),
+                  decoration: const InputDecoration(
+                    labelText: 'Website URL',
+                    prefixIcon: Icon(Symbols.language_rounded, size: 20),
+                  ),
                   validator: Validators.url,
                 ),
                 const SizedBox(height: AppSpacing.md),
                 TextFormField(
                   controller: _facebookController,
-                  decoration: const InputDecoration(labelText: 'Facebook URL'),
+                  decoration: const InputDecoration(
+                    labelText: 'Facebook URL',
+                    prefixIcon: Icon(Symbols.link_rounded, size: 20),
+                  ),
                   validator: Validators.url,
                 ),
                 const SizedBox(height: AppSpacing.md),

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
+import 'package:provider/provider.dart';
 
+import '../../core/providers/auth_provider.dart';
 import '../../core/routes/route_paths.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
@@ -9,7 +11,9 @@ import '../../core/utils/app_exception.dart';
 import '../../core/widgets/states/empty_state_widget.dart';
 import '../../core/widgets/states/loading_widget.dart';
 import '../../data/mock/mock_regions.dart';
+import '../../data/repositories/admin_repository.dart';
 import '../../data/repositories/province_repository.dart';
+import '../../domain/models/admin_user.dart';
 import '../../domain/models/province.dart';
 
 const List<String> _islandGroupOrder = ['Luzon', 'Visayas', 'Mindanao'];
@@ -59,10 +63,26 @@ class _AdminProvinceListScreenState extends State<AdminProvinceListScreen> {
   /// group all of them together under the Region sort.
   String? _regionFilterId;
 
+  /// Re-fetched live (not trusted from the caller) the same way
+  /// `AdminHomeScreen` re-checks its own role — an 'lgu' account only ever
+  /// sees/manages the one province staged for it, enforced again server-side
+  /// by `firestore.rules`' `canManageProvince`.
+  AdminUser? _admin;
+
+  bool get _isLguScoped => _admin?.role == AdminRole.lgu && _admin?.provinceId != null;
+
   @override
   void initState() {
     super.initState();
     _load();
+    _loadAdmin();
+  }
+
+  Future<void> _loadAdmin() async {
+    final uid = context.read<AuthProvider>().firebaseUser?.uid;
+    if (uid == null) return;
+    final admin = await AdminRepository().getById(uid);
+    if (mounted) setState(() => _admin = admin);
   }
 
   void _load() {
@@ -161,6 +181,9 @@ class _AdminProvinceListScreenState extends State<AdminProvinceListScreen> {
                 );
               }
               final filtered = (snapshot.data ?? const [])
+                  .where(
+                    (p) => !_isLguScoped || p.id == _admin!.provinceId,
+                  )
                   .where(
                     (p) => p.name.toLowerCase().contains(_query.toLowerCase()),
                   )

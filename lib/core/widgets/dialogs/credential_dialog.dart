@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 
 import '../../theme/app_colors.dart';
 import '../../theme/app_spacing.dart';
@@ -7,11 +8,18 @@ import '../../theme/app_spacing.dart';
 /// the standard [FormFieldValidator] contract — return an error string, or
 /// null when the value is valid — same as every other form in the app.
 class CredentialField {
-  const CredentialField({required this.label, required this.controller, required this.obscure, this.validator});
+  const CredentialField({
+    required this.label,
+    required this.controller,
+    required this.obscure,
+    this.icon,
+    this.validator,
+  });
 
   final String label;
   final TextEditingController controller;
   final bool obscure;
+  final IconData? icon;
   final FormFieldValidator<String>? validator;
 }
 
@@ -45,6 +53,11 @@ class _CredentialDialogState extends State<CredentialDialog> {
   bool _busy = false;
   String? _error;
 
+  /// One entry per [CredentialField], mirroring each field's own [CredentialField.obscure] —
+  /// toggled independently by that field's show/hide icon rather than a single
+  /// dialog-wide switch, since a dialog can mix a password field with a plain one.
+  late final List<bool> _obscured = widget.fields.map((f) => f.obscure).toList();
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() {
@@ -73,12 +86,25 @@ class _CredentialDialogState extends State<CredentialDialog> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            for (final field in widget.fields) ...[
+            for (var i = 0; i < widget.fields.length; i++) ...[
               TextFormField(
-                controller: field.controller,
-                obscureText: field.obscure,
-                validator: field.validator,
-                decoration: InputDecoration(labelText: field.label, floatingLabelBehavior: FloatingLabelBehavior.auto),
+                controller: widget.fields[i].controller,
+                obscureText: widget.fields[i].obscure && _obscured[i],
+                validator: widget.fields[i].validator,
+                decoration: InputDecoration(
+                  labelText: widget.fields[i].label,
+                  floatingLabelBehavior: FloatingLabelBehavior.auto,
+                  prefixIcon: widget.fields[i].icon != null ? Icon(widget.fields[i].icon, size: 20) : null,
+                  suffixIcon: widget.fields[i].obscure
+                      ? IconButton(
+                          icon: Icon(
+                            _obscured[i] ? Symbols.visibility_off_rounded : Symbols.visibility_rounded,
+                            size: 20,
+                          ),
+                          onPressed: () => setState(() => _obscured[i] = !_obscured[i]),
+                        )
+                      : null,
+                ),
               ),
               const SizedBox(height: AppSpacing.sm),
             ],

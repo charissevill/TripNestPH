@@ -93,6 +93,15 @@ service cloud.firestore {
       return isActiveAdmin() && adminData().role in roles;
     }
 
+    // An 'lgu' account only manages the one province staged for it at
+    // invite time (AdminUser.provinceId); 'admin' has no such restriction.
+    // Used everywhere provinces/tourist_spots/festivals are written instead
+    // of the bare hasAdminRole(['admin', 'lgu']) those collections used
+    // before LGU accounts were province-scoped.
+    function canManageProvince(pid) {
+      return hasAdminRole(['admin']) || (hasAdminRole(['lgu']) && adminData().provinceId == pid);
+    }
+
     // Invites are keyed by the invited person's lowercased email so a
     // client can look up "is there a pending invite for me" using their own
     // auth token email, with no admin-only read required.
@@ -109,6 +118,12 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/admin_invites/$(invitedEmailKey())).data.role;
     }
 
+    // Only meaningful for a pending 'lgu' invite — null for admin/
+    // businessOwner invites, which never stage a province.
+    function pendingInviteProvinceId() {
+      return get(/databases/$(database)/documents/admin_invites/$(invitedEmailKey())).data.provinceId;
+    }
+
     // ---- admin_users/{uid} — Admin Portal accounts -----------------------
     // The very first admin account is created out-of-band by a one-time
     // seed script (an IAM-authenticated token, bypassing these rules),
@@ -118,12 +133,14 @@ service cloud.firestore {
       allow read: if isOwner(uid) || isActiveAdmin();
       // An admin can directly create any account. Alternatively, a signed-in
       // user with no existing admin_users doc can self-claim their *own*
-      // uid — but only using the exact role an admin already staged for
-      // their email in admin_invites, and only as an 'active' account, so
-      // there's no path to self-granting a role nobody offered.
+      // uid — but only using the exact role (and, for 'lgu', the exact
+      // province) an admin already staged for their email in admin_invites,
+      // and only as an 'active' account, so there's no path to
+      // self-granting a role — or a province — nobody offered.
       allow create: if hasAdminRole(['admin'])
                     || (isOwner(uid) && hasPendingInvite()
                         && request.resource.data.role == pendingInviteRole()
+                        && request.resource.data.provinceId == pendingInviteProvinceId()
                         && request.resource.data.status == 'active');
       // Any admin account can edit their own name/photo/business name
       // (self-service profile) — status and role changes are a separate,
@@ -190,9 +207,21 @@ service cloud.firestore {
     // recalculates after a review is added, edited or deleted.
     match /tourist_spots/{spotId} {
       allow get: if isSignedIn();
+      // list stays a plain role check (not province-scoped) — a dashboard
+      // query across every draft is read-only and not the sensitive
+      // operation here; only writes hand curatorial control of a spot to
+      // whichever LGU's province it belongs to.
       allow list: if isSignedIn() && (resource.data.status == 'published' || hasAdminRole(['admin', 'lgu']));
-      allow update: if (isSignedIn() && onlyChangedFields(['rating', 'reviewCount']) && isValidAggregateUpdate()) || hasAdminRole(['admin', 'lgu']);
-      allow create, delete: if hasAdminRole(['admin', 'lgu']);
+      // An LGU can only ever touch a spot that both was and stays in their
+      // own province — canManageProvince alone would still let them
+      // reassign someone else's spot into their own province by editing
+      // provinceId, so the unchanged-provinceId check closes that off too.
+      allow update: if (isSignedIn() && onlyChangedFields(['rating', 'reviewCount']) && isValidAggregateUpdate())
+                    || hasAdminRole(['admin'])
+                    || (hasAdminRole(['lgu']) && adminData().provinceId == resource.data.provinceId
+                        && request.resource.data.provinceId == resource.data.provinceId);
+      allow create: if canManageProvince(request.resource.data.provinceId);
+      allow delete: if canManageProvince(resource.data.provinceId);
     }
 
     // ---- restaurants/{id} — mirrored from an approved foodAndDining ------
@@ -222,10 +251,12 @@ service cloud.firestore {
     match /festivals/{festivalId} {
       allow get: if isSignedIn();
       allow list: if isSignedIn() && (resource.data.status == 'published' || hasAdminRole(['admin', 'lgu']));
-      allow create: if hasAdminRole(['admin', 'lgu']);
+      allow create: if canManageProvince(request.resource.data.provinceId);
       allow update: if (isSignedIn() && onlyChangedFields(['rating', 'reviewCount']) && isValidAggregateUpdate())
-                    || hasAdminRole(['admin', 'lgu']);
-      allow delete: if hasAdminRole(['admin', 'lgu']);
+                    || hasAdminRole(['admin'])
+                    || (hasAdminRole(['lgu']) && adminData().provinceId == resource.data.provinceId
+                        && request.resource.data.provinceId == resource.data.provinceId);
+      allow delete: if canManageProvince(resource.data.provinceId);
     }
 
     match /travel_tips/{tipId} {
@@ -247,11 +278,13 @@ service cloud.firestore {
     match /provinces/{provinceId} {
       allow read: if isSignedIn();
       allow create, delete: if hasAdminRole(['admin']);
-      allow update: if hasAdminRole(['admin', 'lgu']);
+      // A province document *is* the province — no separate provinceId
+      // field to check for tampering, unlike tourist_spots/festivals above.
+      allow update: if canManageProvince(provinceId);
 
       match /cities/{cityId} {
         allow read: if isSignedIn();
-        allow create, update, delete: if hasAdminRole(['admin', 'lgu']);
+        allow create, update, delete: if canManageProvince(provinceId);
       }
     }
 

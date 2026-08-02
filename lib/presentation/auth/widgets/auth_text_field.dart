@@ -54,8 +54,10 @@ class _AuthTextFieldState extends State<AuthTextField> {
         prefixIcon: widget.icon != null ? Icon(widget.icon, color: AppColors.textSecondary, size: 20) : null,
         suffixIcon: widget.obscureText
             ? IconButton(
+                // The icon reflects the field's current state (hidden vs.
+                // shown), not the action a tap performs.
                 icon: Icon(
-                  _obscured ? Symbols.visibility_rounded : Symbols.visibility_off_rounded,
+                  _obscured ? Symbols.visibility_off_rounded : Symbols.visibility_rounded,
                   color: AppColors.textSecondary,
                   size: 20,
                 ),

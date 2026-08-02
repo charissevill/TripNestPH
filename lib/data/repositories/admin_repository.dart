@@ -74,11 +74,26 @@ class AdminRepository {
   /// Stages [role] for [email] — the invited person must already have an
   /// ordinary TripNest account under this exact email; there's no
   /// server-side account creation here (see `AdminInvite`'s doc comment).
-  Future<void> createInvite({required String email, required String role, required String invitedByName}) async {
+  /// [provinceId]/[provinceName] are only meaningful (and required by the
+  /// UI) for an [AdminRole.lgu] invite.
+  Future<void> createInvite({
+    required String email,
+    required String role,
+    required String invitedByName,
+    String? provinceId,
+    String? provinceName,
+  }) async {
     try {
-      await _invites
-          .doc(_normalizeEmail(email))
-          .set(AdminInvite(email: _normalizeEmail(email), role: role, invitedByName: invitedByName, createdAt: DateTime.now()).toMap());
+      await _invites.doc(_normalizeEmail(email)).set(
+            AdminInvite(
+              email: _normalizeEmail(email),
+              role: role,
+              provinceId: provinceId,
+              provinceName: provinceName,
+              invitedByName: invitedByName,
+              createdAt: DateTime.now(),
+            ).toMap(),
+          );
     } catch (e) {
       throw AppException.from(e);
     }
@@ -117,6 +132,8 @@ class AdminRepository {
     required String email,
     required String role,
     required String name,
+    String? provinceId,
+    String? provinceName,
   }) async {
     try {
       await _collection.doc(uid).set({
@@ -126,6 +143,8 @@ class AdminRepository {
         'businessName': '',
         'role': role,
         'status': 'active',
+        'provinceId': provinceId,
+        'provinceName': provinceName,
       });
       await _invites.doc(_normalizeEmail(email)).delete();
     } catch (e) {

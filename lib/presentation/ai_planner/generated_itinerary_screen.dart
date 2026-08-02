@@ -607,6 +607,7 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
                   decoration: InputDecoration(
                     labelText: 'Amount (₱)',
                     errorText: errorText,
+                    prefixIcon: const Icon(Symbols.payments_rounded, size: 20),
                   ),
                 ),
                 const SizedBox(height: AppSpacing.md),
@@ -614,6 +615,7 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
                   controller: noteController,
                   decoration: const InputDecoration(
                     labelText: 'Note (optional)',
+                    prefixIcon: Icon(Symbols.edit_note_rounded, size: 20),
                   ),
                 ),
                 if (memberIds.length > 1) ...[
@@ -758,7 +760,10 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
         content: TextField(
           controller: controller,
           autofocus: true,
-          decoration: const InputDecoration(labelText: 'Item'),
+          decoration: const InputDecoration(
+            labelText: 'Item',
+            prefixIcon: Icon(Symbols.checklist_rounded, size: 20),
+          ),
         ),
         actions: [
           TextButton(

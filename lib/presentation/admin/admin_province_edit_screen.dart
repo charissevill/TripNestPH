@@ -198,6 +198,7 @@ class _AdminProvinceEditScreenState extends State<AdminProvinceEditScreen> {
                       decoration: const InputDecoration(
                         labelText: 'Overview',
                         alignLabelWithHint: true,
+                        prefixIcon: Icon(Symbols.article_rounded, size: 20),
                       ),
                       validator: (v) =>
                           Validators.maxLength(v, 3000, label: 'Overview'),
@@ -209,6 +210,7 @@ class _AdminProvinceEditScreenState extends State<AdminProvinceEditScreen> {
                       decoration: const InputDecoration(
                         labelText: 'Local Culture',
                         alignLabelWithHint: true,
+                        prefixIcon: Icon(Symbols.diversity_3_rounded, size: 20),
                       ),
                       validator: (v) =>
                           Validators.maxLength(v, 3000, label: 'Local Culture'),
@@ -218,6 +220,7 @@ class _AdminProvinceEditScreenState extends State<AdminProvinceEditScreen> {
                       controller: _bestTimeController,
                       decoration: const InputDecoration(
                         labelText: 'Best Time to Visit',
+                        prefixIcon: Icon(Symbols.calendar_month_rounded, size: 20),
                       ),
                       validator: (v) => Validators.maxLength(
                         v,

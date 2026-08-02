@@ -12,6 +12,8 @@ class AdminUser {
     this.businessName = '',
     required this.role,
     this.status = 'active',
+    this.provinceId,
+    this.provinceName,
   });
 
   final String uid;
@@ -21,6 +23,17 @@ class AdminUser {
 
   /// Only meaningful for [AdminRole.businessOwner] accounts.
   final String businessName;
+
+  /// Only meaningful for [AdminRole.lgu] accounts — the one province this
+  /// account may manage. `firestore.rules`' `canManageProvince(id)` enforces
+  /// this server-side on every `provinces`/`tourist_spots`/`festivals`
+  /// write, not just the UI filtering that reads this field. Null for
+  /// `admin`/`businessOwner` accounts, which aren't province-restricted.
+  final String? provinceId;
+
+  /// Denormalized display name for [provinceId] — avoids an extra lookup
+  /// everywhere this account's assigned province needs to be shown.
+  final String? provinceName;
 
   /// One of [AdminRole]'s values — matches `firestore.rules`'s
   /// `hasAdminRole(roles)` checks exactly, so this stays a plain string
@@ -43,6 +56,8 @@ class AdminUser {
       businessName: map['businessName'] as String? ?? '',
       role: map['role'] as String? ?? '',
       status: map['status'] as String? ?? 'active',
+      provinceId: map['provinceId'] as String?,
+      provinceName: map['provinceName'] as String?,
     );
   }
 
@@ -54,6 +69,8 @@ class AdminUser {
       'businessName': businessName,
       'role': role,
       'status': status,
+      'provinceId': provinceId,
+      'provinceName': provinceName,
     };
   }
 }

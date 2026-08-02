@@ -300,6 +300,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             label: 'New Email',
             controller: newEmailController,
             obscure: false,
+            icon: Symbols.mail_rounded,
             validator: (v) {
               final emailError = Validators.email(v);
               if (emailError != null) return emailError;
@@ -313,6 +314,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             label: 'Current Password',
             controller: passwordController,
             obscure: true,
+            icon: Symbols.lock_rounded,
             validator: (v) => (v == null || v.isEmpty)
                 ? 'Current password is required'
                 : null,

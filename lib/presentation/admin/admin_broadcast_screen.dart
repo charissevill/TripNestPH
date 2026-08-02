@@ -112,7 +112,10 @@ class _AdminBroadcastScreenState extends State<AdminBroadcastScreen> {
                 TextFormField(
                   controller: _titleController,
                   maxLength: 100,
-                  decoration: const InputDecoration(labelText: 'Title'),
+                  decoration: const InputDecoration(
+                    labelText: 'Title',
+                    prefixIcon: Icon(Symbols.title_rounded, size: 20),
+                  ),
                   validator: (v) => Validators.required(v, label: 'Title'),
                 ),
                 const SizedBox(height: AppSpacing.md),
@@ -123,6 +126,7 @@ class _AdminBroadcastScreenState extends State<AdminBroadcastScreen> {
                   decoration: const InputDecoration(
                     labelText: 'Message',
                     alignLabelWithHint: true,
+                    prefixIcon: Icon(Symbols.message_rounded, size: 20),
                   ),
                   validator: (v) => Validators.required(v, label: 'Message'),
                 ),

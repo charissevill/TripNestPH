@@ -11,6 +11,8 @@ class AdminInvite {
     required this.role,
     required this.invitedByName,
     required this.createdAt,
+    this.provinceId,
+    this.provinceName,
   });
 
   /// Lowercased — also the Firestore document id.
@@ -18,6 +20,13 @@ class AdminInvite {
 
   /// One of [AdminRole]'s values.
   final String role;
+
+  /// Only staged for [AdminRole.lgu] invites — the province this invite
+  /// grants management of. `firestore.rules`' `admin_users` self-claim rule
+  /// requires the claimed account's own `provinceId` to match this exactly,
+  /// the same way it already requires the claimed `role` to match.
+  final String? provinceId;
+  final String? provinceName;
 
   /// Display name of the admin who sent this, shown on the recipient's
   /// accept/decline prompt for context.
@@ -29,6 +38,8 @@ class AdminInvite {
     return AdminInvite(
       email: email,
       role: map['role'] as String? ?? '',
+      provinceId: map['provinceId'] as String?,
+      provinceName: map['provinceName'] as String?,
       invitedByName: map['invitedByName'] as String? ?? 'An admin',
       createdAt: timestamp is Timestamp ? timestamp.toDate() : DateTime.now(),
     );
@@ -37,6 +48,8 @@ class AdminInvite {
   Map<String, dynamic> toMap() {
     return {
       'role': role,
+      'provinceId': provinceId,
+      'provinceName': provinceName,
       'invitedByName': invitedByName,
       'createdAt': FieldValue.serverTimestamp(),
     };

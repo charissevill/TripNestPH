@@ -740,7 +740,10 @@ Future<int?> _promptForNumber(
           controller: controller,
           autofocus: true,
           keyboardType: TextInputType.number,
-          decoration: InputDecoration(labelText: 'Between $min and $max'),
+          decoration: InputDecoration(
+            labelText: 'Between $min and $max',
+            prefixIcon: const Icon(Symbols.numbers_rounded, size: 20),
+          ),
           validator: (v) {
             final n = int.tryParse((v ?? '').trim());
             if (n == null) return 'Enter a whole number';

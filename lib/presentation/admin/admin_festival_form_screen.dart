@@ -14,8 +14,10 @@ import '../../core/widgets/dialogs/discard_changes_scope.dart';
 import '../../core/widgets/inputs/gallery_image_picker.dart';
 import '../../core/widgets/inputs/hero_image_picker.dart';
 import '../../core/widgets/states/loading_widget.dart';
+import '../../data/repositories/admin_repository.dart';
 import '../../data/repositories/festival_repository.dart';
 import '../../data/repositories/province_repository.dart';
+import '../../domain/models/admin_user.dart';
 import '../../domain/models/festival.dart';
 import '../../domain/models/province.dart';
 
@@ -65,6 +67,11 @@ class _AdminFestivalFormScreenState extends State<AdminFestivalFormScreen> {
   bool _saving = false;
   bool _dirty = false;
 
+  /// An 'lgu' account only ever manages its own province (see
+  /// `AdminUser.provinceId`'s doc comment), so the picker below is locked
+  /// to it — mirrors `firestore.rules`' `canManageProvince` server-side.
+  AdminUser? _admin;
+
   bool get _isEditing => widget.existing != null;
 
   @override
@@ -87,6 +94,20 @@ class _AdminFestivalFormScreenState extends State<AdminFestivalFormScreen> {
       }
       return provinces..sort((a, b) => a.name.compareTo(b.name));
     });
+    _loadAdmin();
+  }
+
+  Future<void> _loadAdmin() async {
+    final uid = context.read<AuthProvider>().firebaseUser?.uid;
+    if (uid == null) return;
+    final admin = await AdminRepository().getById(uid);
+    if (!mounted) return;
+    setState(() => _admin = admin);
+    if (admin?.role == AdminRole.lgu && admin?.provinceId != null && _selectedProvince == null) {
+      final provinces = await _provincesFuture;
+      final own = provinces.where((p) => p.id == admin!.provinceId).firstOrNull;
+      if (own != null) setState(() => _selectedProvince = own);
+    }
   }
 
   @override
@@ -264,7 +285,10 @@ class _AdminFestivalFormScreenState extends State<AdminFestivalFormScreen> {
                   children: [
                     TextFormField(
                       controller: _nameController,
-                      decoration: const InputDecoration(labelText: 'Name'),
+                      decoration: const InputDecoration(
+                        labelText: 'Name',
+                        prefixIcon: Icon(Symbols.title_rounded, size: 20),
+                      ),
                       validator: Validators.name,
                     ),
                     const SizedBox(height: AppSpacing.md),
@@ -278,10 +302,14 @@ class _AdminFestivalFormScreenState extends State<AdminFestivalFormScreen> {
                                 DropdownMenuItem(value: p, child: Text(p.name)),
                           )
                           .toList(),
-                      onChanged: (value) => setState(() {
-                        _selectedProvince = value;
-                        _dirty = true;
-                      }),
+                      // An LGU account can't reassign a festival to a
+                      // different province — see the field's doc comment.
+                      onChanged: _admin?.role == AdminRole.lgu
+                          ? null
+                          : (value) => setState(() {
+                              _selectedProvince = value;
+                              _dirty = true;
+                            }),
                     ),
                     const SizedBox(height: AppSpacing.md),
                     HeroImagePicker(
@@ -329,6 +357,7 @@ class _AdminFestivalFormScreenState extends State<AdminFestivalFormScreen> {
                       decoration: const InputDecoration(
                         labelText: 'Description',
                         alignLabelWithHint: true,
+                        prefixIcon: Icon(Symbols.description_rounded, size: 20),
                       ),
                       validator: (v) =>
                           Validators.maxLength(v, 3000, label: 'Description'),

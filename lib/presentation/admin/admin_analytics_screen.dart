@@ -2,11 +2,14 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
+import 'package:provider/provider.dart';
 
+import '../../core/providers/auth_provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/utils/app_exception.dart';
 import '../../core/widgets/states/loading_widget.dart';
+import '../../data/repositories/admin_repository.dart';
 import '../../data/repositories/business_repository.dart';
 import '../../data/repositories/destination_repository.dart';
 import '../../data/repositories/festival_repository.dart';
@@ -15,7 +18,9 @@ import '../../data/repositories/province_repository.dart';
 import '../../data/repositories/restaurant_repository.dart';
 import '../../data/repositories/review_report_repository.dart';
 import '../../data/repositories/user_repository.dart';
+import '../../domain/models/admin_user.dart';
 import '../../domain/models/destination.dart';
+import '../../domain/models/province.dart';
 
 /// Admin-only read-only stats view — the "dashboard" `firestore.rules`
 /// already anticipated (its own comments cite "Most Saved Places" and
@@ -64,6 +69,8 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
     firestore: widget.firestore,
   );
 
+  late final AdminRepository _adminRepository = AdminRepository();
+
   late Future<_DashboardStats> _future;
 
   @override
@@ -72,7 +79,63 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
     _future = _load();
   }
 
+  /// An 'lgu' account only ever manages one province (see
+  /// `AdminUser.provinceId`'s doc comment) — its dashboard shows that
+  /// province's own content/engagement numbers instead of the platform-wide
+  /// figures an 'admin' account sees, and skips sections (Travelers,
+  /// Businesses, Pending Reports) that aren't an LGU concern at all.
   Future<_DashboardStats> _load() async {
+    // Guarded rather than a bare context.read: this screen is also used in
+    // widget tests with no AuthProvider above it (see widget.firestore's
+    // own "test-only override" doc comment) — falling through to the
+    // global dashboard there is correct, the same as any account this
+    // lookup can't resolve to an 'lgu' role.
+    String? uid;
+    try {
+      uid = context.read<AuthProvider>().firebaseUser?.uid;
+    } catch (_) {
+      // No AuthProvider in the widget tree.
+    }
+    final admin = uid == null ? null : await _adminRepository.getById(uid);
+    if (admin?.role == AdminRole.lgu && admin?.provinceId != null) {
+      return _loadForProvince(admin!.provinceId!, admin.provinceName ?? '');
+    }
+    return _loadGlobal();
+  }
+
+  Future<_DashboardStats> _loadForProvince(String provinceId, String provinceName) async {
+    final results = await Future.wait([
+      _provinceRepository.getById(provinceId),
+      _destinationRepository.filter(provinceId: provinceId, limit: 500),
+      _restaurantRepository.filter(provinceId: provinceId, limit: 500),
+      _festivalRepository.filter(provinceId: provinceId, limit: 500),
+    ]);
+
+    final province = results[0] as Province?;
+    final destinations = results[1] as List<Destination>;
+    final restaurants = results[2] as List;
+    final festivals = results[3] as List;
+    final popular = [...destinations]
+      ..sort((a, b) => b.reviewCount.compareTo(a.reviewCount));
+
+    return _DashboardStats(
+      scopedProvinceName: provinceName,
+      travelerCount: 0,
+      suspendedTravelerCount: 0,
+      publishedDestinationCount: destinations.length,
+      publishedRestaurantCount: restaurants.length,
+      publishedFestivalCount: festivals.length,
+      provinceCount: 1,
+      provinceWithContentCount: (province?.hasContent ?? false) ? 1 : 0,
+      pendingBusinessCount: 0,
+      approvedBusinessCount: 0,
+      savedTripCount: 0,
+      pendingReportCount: 0,
+      popularDestinations: popular.take(5).toList(),
+    );
+  }
+
+  Future<_DashboardStats> _loadGlobal() async {
     final results = await Future.wait([
       _userRepository.countAll(),
       _userRepository.countByStatus('suspended'),
@@ -152,135 +215,176 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
                   AppSpacing.huge,
                 ),
                 children: [
-                  Text(
-                    'Travelers',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _StatCard(
-                          icon: Symbols.group_rounded,
-                          label: 'Total Travelers',
-                          value: '${stats.travelerCount}',
+                  if (stats.isScoped) ...[
+                    Text(
+                      stats.scopedProvinceName!,
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Content coverage for your province',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textTertiary),
+                    ),
+                    const SizedBox(height: AppSpacing.lg),
+                  ] else ...[
+                    Text(
+                      'Travelers',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _StatCard(
+                            icon: Symbols.group_rounded,
+                            label: 'Total Travelers',
+                            value: '${stats.travelerCount}',
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: AppSpacing.sm),
-                      Expanded(
-                        child: _StatCard(
-                          icon: Symbols.block_rounded,
-                          label: 'Suspended',
-                          value: '${stats.suspendedTravelerCount}',
-                          color: stats.suspendedTravelerCount > 0
-                              ? AppColors.error
-                              : null,
+                        const SizedBox(width: AppSpacing.sm),
+                        Expanded(
+                          child: _StatCard(
+                            icon: Symbols.block_rounded,
+                            label: 'Suspended',
+                            value: '${stats.suspendedTravelerCount}',
+                            color: stats.suspendedTravelerCount > 0
+                                ? AppColors.error
+                                : null,
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: AppSpacing.xl),
-                  Text(
-                    'Content Coverage',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _StatCard(
-                          icon: Symbols.public_rounded,
-                          label: 'Provinces w/ Content',
-                          value:
-                              '${stats.provinceWithContentCount}/${stats.provinceCount}',
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.xl),
+                    Text(
+                      'Content Coverage',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _StatCard(
+                            icon: Symbols.public_rounded,
+                            label: 'Provinces w/ Content',
+                            value:
+                                '${stats.provinceWithContentCount}/${stats.provinceCount}',
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: AppSpacing.sm),
-                      Expanded(
-                        child: _StatCard(
-                          icon: Symbols.place_rounded,
-                          label: 'Tourist Spots',
-                          value: '${stats.publishedDestinationCount}',
+                        const SizedBox(width: AppSpacing.sm),
+                        Expanded(
+                          child: _StatCard(
+                            icon: Symbols.place_rounded,
+                            label: 'Tourist Spots',
+                            value: '${stats.publishedDestinationCount}',
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _StatCard(
-                          icon: Symbols.restaurant_rounded,
-                          label: 'Restaurants',
-                          value: '${stats.publishedRestaurantCount}',
+                      ],
+                    ),
+                  ],
+                  if (stats.isScoped) ...[
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _StatCard(
+                            icon: Symbols.place_rounded,
+                            label: 'Tourist Spots',
+                            value: '${stats.publishedDestinationCount}',
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: AppSpacing.sm),
-                      Expanded(
-                        child: _StatCard(
-                          icon: Symbols.celebration_rounded,
-                          label: 'Festivals',
-                          value: '${stats.publishedFestivalCount}',
+                        const SizedBox(width: AppSpacing.sm),
+                        Expanded(
+                          child: _StatCard(
+                            icon: Symbols.restaurant_rounded,
+                            label: 'Restaurants',
+                            value: '${stats.publishedRestaurantCount}',
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: AppSpacing.xl),
-                  Text(
-                    'Businesses',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _StatCard(
-                          icon: Symbols.hourglass_top_rounded,
-                          label: 'Pending Review',
-                          value: '${stats.pendingBusinessCount}',
-                          color: stats.pendingBusinessCount > 0
-                              ? AppColors.warning
-                              : null,
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    _StatCard(
+                      icon: Symbols.celebration_rounded,
+                      label: 'Festivals',
+                      value: '${stats.publishedFestivalCount}',
+                    ),
+                  ] else ...[
+                    const SizedBox(height: AppSpacing.sm),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _StatCard(
+                            icon: Symbols.restaurant_rounded,
+                            label: 'Restaurants',
+                            value: '${stats.publishedRestaurantCount}',
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: AppSpacing.sm),
-                      Expanded(
-                        child: _StatCard(
-                          icon: Symbols.storefront_rounded,
-                          label: 'Approved',
-                          value: '${stats.approvedBusinessCount}',
+                        const SizedBox(width: AppSpacing.sm),
+                        Expanded(
+                          child: _StatCard(
+                            icon: Symbols.celebration_rounded,
+                            label: 'Festivals',
+                            value: '${stats.publishedFestivalCount}',
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: AppSpacing.xl),
-                  Text(
-                    'Engagement',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _StatCard(
-                          icon: Symbols.card_travel_rounded,
-                          label: 'Saved Trips',
-                          value: '${stats.savedTripCount}',
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.xl),
+                    Text(
+                      'Businesses',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _StatCard(
+                            icon: Symbols.hourglass_top_rounded,
+                            label: 'Pending Review',
+                            value: '${stats.pendingBusinessCount}',
+                            color: stats.pendingBusinessCount > 0
+                                ? AppColors.warning
+                                : null,
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: AppSpacing.sm),
-                      Expanded(
-                        child: _StatCard(
-                          icon: Symbols.flag_rounded,
-                          label: 'Pending Reports',
-                          value: '${stats.pendingReportCount}',
-                          color: stats.pendingReportCount > 0
-                              ? AppColors.warning
-                              : null,
+                        const SizedBox(width: AppSpacing.sm),
+                        Expanded(
+                          child: _StatCard(
+                            icon: Symbols.storefront_rounded,
+                            label: 'Approved',
+                            value: '${stats.approvedBusinessCount}',
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.xl),
+                    Text(
+                      'Engagement',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _StatCard(
+                            icon: Symbols.card_travel_rounded,
+                            label: 'Saved Trips',
+                            value: '${stats.savedTripCount}',
+                          ),
+                        ),
+                        const SizedBox(width: AppSpacing.sm),
+                        Expanded(
+                          child: _StatCard(
+                            icon: Symbols.flag_rounded,
+                            label: 'Pending Reports',
+                            value: '${stats.pendingReportCount}',
+                            color: stats.pendingReportCount > 0
+                                ? AppColors.warning
+                                : null,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                   if (stats.popularDestinations.isNotEmpty) ...[
                     const SizedBox(height: AppSpacing.xl),
                     Text(
@@ -322,6 +426,7 @@ class _DashboardStats {
     required this.savedTripCount,
     required this.pendingReportCount,
     required this.popularDestinations,
+    this.scopedProvinceName,
   });
 
   final int travelerCount;
@@ -336,6 +441,13 @@ class _DashboardStats {
   final int savedTripCount;
   final int pendingReportCount;
   final List<Destination> popularDestinations;
+
+  /// Non-null only for an 'lgu' account's province-scoped dashboard — the
+  /// UI uses this to know whether to show the Travelers/Businesses/Pending
+  /// Reports sections at all (never meaningful for a single-province view).
+  final String? scopedProvinceName;
+
+  bool get isScoped => scopedProvinceName != null;
 }
 
 class _StatCard extends StatelessWidget {

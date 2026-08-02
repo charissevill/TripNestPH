@@ -10,8 +10,10 @@ import '../../core/widgets/dialogs/confirmation_dialog.dart';
 import '../../core/widgets/states/empty_state_widget.dart';
 import '../../core/widgets/states/loading_widget.dart';
 import '../../data/repositories/admin_repository.dart';
+import '../../data/repositories/province_repository.dart';
 import '../../domain/models/admin_invite.dart';
 import '../../domain/models/admin_user.dart';
+import '../../domain/models/province.dart';
 
 /// Admin-only: the Admin Portal's own roster, plus staging invites for new
 /// accounts. Replaces having to run `tool/create_admin.js` for every new
@@ -40,6 +42,11 @@ class _AdminTeamScreenState extends State<AdminTeamScreen> {
     final emailController = TextEditingController();
     final dialogFormKey = GlobalKey<FormState>();
     String role = AdminRole.lgu;
+    Province? province;
+    final provinces = (await ProvinceRepository().getAll())
+      ..sort((a, b) => a.name.compareTo(b.name));
+    if (!mounted) return;
+
     final result = await showDialog<bool>(
       context: context,
       builder: (context) => StatefulBuilder(
@@ -57,6 +64,7 @@ class _AdminTeamScreenState extends State<AdminTeamScreen> {
                   decoration: const InputDecoration(
                     labelText: 'Email',
                     hintText: 'Must already have a TripNest account',
+                    prefixIcon: Icon(Symbols.mail_rounded, size: 20),
                   ),
                   validator: Validators.email,
                 ),
@@ -78,9 +86,31 @@ class _AdminTeamScreenState extends State<AdminTeamScreen> {
                       child: Text('Business Owner'),
                     ),
                   ],
-                  onChanged: (value) =>
-                      setDialogState(() => role = value ?? role),
+                  onChanged: (value) => setDialogState(() {
+                    role = value ?? role;
+                    if (role != AdminRole.lgu) province = null;
+                  }),
                 ),
+                // An LGU account is scoped to exactly one province — see
+                // `AdminUser.provinceId`'s doc comment — so this is required
+                // (not optional) whenever that role is picked above.
+                if (role == AdminRole.lgu) ...[
+                  const SizedBox(height: AppSpacing.md),
+                  DropdownButtonFormField<Province>(
+                    initialValue: province,
+                    isExpanded: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Province',
+                      hintText: 'Which province will they manage?',
+                      prefixIcon: Icon(Symbols.public_rounded, size: 20),
+                    ),
+                    items: provinces
+                        .map((p) => DropdownMenuItem(value: p, child: Text(p.name)))
+                        .toList(),
+                    onChanged: (value) => setDialogState(() => province = value),
+                    validator: (v) => v == null ? 'Pick the province this officer manages' : null,
+                  ),
+                ],
               ],
             ),
           ),
@@ -103,11 +133,13 @@ class _AdminTeamScreenState extends State<AdminTeamScreen> {
     if (result != true || !mounted) return;
 
     final email = emailController.text.trim();
+    final selectedProvince = province;
     final confirmed = await showConfirmationDialog(
       context,
       title: 'Invite $email?',
-      message:
-          'They\'ll be offered the "$role" role next time they open the app with that email — only if they already have a TripNest account.',
+      message: role == AdminRole.lgu
+          ? 'They\'ll be offered the "LGU Officer" role for ${selectedProvince?.name} next time they open the app with that email — only if they already have a TripNest account.'
+          : 'They\'ll be offered the "$role" role next time they open the app with that email — only if they already have a TripNest account.',
       confirmLabel: 'Invite',
     );
     if (!confirmed || !mounted) return;
@@ -116,6 +148,8 @@ class _AdminTeamScreenState extends State<AdminTeamScreen> {
         email: email,
         role: role,
         invitedByName: widget.currentAdminName,
+        provinceId: selectedProvince?.id,
+        provinceName: selectedProvince?.name,
       );
       if (mounted)
         ScaffoldMessenger.of(
@@ -237,7 +271,10 @@ class _AdminTeamScreenState extends State<AdminTeamScreen> {
                           color: AppColors.warning,
                         ),
                         title: Text(invite.email),
-                        subtitle: Text('Staged as ${invite.role}'),
+                        subtitle: Text(
+                          'Staged as ${invite.role}'
+                          '${invite.provinceName != null ? ' · ${invite.provinceName}' : ''}',
+                        ),
                         trailing: IconButton(
                           icon: const Icon(Symbols.close_rounded),
                           onPressed: () => _revokeInvite(invite),
@@ -286,7 +323,9 @@ class _AdminTeamScreenState extends State<AdminTeamScreen> {
                         admin.name.isNotEmpty ? admin.name : admin.email,
                       ),
                       subtitle: Text(
-                        '${admin.role}${admin.isActive ? '' : ' · suspended'}',
+                        '${admin.role}'
+                        '${admin.provinceName != null ? ' · ${admin.provinceName}' : ''}'
+                        '${admin.isActive ? '' : ' · suspended'}',
                       ),
                       trailing: isSelf
                           ? const Text(

@@ -11,6 +11,7 @@ import '../../core/routes/route_paths.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/utils/app_exception.dart';
+import '../../core/utils/sign_out.dart';
 import '../../core/widgets/cards/destination_card.dart';
 import '../../core/widgets/dialogs/confirmation_dialog.dart';
 import '../../core/widgets/media/avatar_preview.dart';
@@ -106,7 +107,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
               AppSpacing.lg,
               AppSpacing.sm,
               AppSpacing.lg,
-              AppSpacing.huge,
+              // Taller than AppSpacing.huge alone — this tab also has the
+              // floating AI Chat FAB (`_AiChatFab` in `MainShellScreen`)
+              // hovering above the bottom nav bar, which the plain nav-bar
+              // clearance doesn't account for, letting the last row sit
+              // right behind it.
+              AppSpacing.huge + AppSpacing.xxxl,
             ),
             children: [
               Row(
@@ -355,26 +361,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 label: 'Log Out',
                 iconColor: AppColors.error,
                 showChevron: false,
-                onTap: () => _confirmSignOut(context),
+                onTap: () => confirmSignOut(context),
               ),
             ],
           ),
         ),
       ),
     );
-  }
-}
-
-Future<void> _confirmSignOut(BuildContext context) async {
-  final confirmed = await showConfirmationDialog(
-    context,
-    title: 'Log out?',
-    message: 'You can sign back in anytime with the same account.',
-    confirmLabel: 'Log Out',
-    isDestructive: true,
-  );
-  if (confirmed && context.mounted) {
-    await context.read<AuthProvider>().signOut();
   }
 }
 

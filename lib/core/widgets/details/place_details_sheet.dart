@@ -1,17 +1,24 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
+import 'package:provider/provider.dart';
 import 'package:smooth_page_indicator/smooth_page_indicator.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../ai/providers/ai_planner_provider.dart';
+import '../../../data/repositories/province_repository.dart';
 import '../../../domain/models/place.dart';
+import '../../providers/favorites_provider.dart';
+import '../../routes/route_paths.dart';
 import '../../services/places_service.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_spacing.dart';
 import '../../utils/auto_advance_gallery_mixin.dart';
 import '../../utils/maps_launcher.dart';
+import '../../utils/province_matcher.dart';
 import '../buttons/animated_button.dart';
-import '../indicators/rating_widget.dart';
+import '../buttons/bookmark_button.dart';
 import 'map_preview.dart';
 
 /// Opens the fuller Places API field set for [place] as a modal bottom
@@ -62,26 +69,23 @@ class PlaceDetailsSheet extends StatelessWidget {
                     _PlacePhotoGallery(photoNames: place.photoNames, placesService: placesService),
                     const SizedBox(height: AppSpacing.lg),
                   ],
-                  Text(place.name, style: theme.textTheme.headlineSmall),
+                  Row(
+                    children: [
+                      Expanded(child: Text(place.name, style: theme.textTheme.headlineSmall)),
+                      BookmarkButton(
+                        isSaved: context.watch<FavoritesProvider>().isPlaceSaved(place.id),
+                        onTap: () => context.read<FavoritesProvider>().togglePlace(place),
+                      ),
+                    ],
+                  ),
                   const SizedBox(height: 4),
                   Text(place.categoryLabel, style: theme.textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary)),
                   const SizedBox(height: AppSpacing.md),
-                  Row(
-                    children: [
-                      if (place.rating != null) RatingWidget(rating: place.rating!, reviewCount: place.userRatingCount, starSize: 18),
-                      if (place.priceLevelLabel.isNotEmpty) ...[
-                        const SizedBox(width: AppSpacing.md),
-                        Text(place.priceLevelLabel, style: theme.textTheme.titleSmall?.copyWith(color: theme.colorScheme.primary)),
-                      ],
-                      if (place.isOpenNow != null) ...[
-                        const SizedBox(width: AppSpacing.md),
-                        Text(
-                          place.isOpenNow! ? 'Open now' : 'Closed now',
-                          style: theme.textTheme.labelMedium?.copyWith(color: place.isOpenNow! ? AppColors.success : AppColors.error),
-                        ),
-                      ],
-                    ],
-                  ),
+                  if (place.isOpenNow != null)
+                    Text(
+                      place.isOpenNow! ? 'Open now' : 'Closed now',
+                      style: theme.textTheme.labelMedium?.copyWith(color: place.isOpenNow! ? AppColors.success : AppColors.error),
+                    ),
                   if (place.address.isNotEmpty) ...[
                     const SizedBox(height: AppSpacing.lg),
                     Row(
@@ -124,12 +128,36 @@ class PlaceDetailsSheet extends StatelessWidget {
                     ),
                   ],
                   const SizedBox(height: AppSpacing.xl),
-                  AnimatedButton(
-                    label: 'Get Directions',
-                    icon: Symbols.directions_rounded,
-                    onPressed: place.hasCoordinates
-                        ? () => MapsLauncher.openDirections(latitude: place.latitude!, longitude: place.longitude!, label: place.name)
-                        : () => MapsLauncher.openPlaceSearch('${place.name}, Philippines'),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: AnimatedButton(
+                          label: 'Get Directions',
+                          icon: Symbols.directions_rounded,
+                          filled: false,
+                          onPressed: place.hasCoordinates
+                              ? () => MapsLauncher.openDirections(latitude: place.latitude!, longitude: place.longitude!, label: place.name)
+                              : () => MapsLauncher.openPlaceSearch('${place.name}, Philippines'),
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.sm),
+                      Expanded(
+                        flex: 2,
+                        child: AnimatedButton(
+                          label: 'Plan a Trip Here',
+                          icon: Symbols.auto_awesome_rounded,
+                          onPressed: () async {
+                            final provinces = await ProvinceRepository().getAll();
+                            if (!context.mounted) return;
+                            final matched = matchProvinceByAddress(place.address, provinces);
+                            final planner = context.read<AiPlannerProvider>();
+                            if (matched != null) planner.setPendingDestination(place, matched);
+                            Navigator.of(context).pop();
+                            context.go(RoutePaths.planner);
+                          },
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),

@@ -364,6 +364,7 @@ class _AdminFestivalFormScreenState extends State<AdminFestivalFormScreen> {
                         Expanded(
                           child: TextField(
                             controller: _newHighlightController,
+                            maxLength: 100,
                             decoration: const InputDecoration(
                               hintText: 'Add a highlight...',
                             ),

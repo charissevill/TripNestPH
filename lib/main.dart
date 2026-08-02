@@ -41,14 +41,19 @@ void main() async {
     FirebaseFirestore.instance.settings = const Settings(persistenceEnabled: true);
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
-    // Debug builds report to the console instead of Crashlytics, so local
-    // crashes during development don't pollute production crash-free rates.
-    await FirebaseCrashlytics.instance.setCrashlyticsCollectionEnabled(!kDebugMode);
-    FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
-    ui.PlatformDispatcher.instance.onError = (error, stack) {
-      FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
-      return true;
-    };
+    // Crashlytics has no web SDK at all — calling it there throws a
+    // MissingPluginException, which (before this guard) got caught below as
+    // a fatal `initError` and blocked the entire web app from loading.
+    if (!kIsWeb) {
+      // Debug builds report to the console instead of Crashlytics, so local
+      // crashes during development don't pollute production crash-free rates.
+      await FirebaseCrashlytics.instance.setCrashlyticsCollectionEnabled(!kDebugMode);
+      FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
+      ui.PlatformDispatcher.instance.onError = (error, stack) {
+        FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+        return true;
+      };
+    }
   } catch (e) {
     initError = e;
   }
@@ -111,10 +116,13 @@ class _TripNestAppState extends State<TripNestApp> {
     AnalyticsService.instance.setUserId(userId);
     // Best-effort, same as NotificationService below — no Firebase app
     // exists in widget tests, and a crash-reporting hookup should never be
-    // what takes down sign-in.
-    try {
-      FirebaseCrashlytics.instance.setUserIdentifier(userId ?? '');
-    } catch (_) {}
+    // what takes down sign-in. Crashlytics has no web SDK at all, so skip
+    // it there outright rather than throw-and-swallow on every auth change.
+    if (!kIsWeb) {
+      try {
+        FirebaseCrashlytics.instance.setUserIdentifier(userId ?? '');
+      } catch (_) {}
+    }
     if (userId != null) {
       NotificationService.instance.registerForUser(userId);
     }

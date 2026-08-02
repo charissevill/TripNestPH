@@ -31,8 +31,7 @@ class FestivalCard extends StatelessWidget {
     final theme = Theme.of(context);
     final saved = context.watch<FavoritesProvider>();
     final isSaved = saved.isFestivalSaved(festival.id);
-    final parts = festival.dateLabel.split(' ');
-    final day = parts.length > 1 ? parts[1].replaceAll(RegExp(r'[^0-9]'), '') : '';
+    final day = _dayLabel(festival);
 
     return SizedBox(
       width: width,
@@ -66,6 +65,29 @@ class FestivalCard extends StatelessWidget {
   }
 }
 
+/// A compact day label for the date badge, e.g. "11-17" for a multi-day
+/// festival or "15" for a single day. Prefers the structured [Festival.startDate]/
+/// [Festival.endDate] fields when set; older festivals created before those
+/// existed only have the formatted [Festival.dateLabel] string (e.g.
+/// "January 11–17, 2027") to fall back on. The previous implementation
+/// stripped every non-digit character from that string, which turned a
+/// range like "11–17" into "1117" instead of "11-17".
+String _dayLabel(Festival festival) {
+  final start = festival.startDate;
+  final end = festival.endDate;
+  if (start != null) {
+    return (end != null && end.day != start.day) ? '${start.day}-${end.day}' : '${start.day}';
+  }
+  // Split off the year first (dateLabel is "<month> <day range>, <year>")
+  // so a lone day doesn't get paired with the year as a fake "day-year" range.
+  final days = RegExp(r'\d+').allMatches(festival.dateLabel.split(',').first).map((m) => m.group(0)!).toList();
+  return switch (days.length) {
+    0 => '',
+    1 => days[0],
+    _ => '${days[0]}-${days[1]}',
+  };
+}
+
 class _DateBadge extends StatelessWidget {
   const _DateBadge({required this.month, required this.day});
 
@@ -81,8 +103,14 @@ class _DateBadge extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(month, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: AppColors.error)),
-          Text(day, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+          Text(month, textAlign: TextAlign.center, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: AppColors.error)),
+          // A multi-day range (e.g. "22-24") is wider than the single-digit
+          // day this badge was originally sized for — `FittedBox` shrinks it
+          // to fit the fixed 42px width instead of wrapping/overflowing.
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(day, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+          ),
         ],
       ),
     );

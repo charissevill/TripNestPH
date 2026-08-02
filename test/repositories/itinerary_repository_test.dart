@@ -159,4 +159,11 @@ void main() {
     final trip = await repository.getById(id);
     expect(trip!.startDate, isNull);
   });
+
+  test('countAll() counts every saved trip across every traveler — the Admin Portal analytics stat', () async {
+    await repository.save(userId: 'owner-1', title: 'Palawan Trip', itinerary: mockItinerary);
+    await repository.save(userId: 'owner-2', title: 'Bohol Trip', itinerary: mockItinerary);
+
+    expect(await repository.countAll(), 2);
+  });
 }

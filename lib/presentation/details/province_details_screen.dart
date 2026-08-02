@@ -261,6 +261,19 @@ class _ProvinceDetailsBody extends StatelessWidget {
                     ),
                   ),
                 ),
+              ] else ...[
+                // No curated tourist_spots yet for this province (the LGU
+                // hasn't added any) — falls back to a live Places search so
+                // the page never goes blank just because nothing's been
+                // curated, same reasoning as Hotels & Resorts below.
+                const SizedBox(height: AppSpacing.xxl),
+                NearbyPlacesSection(
+                  title: 'Things to Do',
+                  includedTypes: PlaceCategory.attractions,
+                  textQuery:
+                      'tourist attractions in ${province.name}, Philippines',
+                  areaLabel: province.name,
+                ),
               ],
               if (data.festivals.isNotEmpty) ...[
                 const SizedBox(height: AppSpacing.xl),
@@ -332,6 +345,17 @@ class _ProvinceDetailsBody extends StatelessWidget {
                       ),
                     ),
                   ),
+                ),
+              ] else ...[
+                // No curated (or approved-business) restaurants yet for
+                // this province — same live-Places fallback reasoning as
+                // Featured Attractions above.
+                const SizedBox(height: AppSpacing.xl),
+                NearbyPlacesSection(
+                  title: 'Where to Eat',
+                  includedTypes: PlaceCategory.dining,
+                  textQuery: 'restaurants in ${province.name}, Philippines',
+                  areaLabel: province.name,
                 ),
               ],
               if (province.hasContent && province.travelTips.isNotEmpty) ...[
@@ -412,6 +436,13 @@ class _ProvinceDetailsBody extends StatelessWidget {
 /// by `DetailsGalleryAppBar` on the Tourist/Restaurant/Festival details
 /// screens, kept as its own small widget here so the existing region-chip +
 /// name overlay stays exactly as designed.
+///
+/// When a province has no curated `heroImageUrl`/`galleryImageUrls` on file
+/// yet (most of them, until an LGU/admin fills them in — see
+/// `AdminBulkProvinceContentScreen`), this falls back to a real Google
+/// Places photo of the province itself instead of a flat tinted rectangle —
+/// the same "never show nothing when live data can fill the gap"
+/// principle `NearbyPlacesSection` already applies to attractions/dining.
 class _ProvinceGallery extends StatefulWidget {
   const _ProvinceGallery({required this.province});
 
@@ -424,15 +455,39 @@ class _ProvinceGallery extends StatefulWidget {
 class _ProvinceGalleryState extends State<_ProvinceGallery>
     with AutoAdvanceGalleryMixin {
   final PageController _pageController = PageController();
+  final PlacesService _places = PlacesService();
+  Future<String?>? _liveFallbackPhoto;
+
+  bool get _hasStoredImages =>
+      widget.province.heroImageUrl.isNotEmpty ||
+      widget.province.galleryImageUrls.any((u) => u.isNotEmpty);
 
   @override
   void initState() {
     super.initState();
-    final imageCount = [
-      widget.province.heroImageUrl,
-      ...widget.province.galleryImageUrls,
-    ].where((u) => u.isNotEmpty).length;
-    startAutoAdvance(_pageController, imageCount);
+    if (_hasStoredImages) {
+      final imageCount = [
+        widget.province.heroImageUrl,
+        ...widget.province.galleryImageUrls,
+      ].where((u) => u.isNotEmpty).length;
+      startAutoAdvance(_pageController, imageCount);
+    } else {
+      _liveFallbackPhoto = _loadLiveFallbackPhoto();
+    }
+  }
+
+  /// A province name resolves in Places Text Search to a single
+  /// administrative-area result (the same limitation the Search screen's
+  /// area-match fallback works around) — but that single result still
+  /// carries real photos of the province itself, which is exactly what's
+  /// wanted here.
+  Future<String?> _loadLiveFallbackPhoto() async {
+    final places = await _places.searchText(
+      textQuery: '${widget.province.name}, Philippines',
+      maxResultCount: 1,
+    );
+    if (places.isEmpty || places.first.photoNames.isEmpty) return null;
+    return _places.photoUrl(places.first.photoNames.first);
   }
 
   @override
@@ -450,18 +505,28 @@ class _ProvinceGalleryState extends State<_ProvinceGallery>
       province.heroImageUrl,
       ...province.galleryImageUrls,
     ].where((u) => u.isNotEmpty).toList();
+    final fallbackTint = Container(
+      color: theme.colorScheme.primary.withValues(alpha: 0.15),
+    );
 
     return Stack(
       fit: StackFit.expand,
       children: [
-        if (images.isEmpty)
-          Container(color: theme.colorScheme.primary.withValues(alpha: 0.15))
-        else
+        if (images.isNotEmpty)
           PageView.builder(
             controller: _pageController,
             itemCount: images.length,
             itemBuilder: (context, index) =>
                 CachedNetworkImage(imageUrl: images[index], fit: BoxFit.cover),
+          )
+        else
+          FutureBuilder<String?>(
+            future: _liveFallbackPhoto,
+            builder: (context, snapshot) {
+              final url = snapshot.data;
+              if (url == null || url.isEmpty) return fallbackTint;
+              return CachedNetworkImage(imageUrl: url, fit: BoxFit.cover);
+            },
           ),
         IgnorePointer(
           child: DecoratedBox(

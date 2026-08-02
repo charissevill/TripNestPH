@@ -5,10 +5,8 @@ import '../../core/services/weather_service.dart';
 import '../../core/utils/geo_distance.dart';
 import '../../data/mock/mock_itinerary.dart';
 import '../../domain/models/place.dart';
-import '../../data/repositories/destination_repository.dart';
 import '../../data/repositories/province_repository.dart';
 import '../../data/repositories/restaurant_repository.dart';
-import '../../domain/models/destination.dart';
 import '../../domain/models/itinerary.dart';
 import '../../domain/models/province.dart';
 import '../../domain/models/restaurant.dart';
@@ -30,7 +28,6 @@ class AiRepository {
   AiRepository({
     OpenAiService? openAiService,
     AiCacheService? cacheService,
-    DestinationRepository? destinationRepository,
     RestaurantRepository? restaurantRepository,
     ProvinceRepository? provinceRepository,
     WeatherService? weatherService,
@@ -39,7 +36,6 @@ class AiRepository {
        _cache = cacheService ?? AiCacheService(),
        _weather = weatherService ?? WeatherService(),
        _places = placesService ?? PlacesService(),
-       _destinationRepositoryOverride = destinationRepository,
        _restaurantRepositoryOverride = restaurantRepository,
        _provinceRepositoryOverride = provinceRepository;
 
@@ -53,15 +49,10 @@ class AiRepository {
   // Planner tab is instant to open), but itinerary generation is the only
   // thing that ever needs Firestore here — no reason to pay for
   // FirebaseFirestore.instance before that actually happens.
-  final DestinationRepository? _destinationRepositoryOverride;
   final RestaurantRepository? _restaurantRepositoryOverride;
   final ProvinceRepository? _provinceRepositoryOverride;
-  DestinationRepository? _destinationRepositoryInstance;
   RestaurantRepository? _restaurantRepositoryInstance;
   ProvinceRepository? _provinceRepositoryInstance;
-  DestinationRepository get _destinationRepository =>
-      _destinationRepositoryOverride ??
-      (_destinationRepositoryInstance ??= DestinationRepository());
   RestaurantRepository get _restaurantRepository =>
       _restaurantRepositoryOverride ??
       (_restaurantRepositoryInstance ??= RestaurantRepository());
@@ -83,11 +74,13 @@ class AiRepository {
   Future<Itinerary> generateItinerary(
     AiItineraryRequest request, {
     required String coverImageUrl,
+    bool forceRefresh = false,
   }) async {
     try {
       return await _generateItineraryViaAi(
         request,
         coverImageUrl: coverImageUrl,
+        forceRefresh: forceRefresh,
       );
     } on AiException catch (e) {
       if (e.isConfigError) return _demoItinerary();
@@ -98,30 +91,28 @@ class AiRepository {
   Future<Itinerary> _generateItineraryViaAi(
     AiItineraryRequest request, {
     required String coverImageUrl,
+    bool forceRefresh = false,
   }) async {
-    // Restaurants/attractions come from the curated Firestore catalog;
-    // accommodations and Places-sourced attractions come live from Places
-    // API; province facts (emergency hotlines/travel tips/budget guide) come
-    // from Firestore too — all fetched together so the (often slower) live
-    // Places lookups don't add latency on top of the Firestore reads.
+    // Restaurants come from the curated Firestore catalog (not LGU content —
+    // business-owner-submitted); accommodations and attractions come live
+    // from Places API; province facts (emergency hotlines/travel tips/budget
+    // guide) come from Firestore too — all fetched together so the (often
+    // slower) live Places lookups don't add latency on top of the Firestore
+    // reads.
     final candidateResults = await Future.wait([
       _restaurantRepository.filter(provinceId: request.provinceId, limit: 30),
-      _destinationRepository.filter(provinceId: request.provinceId, limit: 30),
       _fetchAccommodations(request),
       _fetchPlaceAttractions(request),
       _provinceRepository.getById(request.provinceId),
       _resolveDestinationCoordinates(request),
     ]);
     final candidateRestaurants = candidateResults[0] as List<Restaurant>;
-    final candidateAttractions = (candidateResults[1] as List<Destination>)
-        .where((d) => d.id != request.destinationId)
-        .toList();
-    final accommodations = candidateResults[2] as List<PlaceRecommendation>;
+    final accommodations = candidateResults[1] as List<PlaceRecommendation>;
     final candidatePlaceAttractions =
-        candidateResults[3] as List<PlaceRecommendation>;
-    final province = candidateResults[4] as Province?;
+        candidateResults[2] as List<PlaceRecommendation>;
+    final province = candidateResults[3] as Province?;
     final destinationCoordinates =
-        candidateResults[5] as ({double? latitude, double? longitude});
+        candidateResults[4] as ({double? latitude, double? longitude});
 
     // When the traveler said where they're staying, closer candidates lead
     // each list — combined with the explicit prompt instruction below, this
@@ -132,12 +123,6 @@ class AiRepository {
       request,
       (r) => r.latitude,
       (r) => r.longitude,
-    );
-    _sortByDistanceFromAccommodation(
-      candidateAttractions,
-      request,
-      (d) => d.latitude,
-      (d) => d.longitude,
     );
     _sortByDistanceFromAccommodation(
       candidatePlaceAttractions,
@@ -169,7 +154,12 @@ class AiRepository {
       'accommodationName': request.accommodationName,
     });
 
-    var raw = await _cache.get('itinerary', signature);
+    // "Regenerate" on the result screen deliberately skips the cache lookup
+    // (but still writes its result below) — it exists specifically to ask
+    // for a *different* itinerary for the same trip, unlike an accidental
+    // resubmission of the same untouched Planner form, which should reuse
+    // what was already generated instead of spending another API call.
+    var raw = forceRefresh ? null : await _cache.get('itinerary', signature);
     if (raw == null) {
       raw = await _openAi.complete(
         messages: [
@@ -181,10 +171,9 @@ class AiRepository {
               candidateRestaurantNames: candidateRestaurants
                   .map((r) => r.name)
                   .toList(),
-              candidateAttractionNames: [
-                ...candidateAttractions.map((d) => d.name),
-                ...candidatePlaceAttractions.map((p) => p.name),
-              ],
+              candidateAttractionNames: candidatePlaceAttractions
+                  .map((p) => p.name)
+                  .toList(),
               candidateHotelNames: accommodations.map((a) => a.name).toList(),
               emergencyHotlines: province?.emergencyHotlines ?? const [],
               provinceTravelTips: province?.travelTips ?? const [],
@@ -207,7 +196,6 @@ class AiRepository {
       request: request,
       coverImageUrl: coverImageUrl,
       candidateRestaurants: candidateRestaurants,
-      candidateAttractions: candidateAttractions,
       candidatePlaceAttractions: candidatePlaceAttractions,
       accommodations: accommodations,
       weather: weather,
@@ -335,8 +323,9 @@ class AiRepository {
   }
 
   /// Live Places API attractions (museums, parks, landmarks) near the
-  /// destination, offered as extra candidates alongside the curated
-  /// Firestore `tourist_spots` list — same rating-ranked top-N pattern as
+  /// destination — the sole source of attraction candidates/recommendations
+  /// (never the curated Firestore `tourist_spots` catalog, which is
+  /// LGU-curated content), same rating-ranked top-N pattern as
   /// [_fetchAccommodations].
   Future<List<PlaceRecommendation>> _fetchPlaceAttractions(
     AiItineraryRequest request,
@@ -445,7 +434,6 @@ class AiRepository {
     required AiItineraryRequest request,
     required String coverImageUrl,
     required List<Restaurant> candidateRestaurants,
-    required List<Destination> candidateAttractions,
     required List<PlaceRecommendation> candidatePlaceAttractions,
     required List<PlaceRecommendation> accommodations,
     required List<WeatherForecast> weather,
@@ -490,24 +478,10 @@ class AiRepository {
           )
           .map((r) => r.id)
           .toList();
-      final attractionIds = candidateAttractions
-          .where(
-            (d) => attractionNames.any(
-              (n) => n.toLowerCase() == d.name.toLowerCase(),
-            ),
-          )
-          .map((d) => d.id)
-          .toList();
-      final matchedFirestoreAttractionNames = candidateAttractions
-          .where((d) => attractionIds.contains(d.id))
-          .map((d) => d.name.toLowerCase())
-          .toSet();
       final placeAttractionRecs = candidatePlaceAttractions
           .where(
             (p) => attractionNames.any(
-              (n) =>
-                  n.toLowerCase() == p.name.toLowerCase() &&
-                  !matchedFirestoreAttractionNames.contains(n.toLowerCase()),
+              (n) => n.toLowerCase() == p.name.toLowerCase(),
             ),
           )
           .toList();
@@ -536,7 +510,9 @@ class AiRepository {
         weather: weather,
         travelTips: travelTips,
         recommendedRestaurantIds: restaurantIds,
-        nearbyAttractionIds: attractionIds,
+        // Attractions are Google Places-only now (never a curated
+        // `tourist_spots` doc id) — see `recommendedPlaceAttractions` below.
+        nearbyAttractionIds: const [],
         recommendedAccommodations: accommodations,
         recommendedPlaceAttractions: placeAttractionRecs,
         accommodationName: request.accommodationName ?? '',

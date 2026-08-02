@@ -84,6 +84,24 @@ class _AiPlannerScreenState extends State<AiPlannerScreen> {
   /// two are mutually exclusive, cleared whenever the other is picked.
   Province? _province;
 
+  /// Set via "Plan a Trip Here" on a live Places result (see
+  /// `PlaceDetailsSheet`) — always paired with [_province] (the resolved
+  /// province backing it, never set alone), so every existing
+  /// `_destination == null && _province == null` gate below still works
+  /// unmodified. Cleared whenever the traveler manually re-picks a
+  /// destination via [_pickDestination].
+  Place? _placeDestination;
+
+  @override
+  void initState() {
+    super.initState();
+    final pending = context.read<AiPlannerProvider>().takePendingDestination();
+    if (pending != null) {
+      _placeDestination = pending.place;
+      _province = pending.province;
+    }
+  }
+
   /// Where the traveler said they're staying — optional, searched via
   /// [PlacesService]. When set, [AiRepository] sorts candidate restaurants/
   /// attractions by distance from here. Cleared whenever the destination
@@ -159,12 +177,14 @@ class _AiPlannerScreenState extends State<AiPlannerScreen> {
       setState(() {
         _destination = selected;
         _province = null;
+        _placeDestination = null;
         _accommodation = null;
       });
     } else if (selected is Province) {
       setState(() {
         _province = selected;
         _destination = null;
+        _placeDestination = null;
         _accommodation = null;
       });
     }
@@ -185,15 +205,19 @@ class _AiPlannerScreenState extends State<AiPlannerScreen> {
 
   Future<void> _generate() async {
     final destination = _destination;
+    final place = _placeDestination;
     final province = _province;
-    if (destination == null && province == null) return;
+    if (destination == null && place == null && province == null) return;
     final tier = _budgetTiers[_budgetTierIndex];
 
     final planner = context.read<AiPlannerProvider>();
     final itinerary = await planner.generate(
       AiItineraryRequest(
-        destinationId: destination?.id ?? '',
-        destinationName: destination?.name ?? province!.name,
+        destinationId: destination?.id ?? place?.id ?? '',
+        destinationName: destination?.name ?? place?.name ?? province!.name,
+        // A place-based pick always carries its resolved province alongside
+        // it (see `_placeDestination`'s doc comment), so this stays exactly
+        // the destination/whole-province fallback it already was.
         provinceId: destination?.provinceId ?? province!.id,
         provinceName: destination?.provinceName ?? province!.name,
         budgetTierLabel: tier.label,
@@ -207,13 +231,16 @@ class _AiPlannerScreenState extends State<AiPlannerScreen> {
         // reasoning for not fabricating one), so a whole-province request
         // just skips the itinerary's weather section — same graceful
         // degradation as a destination with no coordinates on file.
-        latitude: destination?.latitude,
-        longitude: destination?.longitude,
+        latitude: destination?.latitude ?? place?.latitude,
+        longitude: destination?.longitude ?? place?.longitude,
         accommodationName: _accommodation?.name,
         accommodationLatitude: _accommodation?.latitude,
         accommodationLongitude: _accommodation?.longitude,
       ),
-      coverImageUrl: destination?.heroImageUrl ?? province!.heroImageUrl,
+      coverImageUrl: destination?.heroImageUrl ??
+          (place != null && place.photoNames.isNotEmpty
+              ? PlacesService().photoUrl(place.photoNames.first)
+              : province!.heroImageUrl),
     );
 
     if (!mounted) return;
@@ -273,11 +300,6 @@ class _AiPlannerScreenState extends State<AiPlannerScreen> {
                   ),
                 ),
               ],
-            ),
-            const SizedBox(height: 2),
-            Text(
-              'Plan your next Philippine adventure with AI',
-              style: theme.textTheme.bodyMedium,
             ),
             const SizedBox(height: AppSpacing.lg),
             Container(
@@ -342,6 +364,8 @@ class _AiPlannerScreenState extends State<AiPlannerScreen> {
                       child: Text(
                         _destination != null
                             ? '${_destination!.name}, ${_destination!.provinceName}'
+                            : _placeDestination != null
+                            ? '${_placeDestination!.name}, ${_province?.name ?? _placeDestination!.address}'
                             : _province != null
                             ? '${_province!.name} (whole province)'
                             : 'Select a destination',

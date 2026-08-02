@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -5,28 +7,30 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
 import '../../core/routes/route_paths.dart';
+import '../../core/services/places_service.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/utils/app_exception.dart';
+import '../../core/utils/place_dedup.dart';
 import '../../core/widgets/buttons/animated_button.dart';
 import '../../core/widgets/cards/category_card.dart';
-import '../../core/widgets/cards/destination_card.dart';
 import '../../core/widgets/cards/festival_card.dart';
+import '../../core/widgets/cards/place_card.dart';
 import '../../core/widgets/cards/restaurant_card.dart';
 import '../../core/widgets/details/explore_map_view.dart';
+import '../../core/widgets/details/place_details_sheet.dart';
 import '../../core/widgets/dialogs/active_filter_chips.dart';
 import '../../core/widgets/dialogs/search_filter_sheet.dart';
 import '../../core/widgets/inputs/search_bar_widget.dart';
 import '../../core/widgets/states/empty_state_widget.dart';
 import '../../core/widgets/states/loading_widget.dart';
 import '../../data/mock/mock_categories.dart';
-import '../../data/repositories/destination_repository.dart';
 import '../../data/repositories/festival_repository.dart';
 import '../../data/repositories/province_repository.dart';
 import '../../data/repositories/region_repository.dart';
 import '../../data/repositories/restaurant_repository.dart';
-import '../../domain/models/destination.dart';
 import '../../domain/models/festival.dart';
+import '../../domain/models/place.dart';
 import '../../domain/models/province.dart';
 import '../../domain/models/region.dart';
 import '../../domain/models/restaurant.dart';
@@ -39,28 +43,72 @@ const double _gridImageHeight = 140;
 const double _gridCellExtent = _gridImageHeight + 92;
 const int _pageSize = 20;
 
+/// Category chip id -> a Places `searchText` phrase — mirrors
+/// `search_screen.dart`'s `_categoryKeywords` reasoning: Google has no
+/// dedicated Places type for "beach" or "waterfall", so these ride on a
+/// free-text query instead of `PlaceCategory`'s `includedTypes` lists.
+/// `food`/`festivals` never reach here — `_applyInitialCategory` routes
+/// those straight to the Restaurants/Festivals tabs instead.
+const Map<String, String> _placesCategoryPhrase = {
+  'beaches': 'beaches',
+  'mountains': 'mountains and hiking trails',
+  'historical': 'historical landmarks',
+  'nature': 'waterfalls and nature parks',
+};
+
 /// Browse-everything screen: category chips + a destinations / restaurants /
-/// festivals tab switch, all rendered as a responsive, paginated two-column
-/// grid loaded live from Firestore.
+/// festivals tab switch, rendered as a responsive, paginated two-column grid.
+/// Destinations is live Google Places only — LGU/admin-curated `tourist_spots`
+/// content is deliberately not shown here anymore (it's still readable
+/// elsewhere, e.g. a direct link to an existing bookmark/review still works;
+/// it's just no longer discoverable by browsing). Restaurants still blends
+/// live Places with the business-owner-submitted catalog (not LGU content —
+/// see `RestaurantRepository.createFromBusiness`), which still provides the
+/// paginated "Load More" tail. Festivals stays 100% curated: Google Places
+/// models physical points of interest, not time-bound recurring events, so
+/// there's no sensible query to run for it.
 class ExploreScreen extends StatefulWidget {
-  const ExploreScreen({super.key, this.initialCategoryId});
+  const ExploreScreen({
+    super.key,
+    this.initialCategoryId,
+    this.placesService,
+    this.restaurantRepository,
+    this.festivalRepository,
+    this.regionRepository,
+    this.provinceRepository,
+  });
 
   final String? initialCategoryId;
+
+  // Test-only overrides — production call sites never pass these (same
+  // pattern `SearchScreen` already uses): a widget test can inject a
+  // `FakeFirebaseFirestore`-backed repository and a fake `PlacesService`
+  // caller without touching the real Firestore/Cloud Functions plugins.
+  final PlacesService? placesService;
+  final RestaurantRepository? restaurantRepository;
+  final FestivalRepository? festivalRepository;
+  final RegionRepository? regionRepository;
+  final ProvinceRepository? provinceRepository;
 
   @override
   State<ExploreScreen> createState() => _ExploreScreenState();
 }
 
 class _ExploreScreenState extends State<ExploreScreen> {
-  final DestinationRepository _destinationRepository = DestinationRepository();
-  final RestaurantRepository _restaurantRepository = RestaurantRepository();
-  final FestivalRepository _festivalRepository = FestivalRepository();
-  final RegionRepository _regionRepository = RegionRepository();
-  final ProvinceRepository _provinceRepository = ProvinceRepository();
+  late final RestaurantRepository _restaurantRepository =
+      widget.restaurantRepository ?? RestaurantRepository();
+  late final FestivalRepository _festivalRepository =
+      widget.festivalRepository ?? FestivalRepository();
+  late final RegionRepository _regionRepository =
+      widget.regionRepository ?? RegionRepository();
+  late final ProvinceRepository _provinceRepository =
+      widget.provinceRepository ?? ProvinceRepository();
+  late final PlacesService _places = widget.placesService ?? PlacesService();
 
   _ExploreTab _tab = _ExploreTab.destinations;
   String? _selectedCategory;
   bool _mapMode = false;
+  Timer? _categoryDebounce;
 
   String? _regionId;
   String? _provinceId;
@@ -70,9 +118,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
   List<Province> _provinces = [];
   bool get _hasFilters => _provinceId != null || _minRating != null;
 
-  List<Destination>? _destinations;
-  DocumentSnapshot<Map<String, dynamic>>? _destinationsCursor;
-  bool _destinationsHasMore = true;
+  List<Place>? _destinationPlaces;
   bool _loadingDestinations = false;
   Object? _destinationsError;
 
@@ -81,6 +127,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
   bool _restaurantsHasMore = true;
   bool _loadingRestaurants = false;
   Object? _restaurantsError;
+  List<Place> _liveRestaurantPlaces = [];
 
   List<Festival>? _festivals;
   DocumentSnapshot<Map<String, dynamic>>? _festivalsCursor;
@@ -88,12 +135,43 @@ class _ExploreScreenState extends State<ExploreScreen> {
   bool _loadingFestivals = false;
   Object? _festivalsError;
 
+  List<Object>? get _restaurantItems =>
+      _restaurants == null ? null : [..._liveRestaurantPlaces, ..._restaurants!];
+
+  String _destinationsTextQuery() {
+    final phrase = _placesCategoryPhrase[_selectedCategory] ?? 'top tourist attractions';
+    return _provinceName != null ? '$phrase in $_provinceName, Philippines' : '$phrase in the Philippines';
+  }
+
+  String _restaurantsTextQuery() =>
+      _provinceName != null ? 'restaurants in $_provinceName, Philippines' : 'best restaurants in the Philippines';
+
+  /// Drops any live result whose own address doesn't name [areaName] — a
+  /// fixed-radius/area text search can resolve into a neighboring city or
+  /// province (the exact "Guimaras search returning Iloilo City hotels" leak
+  /// found and fixed in `search_screen.dart`) — then drops any live result
+  /// that's a near-duplicate of an already-curated name.
+  List<Place> _filterLivePlaces(List<Place> places, {required String? areaName, required Set<String> curatedNamesLower}) {
+    var filtered = places;
+    if (areaName != null) {
+      final areaLower = areaName.toLowerCase();
+      filtered = filtered.where((p) => p.address.toLowerCase().contains(areaLower)).toList();
+    }
+    return filtered.where((p) => !isDuplicateOfCurated(p.name, curatedNamesLower)).toList();
+  }
+
   @override
   void initState() {
     super.initState();
     _applyInitialCategory(widget.initialCategoryId);
     _ensureLoaded(_tab);
     _loadGeography();
+  }
+
+  @override
+  void dispose() {
+    _categoryDebounce?.cancel();
+    super.dispose();
   }
 
   /// One bounded read each against the small, fixed `regions`/`provinces`
@@ -165,12 +243,11 @@ class _ExploreScreenState extends State<ExploreScreen> {
   /// traveler switches to them, instead of silently showing stale results.
   void _invalidateAllTabsAndReload() {
     setState(() {
-      _destinations = null;
-      _destinationsCursor = null;
-      _destinationsHasMore = true;
+      _destinationPlaces = null;
       _restaurants = null;
       _restaurantsCursor = null;
       _restaurantsHasMore = true;
+      _liveRestaurantPlaces = [];
       _festivals = null;
       _festivalsCursor = null;
       _festivalsHasMore = true;
@@ -205,7 +282,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
   void _ensureLoaded(_ExploreTab tab) {
     switch (tab) {
       case _ExploreTab.destinations:
-        if (_destinations == null) _loadDestinations();
+        if (_destinationPlaces == null) _loadDestinations();
       case _ExploreTab.restaurants:
         if (_restaurants == null) _loadRestaurants();
       case _ExploreTab.festivals:
@@ -213,44 +290,32 @@ class _ExploreScreenState extends State<ExploreScreen> {
     }
   }
 
+  /// Destinations is Google Places only — no curated `tourist_spots` tail
+  /// (see the class doc comment). One bounded fetch per filter/category
+  /// selection; Google's own 20-result cap means there's no further page to
+  /// load, so this never re-fires on its own once loaded (there's no "Load
+  /// More" for this tab).
   Future<void> _loadDestinations({bool reset = false}) async {
     if (_loadingDestinations) return;
     setState(() {
       _loadingDestinations = true;
       _destinationsError = null;
-      if (reset) {
-        _destinations = null;
-        _destinationsCursor = null;
-        _destinationsHasMore = true;
-      }
+      if (reset) _destinationPlaces = null;
     });
     try {
-      List<Destination> page;
-      DocumentSnapshot<Map<String, dynamic>>? cursor;
-      bool hasMore;
-      if (_selectedCategory != null || _hasFilters || _mapMode) {
-        page = await _destinationRepository.filter(
-          categoryId: _selectedCategory,
-          provinceId: _provinceId,
-          minRating: _minRating,
-          limit: 150,
-        );
-        cursor = null;
-        hasMore = false;
-      } else {
-        final result = await _destinationRepository.getPage(
-          pageSize: _pageSize,
-          startAfter: _destinationsCursor,
-        );
-        page = result.items;
-        cursor = result.lastDoc;
-        hasMore = result.items.length == _pageSize;
-      }
+      final places = await _places.searchText(
+        textQuery: _destinationsTextQuery(),
+        maxResultCount: 20,
+      );
+      final filtered = _provinceName == null
+          ? places
+          : places
+              .where((p) => p.address.toLowerCase().contains(_provinceName!.toLowerCase()))
+              .toList();
+
       if (!mounted) return;
       setState(() {
-        _destinations = [...(_destinations ?? []), ...page];
-        _destinationsCursor = cursor;
-        _destinationsHasMore = hasMore;
+        _destinationPlaces = filtered;
         _loadingDestinations = false;
       });
     } catch (e) {
@@ -264,6 +329,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
 
   Future<void> _loadRestaurants({bool reset = false}) async {
     if (_loadingRestaurants) return;
+    final needsLiveFetch = reset || _restaurants == null;
     setState(() {
       _loadingRestaurants = true;
       _restaurantsError = null;
@@ -271,9 +337,14 @@ class _ExploreScreenState extends State<ExploreScreen> {
         _restaurants = null;
         _restaurantsCursor = null;
         _restaurantsHasMore = true;
+        _liveRestaurantPlaces = [];
       }
     });
     try {
+      final livePlacesFuture = needsLiveFetch
+          ? _places.searchText(textQuery: _restaurantsTextQuery(), maxResultCount: 20)
+          : Future.value(_liveRestaurantPlaces);
+
       List<Restaurant> page;
       DocumentSnapshot<Map<String, dynamic>>? cursor;
       bool hasMore;
@@ -294,11 +365,23 @@ class _ExploreScreenState extends State<ExploreScreen> {
         cursor = result.lastDoc;
         hasMore = result.items.length == _pageSize;
       }
+
+      var livePlaces = await livePlacesFuture;
+      final List<Restaurant> allRestaurants = [...(_restaurants ?? []), ...page];
+      if (needsLiveFetch) {
+        livePlaces = _filterLivePlaces(
+          livePlaces,
+          areaName: _provinceName,
+          curatedNamesLower: allRestaurants.map((r) => r.name.toLowerCase()).toSet(),
+        );
+      }
+
       if (!mounted) return;
       setState(() {
-        _restaurants = [...(_restaurants ?? []), ...page];
+        _restaurants = allRestaurants;
         _restaurantsCursor = cursor;
         _restaurantsHasMore = hasMore;
+        _liveRestaurantPlaces = livePlaces;
         _loadingRestaurants = false;
       });
     } catch (e) {
@@ -467,7 +550,16 @@ class _ExploreScreenState extends State<ExploreScreen> {
                               ? null
                               : category.id,
                         );
-                        _loadDestinations(reset: true);
+                        // Debounced — each tap fires a billed Places call,
+                        // so rapidly tapping through categories should only
+                        // query the final selection, not every intermediate
+                        // one (same shape as search_screen.dart's own
+                        // typing debounce).
+                        _categoryDebounce?.cancel();
+                        _categoryDebounce = Timer(
+                          const Duration(milliseconds: 350),
+                          () => _loadDestinations(reset: true),
+                        );
                       },
                     );
                   },
@@ -479,42 +571,53 @@ class _ExploreScreenState extends State<ExploreScreen> {
               child: _mapMode
                   ? switch (_tab) {
                       _ExploreTab.destinations => _buildMap(
-                        items: _destinations,
+                        items: _destinationPlaces,
                         isLoading: _loadingDestinations,
                         error: _destinationsError,
                         onRetry: () => _loadDestinations(reset: true),
                         emptyMessage: _hasFilters
                             ? 'No destinations match your filters — try widening them.'
                             : 'No mapped destinations yet.',
-                        markerFor: (item) => !item.hasCoordinates
+                        markerFor: (p) => !p.hasCoordinates
                             ? null
                             : Marker(
-                                markerId: MarkerId('destination-${item.id}'),
-                                position: LatLng(item.latitude!, item.longitude!),
+                                markerId: MarkerId('place-${p.id}'),
+                                position: LatLng(p.latitude!, p.longitude!),
+                                icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueViolet),
                                 infoWindow: InfoWindow(
-                                  title: item.name,
-                                  onTap: () => context.push(RoutePaths.destinationDetails(item.id)),
+                                  title: p.name,
+                                  onTap: () => showPlaceDetailsSheet(context, place: p, placesService: _places),
                                 ),
                               ),
                       ),
                       _ExploreTab.restaurants => _buildMap(
-                        items: _restaurants,
+                        items: _restaurantItems,
                         isLoading: _loadingRestaurants,
                         error: _restaurantsError,
                         onRetry: () => _loadRestaurants(reset: true),
                         emptyMessage: _hasFilters
                             ? 'No restaurants match your filters — try widening them.'
                             : 'No mapped restaurants yet.',
-                        markerFor: (item) => !item.hasCoordinates
-                            ? null
-                            : Marker(
-                                markerId: MarkerId('restaurant-${item.id}'),
-                                position: LatLng(item.latitude!, item.longitude!),
-                                infoWindow: InfoWindow(
-                                  title: item.name,
-                                  onTap: () => context.push(RoutePaths.restaurantDetails(item.id)),
-                                ),
-                              ),
+                        markerFor: (item) => switch (item) {
+                          Restaurant r when r.hasCoordinates => Marker(
+                            markerId: MarkerId('restaurant-${r.id}'),
+                            position: LatLng(r.latitude!, r.longitude!),
+                            infoWindow: InfoWindow(
+                              title: r.name,
+                              onTap: () => context.push(RoutePaths.restaurantDetails(r.id)),
+                            ),
+                          ),
+                          Place p when p.hasCoordinates => Marker(
+                            markerId: MarkerId('place-${p.id}'),
+                            position: LatLng(p.latitude!, p.longitude!),
+                            icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueViolet),
+                            infoWindow: InfoWindow(
+                              title: p.name,
+                              onTap: () => showPlaceDetailsSheet(context, place: p, placesService: _places),
+                            ),
+                          ),
+                          Object() => null,
+                        },
                       ),
                       _ExploreTab.festivals => _buildMap(
                         items: _festivals,
@@ -538,26 +641,30 @@ class _ExploreScreenState extends State<ExploreScreen> {
                     }
                   : switch (_tab) {
                       _ExploreTab.destinations => _buildGrid(
-                        items: _destinations,
+                        items: _destinationPlaces,
                         isLoading: _loadingDestinations,
                         error: _destinationsError,
-                        hasMore: _destinationsHasMore,
+                        // Google's 20-result cap is the whole result set —
+                        // there's no further page to load, unlike the
+                        // curated-catalog "Load More" the Restaurants tab
+                        // still has.
+                        hasMore: false,
                         onLoadMore: _loadDestinations,
                         onRetry: () => _loadDestinations(reset: true),
                         onRefresh: () => _loadDestinations(reset: true),
                         emptyMessage: _hasFilters
                             ? 'No destinations match your filters — try widening them.'
                             : 'No destinations in this category yet — try another one.',
-                        itemBuilder: (context, width, item) => DestinationCard(
-                          destination: item,
+                        itemBuilder: (context, width, p) => PlaceCard(
+                          place: p,
                           width: width,
                           imageHeight: _gridImageHeight,
-                          onTap: () =>
-                              context.push(RoutePaths.destinationDetails(item.id)),
+                          imageUrl: p.photoNames.isNotEmpty ? _places.photoUrl(p.photoNames.first) : '',
+                          onTap: () => showPlaceDetailsSheet(context, place: p, placesService: _places),
                         ),
                       ),
                       _ExploreTab.restaurants => _buildGrid(
-                        items: _restaurants,
+                        items: _restaurantItems,
                         isLoading: _loadingRestaurants,
                         error: _restaurantsError,
                         hasMore: _restaurantsHasMore,
@@ -567,13 +674,22 @@ class _ExploreScreenState extends State<ExploreScreen> {
                         emptyMessage: _hasFilters
                             ? 'No restaurants match your filters — try widening them.'
                             : 'No restaurants found.',
-                        itemBuilder: (context, width, item) => RestaurantCard(
-                          restaurant: item,
-                          width: width,
-                          imageHeight: _gridImageHeight,
-                          onTap: () =>
-                              context.push(RoutePaths.restaurantDetails(item.id)),
-                        ),
+                        itemBuilder: (context, width, item) => switch (item) {
+                          Restaurant r => RestaurantCard(
+                            restaurant: r,
+                            width: width,
+                            imageHeight: _gridImageHeight,
+                            onTap: () => context.push(RoutePaths.restaurantDetails(r.id)),
+                          ),
+                          Place p => PlaceCard(
+                            place: p,
+                            width: width,
+                            imageHeight: _gridImageHeight,
+                            imageUrl: p.photoNames.isNotEmpty ? _places.photoUrl(p.photoNames.first) : '',
+                            onTap: () => showPlaceDetailsSheet(context, place: p, placesService: _places),
+                          ),
+                          Object() => const SizedBox.shrink(),
+                        },
                       ),
                       _ExploreTab.festivals => _buildGrid(
                         items: _festivals,
@@ -658,7 +774,12 @@ class _ExploreScreenState extends State<ExploreScreen> {
               AppSpacing.lg,
               0,
               AppSpacing.lg,
-              AppSpacing.huge,
+              // Taller than AppSpacing.huge alone — this tab also has the
+              // floating AI Chat FAB (`_AiChatFab` in `MainShellScreen`)
+              // hovering above the bottom nav bar, which the plain nav-bar
+              // clearance doesn't account for, letting the last row sit
+              // right behind it.
+              AppSpacing.huge + AppSpacing.xxxl,
             ),
             gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 2,

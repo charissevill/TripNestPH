@@ -1,17 +1,26 @@
+import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:material_symbols_icons/symbols.dart';
+import 'package:provider/provider.dart';
 
+import 'package:tripnest_ph/core/providers/favorites_provider.dart';
 import 'package:tripnest_ph/core/services/places_service.dart';
 import 'package:tripnest_ph/core/widgets/details/place_details_sheet.dart';
+import 'package:tripnest_ph/data/repositories/favorites_repository.dart';
 import 'package:tripnest_ph/domain/models/place.dart';
 
 void main() {
   final placesService = PlacesService(caller: (name, data) async => {'places': <Map<String, dynamic>>[]});
 
-  Widget wrap(Place place) => MaterialApp(
-    home: Scaffold(body: PlaceDetailsSheet(place: place, placesService: placesService)),
+  // PlaceDetailsSheet's bookmark button needs a FavoritesProvider ancestor,
+  // same as DestinationCard/RestaurantCard elsewhere.
+  Widget wrap(Place place) => ChangeNotifierProvider<FavoritesProvider>(
+    create: (_) => FavoritesProvider(repository: FavoritesRepository(firestore: FakeFirebaseFirestore())),
+    child: MaterialApp(
+      home: Scaffold(body: PlaceDetailsSheet(place: place, placesService: placesService)),
+    ),
   );
 
   testWidgets('embeds a real map pin when the place has coordinates', (tester) async {

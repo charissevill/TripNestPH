@@ -11,11 +11,26 @@ import '../../domain/models/saved_itinerary.dart';
 /// Firestore access for the `saved_itineraries` collection — the trips a
 /// user has saved from the AI/trip planner.
 class ItineraryRepository {
-  ItineraryRepository({FirebaseFirestore? firestore}) : _db = firestore ?? FirebaseFirestore.instance;
+  ItineraryRepository({FirebaseFirestore? firestore})
+    : _db = firestore ?? FirebaseFirestore.instance;
 
   final FirebaseFirestore _db;
 
-  CollectionReference<Map<String, dynamic>> get _collection => _db.collection(FirestorePaths.savedItineraries);
+  CollectionReference<Map<String, dynamic>> get _collection =>
+      _db.collection(FirestorePaths.savedItineraries);
+
+  /// Total saved trips across every traveler — the Admin Portal analytics
+  /// dashboard's "Saved Trips" stat. A `count()` aggregation, not a full
+  /// fetch. Allowed under firestore.rules' `hasAdminRole(['admin'])` branch
+  /// the same way `tourist_spots`' admin-wide list already works.
+  Future<int> countAll() async {
+    try {
+      final result = await _collection.count().get();
+      return result.count ?? 0;
+    } catch (e) {
+      throw AppException.from(e);
+    }
+  }
 
   /// Trips [userId] owns, plus trips they joined as a collaborator, merged
   /// and sorted newest-first. Either side updating in real time refreshes
@@ -24,7 +39,9 @@ class ItineraryRepository {
   /// picture rather than momentarily missing whichever side loads slower.
   Stream<List<SavedItinerary>> streamForUser(String userId) {
     final owned = _collection.where('userId', isEqualTo: userId).snapshots();
-    final shared = _collection.where('collaboratorIds', arrayContains: userId).snapshots();
+    final shared = _collection
+        .where('collaboratorIds', arrayContains: userId)
+        .snapshots();
 
     var ownedDocs = <String, QueryDocumentSnapshot<Map<String, dynamic>>>{};
     var sharedDocs = <String, QueryDocumentSnapshot<Map<String, dynamic>>>{};
@@ -38,8 +55,11 @@ class ItineraryRepository {
     void emit() {
       if (!hasOwned || !hasShared) return;
       final merged = {...ownedDocs, ...sharedDocs};
-      final list = merged.values.map((d) => SavedItinerary.fromMap(d.id, d.data())).toList()
-        ..sort((a, b) => b.savedAt.compareTo(a.savedAt));
+      final list =
+          merged.values
+              .map((d) => SavedItinerary.fromMap(d.id, d.data()))
+              .toList()
+            ..sort((a, b) => b.savedAt.compareTo(a.savedAt));
       controller.add(list);
     }
 
@@ -116,12 +136,21 @@ class ItineraryRepository {
   /// itinerary content, a fresh id/savedAt, no collaborators or start date
   /// carried over (a plain `save()`, just sourced from an existing trip
   /// instead of a freshly generated one). Returns the new trip's id.
-  Future<String> duplicate(String sourceId, String userId, {String ownerName = ''}) async {
+  Future<String> duplicate(
+    String sourceId,
+    String userId, {
+    String ownerName = '',
+  }) async {
     final source = await getById(sourceId);
     if (source == null) {
       throw const AppException('This trip is no longer available.');
     }
-    return save(userId: userId, title: '${source.title} (Copy)', itinerary: source.itinerary, ownerName: ownerName);
+    return save(
+      userId: userId,
+      title: '${source.title} (Copy)',
+      itinerary: source.itinerary,
+      ownerName: ownerName,
+    );
   }
 
   Future<void> delete(String id) async {
@@ -137,7 +166,11 @@ class ItineraryRepository {
   /// tags the joiner's own display name into `memberNames` (their own entry
   /// only) so the owner can see who's who in the Budget Tracker without
   /// needing read access to anyone else's `users/{uid}` profile.
-  Future<void> joinAsCollaborator({required String itineraryId, required String userId, String userName = ''}) async {
+  Future<void> joinAsCollaborator({
+    required String itineraryId,
+    required String userId,
+    String userName = '',
+  }) async {
     try {
       final update = <String, dynamic>{
         'collaboratorIds': FieldValue.arrayUnion([userId]),
@@ -151,7 +184,10 @@ class ItineraryRepository {
 
   /// Leaves a shared trip. Owners can't leave their own trip — they delete
   /// it instead.
-  Future<void> leaveTrip({required String itineraryId, required String userId}) async {
+  Future<void> leaveTrip({
+    required String itineraryId,
+    required String userId,
+  }) async {
     try {
       await _collection.doc(itineraryId).update({
         'collaboratorIds': FieldValue.arrayRemove([userId]),
@@ -162,9 +198,14 @@ class ItineraryRepository {
     }
   }
 
-  Future<void> updatePackingItems(String itineraryId, List<PackingItem> items) async {
+  Future<void> updatePackingItems(
+    String itineraryId,
+    List<PackingItem> items,
+  ) async {
     try {
-      await _collection.doc(itineraryId).update({'packingItems': items.map((p) => p.toMap()).toList()});
+      await _collection.doc(itineraryId).update({
+        'packingItems': items.map((p) => p.toMap()).toList(),
+      });
     } catch (e) {
       throw AppException.from(e);
     }
@@ -174,7 +215,9 @@ class ItineraryRepository {
   /// account-deletion flow.
   Future<void> deleteAllForUser(String userId) async {
     try {
-      final snapshot = await _collection.where('userId', isEqualTo: userId).get();
+      final snapshot = await _collection
+          .where('userId', isEqualTo: userId)
+          .get();
       final batch = _db.batch();
       for (final doc in snapshot.docs) {
         batch.delete(doc.reference);

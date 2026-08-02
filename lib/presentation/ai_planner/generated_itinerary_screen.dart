@@ -10,34 +10,38 @@ import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../../ai/models/itinerary_request.dart';
+import '../../ai/providers/ai_planner_provider.dart';
 import '../../core/providers/auth_provider.dart';
 import '../../core/routes/route_paths.dart';
 import '../../core/services/itinerary_offline_service.dart';
 import '../../core/services/local_preferences_service.dart';
 import '../../core/services/notification_service.dart';
+import '../../core/services/places_service.dart';
+import '../../core/services/weather_service.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_shadows.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/utils/app_exception.dart';
 import '../../core/utils/expense_split.dart';
+import '../../core/utils/validators.dart';
 import '../../core/utils/itinerary_export.dart';
 import '../../core/utils/itinerary_route_matcher.dart';
 import '../../core/utils/maps_launcher.dart';
+import '../../core/utils/province_matcher.dart';
 import '../../core/utils/reminder_picker.dart';
 import '../../core/widgets/banners/offline_banner.dart';
 import '../../core/widgets/dialogs/confirmation_dialog.dart';
 import '../../core/widgets/cards/restaurant_card.dart';
-import '../../core/widgets/cards/destination_card.dart';
 import '../../core/widgets/cards/travel_image_frame.dart';
 import '../../core/widgets/details/trip_route_map.dart';
 import '../../core/widgets/indicators/rating_widget.dart';
 import '../../core/widgets/layout/section_header.dart';
 import '../../data/mock/mock_itinerary.dart';
-import '../../data/repositories/destination_repository.dart';
 import '../../data/repositories/expense_repository.dart';
 import '../../data/repositories/itinerary_repository.dart';
+import '../../data/repositories/province_repository.dart';
 import '../../data/repositories/restaurant_repository.dart';
-import '../../domain/models/destination.dart';
 import '../../domain/models/expense.dart';
 import '../../domain/models/itinerary.dart';
 import '../../domain/models/packing_item.dart';
@@ -69,17 +73,30 @@ class GeneratedItineraryScreen extends StatefulWidget {
 class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
   final ItineraryRepository _repository = ItineraryRepository();
   final RestaurantRepository _restaurantRepository = RestaurantRepository();
-  final DestinationRepository _destinationRepository = DestinationRepository();
   final ExpenseRepository _expenseRepository = ExpenseRepository();
   final ItineraryOfflineService _offlineService = ItineraryOfflineService();
   final LocalPreferencesService _preferencesService = LocalPreferencesService();
+  final WeatherService _weatherService = WeatherService();
+  final PlacesService _places = PlacesService();
   bool _busy = false;
   bool _exportingPdf = false;
   bool _offlineBusy = false;
+  bool _regenerating = false;
   bool _isAvailableOffline = false;
   List<Restaurant> _recommendedRestaurants = [];
-  List<Destination> _nearbyAttractions = [];
   SavedItinerary? _savedItinerary;
+
+  /// Non-null once the traveler edits the trip's start date — re-fetched for
+  /// that specific date range rather than trusting [Itinerary.weather],
+  /// which was only ever fetched once for "starting today" at generation
+  /// time. An empty list (as opposed to null) means a refresh was attempted
+  /// but no real forecast is available for that date (see
+  /// [_refreshWeatherForDate]), so the UI should show a fallback message
+  /// instead of silently falling back to the stale original forecast.
+  List<WeatherForecast>? _weatherOverride;
+
+  List<WeatherForecast> get _weather =>
+      _weatherOverride ?? widget.itinerary.weather;
 
   /// Set right before a deliberate pop (after the traveler chooses Save or
   /// Discard in [_handleUnsavedPopAttempt]) so that second, self-triggered
@@ -101,6 +118,12 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
       _loadSavedItinerary();
       _loadOfflineStatus();
     }
+  }
+
+  @override
+  void dispose() {
+    _weatherService.dispose();
+    super.dispose();
   }
 
   Future<void> _loadOfflineStatus() async {
@@ -145,25 +168,20 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
     }
   }
 
-  // The itinerary only stores restaurant/destination ids — resolved here
-  // against the live Firestore catalog so "Recommended Restaurants" and
-  // "Nearby Attractions" always show real, current listings rather than a
-  // frozen snapshot.
+  // The itinerary only stores restaurant ids — resolved here against the
+  // live Firestore catalog so "Recommended Restaurants" always shows real,
+  // current listings rather than a frozen snapshot. Nearby attractions are
+  // Google Places-only (see `recommendedPlaceAttractions`) and already come
+  // fully resolved off the itinerary itself — no separate fetch needed.
   Future<void> _loadRecommendations() async {
     try {
-      final results = await Future.wait([
-        _restaurantRepository.getByIds(
-          widget.itinerary.recommendedRestaurantIds,
-        ),
-        _destinationRepository.getByIds(widget.itinerary.nearbyAttractionIds),
-      ]);
+      final restaurants = await _restaurantRepository.getByIds(
+        widget.itinerary.recommendedRestaurantIds,
+      );
       if (!mounted) return;
-      setState(() {
-        _recommendedRestaurants = results[0] as List<Restaurant>;
-        _nearbyAttractions = results[1] as List<Destination>;
-      });
+      setState(() => _recommendedRestaurants = restaurants);
     } catch (_) {
-      // Best-effort: these are supplementary sections, never worth
+      // Best-effort: this is a supplementary section, never worth
       // blocking or erroring the whole itinerary view over.
     }
   }
@@ -328,6 +346,124 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
           context,
         ).showSnackBar(SnackBar(content: Text(AppException.from(e).message)));
     }
+    await _refreshWeatherForDate(picked);
+  }
+
+  /// Re-fetches the Weather Outlook for [startDate] instead of leaving it
+  /// showing [Itinerary.weather] — a forecast for "starting today" fetched
+  /// once at generation time, which has nothing to do with a trip date
+  /// picked afterward. Open-Meteo's free forecast only reaches 16 days
+  /// ahead of today; when the trip's date range falls outside that window
+  /// there's no real forecast to show, so [_weatherOverride] is set to an
+  /// empty list (a fallback message) rather than guessing.
+  Future<void> _refreshWeatherForDate(DateTime startDate) async {
+    final latitude = widget.itinerary.destinationLatitude;
+    final longitude = widget.itinerary.destinationLongitude;
+    if (latitude == null || longitude == null) return;
+
+    final today = DateTime.now();
+    final todayDate = DateTime(today.year, today.month, today.day);
+    final tripDate = DateTime(startDate.year, startDate.month, startDate.day);
+    final daysUntilTrip = tripDate.isBefore(todayDate) ? 0 : tripDate.difference(todayDate).inDays;
+    final forecastWindow = daysUntilTrip + widget.itinerary.totalDays;
+
+    if (forecastWindow > 16) {
+      if (mounted) setState(() => _weatherOverride = const []);
+      return;
+    }
+
+    final forecast = await _weatherService.getForecast(
+      latitude: latitude,
+      longitude: longitude,
+      days: forecastWindow,
+    );
+    final forTrip = forecast.length > daysUntilTrip ? forecast.sublist(daysUntilTrip) : const <WeatherForecast>[];
+    if (mounted) setState(() => _weatherOverride = forTrip);
+  }
+
+  /// Re-runs generation for the same destination — resolved fresh via
+  /// Places (the same "search by name, then match its province" building
+  /// block the AI Chat generate flow already uses), since neither
+  /// [Itinerary] nor [SavedItinerary] persist the original request's
+  /// province, budget tier, transportation or interests. Days, traveler
+  /// count and accommodation carry over from this itinerary; budget tier is
+  /// approximated from [Itinerary.totalBudget] against the Planner form's
+  /// own tiers, and traveler type from the traveler count, since neither's
+  /// original label survives past generation. Lands on a fresh (unsaved)
+  /// itinerary via `pushReplacement` — same place, new content, without
+  /// silently overwriting an already-saved trip or piling up a back-stack
+  /// entry per regenerate.
+  Future<void> _regenerate() async {
+    setState(() => _regenerating = true);
+    try {
+      final places = await _places.searchText(textQuery: '${widget.itinerary.destinationName}, Philippines');
+      final place = places.isNotEmpty ? places.first : null;
+      if (place == null) {
+        _showRegenerateError('Couldn\'t find that destination again — try Regenerate once more, or start a new trip from the Planner.');
+        return;
+      }
+
+      final provinces = await ProvinceRepository().getAll();
+      final province = matchProvinceByAddress(place.address, provinces);
+      if (province == null) {
+        _showRegenerateError('Couldn\'t match "${place.name}" to a province — try again shortly.');
+        return;
+      }
+
+      if (!mounted) return;
+      final travelers = widget.itinerary.travelers;
+      final travelerType = travelers <= 1 ? 'Solo' : (travelers == 2 ? 'Couple' : 'Friends');
+      final (budgetTierLabel, budgetRange) = _inferBudgetTier(widget.itinerary.totalBudget);
+
+      final planner = context.read<AiPlannerProvider>();
+      final itinerary = await planner.generate(
+        AiItineraryRequest(
+          destinationId: place.id,
+          destinationName: place.name,
+          provinceId: province.id,
+          provinceName: province.name,
+          budgetTierLabel: budgetTierLabel,
+          budgetRange: budgetRange,
+          days: widget.itinerary.totalDays,
+          travelers: travelers,
+          travelerType: travelerType,
+          transportation: const {'Van / Car Rental'},
+          interests: const {'Beaches', 'Food'},
+          latitude: place.latitude,
+          longitude: place.longitude,
+          accommodationName: widget.itinerary.accommodationName.isNotEmpty ? widget.itinerary.accommodationName : null,
+        ),
+        coverImageUrl: widget.itinerary.coverImageUrl.isNotEmpty
+            ? widget.itinerary.coverImageUrl
+            : (place.photoNames.isNotEmpty ? _places.photoUrl(place.photoNames.first) : province.heroImageUrl),
+        // Skips the cached-response short-circuit — otherwise an identical
+        // reconstructed request would just hand back this same itinerary,
+        // defeating the point of "Regenerate".
+        forceRefresh: true,
+      );
+
+      if (!mounted) return;
+      if (itinerary != null) {
+        context.pushReplacement(RoutePaths.generatedItinerary, extra: {'itinerary': itinerary});
+      } else {
+        _showRegenerateError(planner.errorMessage ?? 'Couldn\'t regenerate your itinerary. Please try again.');
+      }
+    } catch (_) {
+      _showRegenerateError('Something went wrong regenerating that itinerary. Please try again.');
+    } finally {
+      if (mounted) setState(() => _regenerating = false);
+    }
+  }
+
+  void _showRegenerateError(String reason) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(reason)));
+  }
+
+  (String, String) _inferBudgetTier(double totalBudget) {
+    if (totalBudget >= 40000) return ('Luxury', '₱40k+');
+    if (totalBudget >= 15000) return ('Mid-range', '₱15k – ₱40k');
+    return ('Budget', '₱5k – ₱15k');
   }
 
   Rect? _sharePositionOrigin() {
@@ -531,9 +667,9 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
             ),
             FilledButton(
               onPressed: () {
-                final amount = double.tryParse(amountController.text.trim());
-                if (amount == null || amount <= 0) {
-                  setDialogState(() => errorText = 'Enter a valid amount');
+                final amountError = Validators.amount(amountController.text, required: true, maxAmount: 500000);
+                if (amountError != null) {
+                  setDialogState(() => errorText = amountError);
                   return;
                 }
                 if (splitWith.isEmpty) {
@@ -717,7 +853,6 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
     final theme = Theme.of(context);
     final itinerary = widget.itinerary;
     final restaurants = _recommendedRestaurants;
-    final attractions = _nearbyAttractions;
 
     return PopScope(
       canPop: _isSaved || _readyToPop,
@@ -812,67 +947,51 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
                     ),
                     sliver: SliverList.list(
                       children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _ActionButton(
-                                icon: _isSaved
-                                    ? Symbols.bookmark_rounded
-                                    : Symbols.bookmark_add_rounded,
-                                label: widget.savedItineraryId != null
-                                    ? 'Remove'
-                                    : 'Save',
-                                busy: _busy,
-                                onTap: _toggleSave,
-                              ),
+                        _ActionButtonGrid(
+                          buttons: [
+                            _ActionButton(
+                              icon: _isSaved
+                                  ? Symbols.bookmark_rounded
+                                  : Symbols.bookmark_add_rounded,
+                              label: widget.savedItineraryId != null
+                                  ? 'Remove'
+                                  : 'Save',
+                              busy: _busy,
+                              onTap: _toggleSave,
                             ),
-                            const SizedBox(width: AppSpacing.sm),
-                            Expanded(
-                              child: _ActionButton(
-                                icon: Symbols.ios_share_rounded,
-                                label: 'Share',
-                                onTap: _share,
-                              ),
+                            _ActionButton(
+                              icon: Symbols.ios_share_rounded,
+                              label: 'Share',
+                              onTap: _share,
                             ),
-                            const SizedBox(width: AppSpacing.sm),
-                            Expanded(
-                              child: _ActionButton(
-                                icon: Symbols.download_rounded,
-                                label: 'Download',
-                                busy: _exportingPdf,
-                                onTap: _downloadPdf,
-                              ),
+                            _ActionButton(
+                              icon: Symbols.download_rounded,
+                              label: 'Download',
+                              busy: _exportingPdf,
+                              onTap: _downloadPdf,
                             ),
                             if (_isSaved) ...[
-                              const SizedBox(width: AppSpacing.sm),
-                              Expanded(
-                                child: _ActionButton(
-                                  icon: Symbols.notifications_active_rounded,
-                                  label: 'Remind',
-                                  onTap: _setReminder,
-                                ),
+                              _ActionButton(
+                                icon: Symbols.notifications_active_rounded,
+                                label: 'Remind',
+                                onTap: _setReminder,
                               ),
-                              const SizedBox(width: AppSpacing.sm),
-                              Expanded(
-                                child: _ActionButton(
-                                  icon: _isAvailableOffline
-                                      ? Symbols.offline_pin_rounded
-                                      : Symbols.download_for_offline_rounded,
-                                  label: _isAvailableOffline
-                                      ? 'Downloaded'
-                                      : 'Offline',
-                                  busy: _offlineBusy,
-                                  onTap: _saveOffline,
-                                ),
+                              _ActionButton(
+                                icon: _isAvailableOffline
+                                    ? Symbols.offline_pin_rounded
+                                    : Symbols.download_for_offline_rounded,
+                                label: _isAvailableOffline
+                                    ? 'Downloaded'
+                                    : 'Offline',
+                                busy: _offlineBusy,
+                                onTap: _saveOffline,
                               ),
                             ],
-                            const SizedBox(width: AppSpacing.sm),
-                            Expanded(
-                              child: _ActionButton(
-                                icon: Symbols.refresh_rounded,
-                                label: 'Regenerate',
-                                onTap: () => context.go(RoutePaths.planner),
-                              ),
+                            _ActionButton(
+                              icon: Symbols.refresh_rounded,
+                              label: 'Regenerate',
+                              busy: _regenerating,
+                              onTap: _regenerate,
                             ),
                           ],
                         ),
@@ -890,20 +1009,25 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
                           style: theme.textTheme.titleLarge,
                         ),
                         const SizedBox(height: AppSpacing.md),
-                        Row(
-                          children: itinerary.weather
-                              .map(
-                                (w) => Expanded(
-                                  child: Padding(
-                                    padding: const EdgeInsets.only(
-                                      right: AppSpacing.sm,
-                                    ),
-                                    child: _WeatherTile(forecast: w),
-                                  ),
-                                ),
+                        _weather.isEmpty
+                            ? Text(
+                                'No forecast available for these dates yet — check back closer to your trip.',
+                                style: theme.textTheme.bodySmall,
                               )
-                              .toList(),
-                        ),
+                            : Row(
+                                children: _weather
+                                    .map(
+                                      (w) => Expanded(
+                                        child: Padding(
+                                          padding: const EdgeInsets.only(
+                                            right: AppSpacing.sm,
+                                          ),
+                                          child: _WeatherTile(forecast: w),
+                                        ),
+                                      ),
+                                    )
+                                    .toList(),
+                              ),
                         if (itinerary.recommendedAccommodations.isNotEmpty) ...[
                           const SizedBox(height: AppSpacing.xxl),
                           Text(
@@ -1048,7 +1172,6 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
                               day: day,
                               date: _savedItinerary?.dateForDay(day.dayNumber),
                               restaurants: restaurants,
-                              destinations: attractions,
                               placeRecommendations: [
                                 ...itinerary.recommendedAccommodations,
                                 ...itinerary.recommendedPlaceAttractions,
@@ -1087,37 +1210,12 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
                             ),
                           ),
                         ],
-                        if (attractions.isNotEmpty) ...[
-                          const SizedBox(height: AppSpacing.xl),
-                          const SectionHeader(
-                            title: 'Nearby Attractions',
-                            padding: EdgeInsets.zero,
-                          ),
-                          const SizedBox(height: AppSpacing.md),
-                          SizedBox(
-                            height: 250,
-                            child: ListView.separated(
-                              scrollDirection: Axis.horizontal,
-                              itemCount: attractions.length,
-                              separatorBuilder: (_, _) =>
-                                  const SizedBox(width: AppSpacing.md),
-                              itemBuilder: (context, i) => DestinationCard(
-                                destination: attractions[i],
-                                onTap: () => context.push(
-                                  RoutePaths.destinationDetails(
-                                    attractions[i].id,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
                         if (itinerary
                             .recommendedPlaceAttractions
                             .isNotEmpty) ...[
                           const SizedBox(height: AppSpacing.xl),
                           const SectionHeader(
-                            title: 'More to Explore Nearby',
+                            title: 'Nearby Attractions',
                             padding: EdgeInsets.zero,
                           ),
                           const SizedBox(height: AppSpacing.md),
@@ -1212,6 +1310,43 @@ class _CircleButton extends StatelessWidget {
         child: Icon(icon, color: Colors.white, size: 18),
       ),
     );
+  }
+}
+
+/// Lays [buttons] out three per row (rather than one cramped row stretching
+/// to fit all of them — up to 6 when the trip is saved) so each keeps
+/// comfortable width for its icon + label. An incomplete trailing row (e.g.
+/// 4 buttons) keeps its buttons at the same width as a full row instead of
+/// stretching to fill the row, via blank spacer cells.
+class _ActionButtonGrid extends StatelessWidget {
+  const _ActionButtonGrid({required this.buttons});
+
+  final List<Widget> buttons;
+
+  /// 4 or fewer (unsaved trip: Save/Share/Download/Regenerate) fits on one
+  /// row; more than that (saved trip adds Remind/Offline, for 6 total) wraps
+  /// at 3 per row rather than stretching a single row to fit 5-6 buttons.
+  int get _perRow => buttons.length <= 4 ? buttons.length : 3;
+
+  @override
+  Widget build(BuildContext context) {
+    final perRow = _perRow;
+    final rows = <Widget>[];
+    for (var i = 0; i < buttons.length; i += perRow) {
+      final rowButtons = buttons.skip(i).take(perRow).toList();
+      if (rows.isNotEmpty) rows.add(const SizedBox(height: AppSpacing.sm));
+      rows.add(
+        Row(
+          children: [
+            for (var j = 0; j < perRow; j++) ...[
+              if (j > 0) const SizedBox(width: AppSpacing.sm),
+              Expanded(child: j < rowButtons.length ? rowButtons[j] : const SizedBox()),
+            ],
+          ],
+        ),
+      );
+    }
+    return Column(children: rows);
   }
 }
 
@@ -2006,7 +2141,6 @@ class _DayCard extends StatelessWidget {
     required this.day,
     this.date,
     required this.restaurants,
-    required this.destinations,
     this.placeRecommendations = const [],
     this.mainDestinationId,
     this.mainDestinationName,
@@ -2024,9 +2158,10 @@ class _DayCard extends StatelessWidget {
   /// The trip's already-resolved, real-coordinate recommendations — used to
   /// match this day's activities to a real place for [TripRouteMap] (see
   /// `matchDayToRoute`). Never re-fetched here; just what the parent screen
-  /// already loaded.
+  /// already loaded. Attractions are Google Places-only now — see
+  /// [placeRecommendations] — so `matchDayToRoute`'s own `destinations` param
+  /// is always passed an empty list from here.
   final List<Restaurant> restaurants;
-  final List<Destination> destinations;
   final List<PlaceRecommendation> placeRecommendations;
 
   /// The trip's own destination — see `matchDayToRoute`'s doc comment for
@@ -2042,7 +2177,7 @@ class _DayCard extends StatelessWidget {
     final routeStops = matchDayToRoute(
       day,
       restaurants: restaurants,
-      destinations: destinations,
+      destinations: const [],
       placeRecommendations: placeRecommendations,
       mainDestinationId: mainDestinationId,
       mainDestinationName: mainDestinationName,
@@ -2179,7 +2314,14 @@ class _TimelineActivity extends StatelessWidget {
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
                       const SizedBox(width: 2),
-                      Text(activity.location, style: theme.textTheme.bodySmall),
+                      Expanded(
+                        child: Text(
+                          activity.location,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodySmall,
+                        ),
+                      ),
                     ],
                   ),
                 ],

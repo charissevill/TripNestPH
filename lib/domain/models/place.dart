@@ -121,13 +121,13 @@ class Place {
   static double _degToRad(double deg) => deg * (math.pi / 180);
 
   factory Place.fromJson(Map<String, dynamic> json) {
-    final location = json['location'] as Map<String, dynamic>?;
+    final location = _asStringMap(json['location']);
     return Place(
       id: json['id'] as String? ?? '',
-      name: (json['displayName'] as Map<String, dynamic>?)?['text'] as String? ?? '',
+      name: _asStringMap(json['displayName'])?['text'] as String? ?? '',
       types: List<String>.from(json['types'] as List? ?? const []),
       photoNames: (json['photos'] as List? ?? const [])
-          .map((p) => (p as Map<String, dynamic>)['name'] as String? ?? '')
+          .map((p) => _asStringMap(p)?['name'] as String? ?? '')
           .where((n) => n.isNotEmpty)
           .toList(),
       rating: (json['rating'] as num?)?.toDouble(),
@@ -136,15 +136,28 @@ class Place {
       phoneNumber: json['nationalPhoneNumber'] as String? ?? '',
       websiteUri: json['websiteUri'] as String? ?? '',
       priceLevel: _priceLevelFromJson(json['priceLevel']),
-      isOpenNow: (json['currentOpeningHours'] as Map<String, dynamic>?)?['openNow'] as bool?,
+      isOpenNow: _asStringMap(json['currentOpeningHours'])?['openNow'] as bool?,
       latitude: (location?['latitude'] as num?)?.toDouble(),
       longitude: (location?['longitude'] as num?)?.toDouble(),
       googleMapsUri: json['googleMapsUri'] as String? ?? '',
       weekdayDescriptions: List<String>.from(
-        (json['regularOpeningHours'] as Map<String, dynamic>?)?['weekdayDescriptions'] as List? ?? const [],
+        _asStringMap(json['regularOpeningHours'])?['weekdayDescriptions'] as List? ?? const [],
       ),
-      editorialSummary: (json['editorialSummary'] as Map<String, dynamic>?)?['text'] as String? ?? '',
+      editorialSummary: _asStringMap(json['editorialSummary'])?['text'] as String? ?? '',
     );
+  }
+
+  /// Cloud Functions' platform channel decodes nested maps as
+  /// `Map<Object?, Object?>`, not `Map<String, dynamic>` — only the
+  /// top-level place map arrives pre-converted (see `PlacesService._parsePlaces`).
+  /// A direct `as Map<String, dynamic>` cast on a nested field (`location`,
+  /// `displayName`, each `photos` entry, etc.) throws at runtime, which
+  /// `PlacesService.searchText`/`searchNearby`'s catch-all then silently
+  /// swallows into an empty result list — this is why real Places results
+  /// with a location/displayName (i.e. every real result) never showed up.
+  static Map<String, dynamic>? _asStringMap(Object? value) {
+    if (value == null) return null;
+    return Map<String, dynamic>.from(value as Map);
   }
 
   Map<String, dynamic> toJson() {

@@ -5,10 +5,13 @@ import 'package:provider/provider.dart';
 
 import '../../core/providers/favorites_provider.dart';
 import '../../core/routes/route_paths.dart';
+import '../../core/services/places_service.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/widgets/cards/destination_card.dart';
 import '../../core/widgets/cards/festival_card.dart';
+import '../../core/widgets/cards/place_card.dart';
 import '../../core/widgets/cards/restaurant_card.dart';
+import '../../core/widgets/details/place_details_sheet.dart';
 import '../../core/widgets/states/empty_state_widget.dart';
 import '../../core/widgets/states/loading_widget.dart';
 import '../../data/repositories/destination_repository.dart';
@@ -24,8 +27,11 @@ const double _gridImageHeight = 140;
 const double _gridCellExtent = _gridImageHeight + 92;
 
 /// Everything the traveler has bookmarked, split into Destinations,
-/// Restaurants and Festivals tabs, all backed by [FavoritesProvider] and
-/// resolved live against Firestore.
+/// Restaurants, Festivals, and Attractions (live Google Places results)
+/// tabs, all backed by [FavoritesProvider] — the first three resolved live
+/// against their own Firestore collection given just a saved id, the last
+/// rendered directly from its own fully-hydrated snapshot (a `Place` has no
+/// other collection to resolve one from).
 class SavedScreen extends StatefulWidget {
   const SavedScreen({super.key});
 
@@ -36,12 +42,13 @@ class SavedScreen extends StatefulWidget {
 class _SavedScreenState extends State<SavedScreen>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController = TabController(
-    length: 3,
+    length: 4,
     vsync: this,
   );
   final DestinationRepository _destinationRepository = DestinationRepository();
   final RestaurantRepository _restaurantRepository = RestaurantRepository();
   final FestivalRepository _festivalRepository = FestivalRepository();
+  final PlacesService _places = PlacesService();
 
   @override
   void dispose() {
@@ -79,10 +86,13 @@ class _SavedScreenState extends State<SavedScreen>
               unselectedLabelColor: theme.textTheme.bodyMedium?.color,
               indicatorColor: theme.colorScheme.primary,
               labelStyle: theme.textTheme.labelLarge,
+              isScrollable: true,
+              tabAlignment: TabAlignment.start,
               tabs: [
                 Tab(text: 'Places (${destinationIds.length})'),
                 Tab(text: 'Food (${restaurantIds.length})'),
                 Tab(text: 'Festivals (${festivalIds.length})'),
+                Tab(text: 'Attractions (${saved.savedPlaces.length})'),
               ],
             ),
             Expanded(
@@ -164,6 +174,28 @@ class _SavedScreenState extends State<SavedScreen>
                       ),
                     ),
                   ),
+                  // No FutureBuilder/repository lookup — a saved place is
+                  // never persisted anywhere else, so `saved.savedPlaces` is
+                  // already the fully-hydrated favorite data straight off
+                  // FavoritesProvider's live stream (see
+                  // FavoritesRepository.streamSavedPlaces).
+                  _SavedGrid(
+                    itemCount: saved.savedPlaces.length,
+                    isLoading: false,
+                    emptyTitle: 'No saved attractions yet',
+                    emptyMessage:
+                        'Tap the bookmark icon on any attraction to save it here.',
+                    itemBuilder: (context, width, i) {
+                      final place = saved.savedPlaces[i];
+                      return PlaceCard(
+                        place: place,
+                        width: width,
+                        imageHeight: _gridImageHeight,
+                        imageUrl: place.photoNames.isNotEmpty ? _places.photoUrl(place.photoNames.first) : '',
+                        onTap: () => showPlaceDetailsSheet(context, place: place, placesService: _places),
+                      );
+                    },
+                  ),
                 ],
               ),
             ),
@@ -212,7 +244,12 @@ class _SavedGrid extends StatelessWidget {
             AppSpacing.lg,
             AppSpacing.md,
             AppSpacing.lg,
-            AppSpacing.huge,
+            // Taller than AppSpacing.huge alone — this tab also has the
+            // floating AI Chat FAB (`_AiChatFab` in `MainShellScreen`)
+            // hovering above the bottom nav bar, which the plain nav-bar
+            // clearance doesn't account for, letting the last row sit right
+            // behind it.
+            AppSpacing.huge + AppSpacing.xxxl,
           ),
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: 2,

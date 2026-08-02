@@ -87,6 +87,16 @@ dependencies:
   pdf: ^3.11.1
   path_provider: ^2.1.5
 
+  # Admin bulk content import
+  # Pinned below 11.x deliberately: file_picker 11.x's own Android module
+  # skips applying its Kotlin Gradle Plugin when AGP 9+ is detected (this
+  # project uses AGP 9.0.1), assuming Flutter's "Built-in Kotlin" support
+  # (needs Flutter 3.47+) will compile it instead — we're on 3.44, so it
+  # doesn't, and the build fails with "cannot find symbol: FilePickerPlugin".
+  # 10.3.10 still applies kotlin-android unconditionally, avoiding this.
+  file_picker: ^10.3.10
+  csv: ^6.0.0
+
   # AI (Phase 3)
   http: ^1.2.2
   flutter_markdown: ^0.7.4+3

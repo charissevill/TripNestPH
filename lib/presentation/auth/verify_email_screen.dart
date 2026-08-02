@@ -9,6 +9,7 @@ import '../../core/providers/auth_provider.dart';
 import '../../core/routes/route_paths.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
+import '../../core/utils/sign_out.dart';
 import '../../core/widgets/buttons/animated_button.dart';
 
 /// Shown right after registration until the traveler confirms their email.
@@ -92,8 +93,8 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
               Center(
                 child: TextButton(
                   onPressed: () async {
-                    await context.read<AuthProvider>().signOut();
-                    if (context.mounted) context.go(RoutePaths.login);
+                    final signedOut = await confirmSignOut(context);
+                    if (signedOut && context.mounted) context.go(RoutePaths.login);
                   },
                   child: const Text('Sign out'),
                 ),

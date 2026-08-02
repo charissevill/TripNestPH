@@ -29,6 +29,17 @@ class RestaurantRepository {
   Future<List<Restaurant>> getPopular({int limit = 10}) =>
       _query(_publishedOnly.where('isPopular', isEqualTo: true).limit(limit));
 
+  /// Total published restaurants — the Admin Portal analytics dashboard's
+  /// content-coverage stat.
+  Future<int> countPublished() async {
+    try {
+      final result = await _publishedOnly.count().get();
+      return result.count ?? 0;
+    } catch (e) {
+      throw AppException.from(e);
+    }
+  }
+
   Future<
     ({List<Restaurant> items, DocumentSnapshot<Map<String, dynamic>>? lastDoc})
   >

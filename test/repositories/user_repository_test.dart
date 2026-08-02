@@ -54,4 +54,49 @@ void main() {
     final visited = await repository.hasVisited(uid: 'user-1', targetType: 'destination', targetId: 'palawan');
     expect(visited, isFalse);
   });
+
+  group('Admin Portal: counts, pagination, setStatus()', () {
+    test('countAll() counts every traveler regardless of status', () async {
+      await repository.createIfMissing(uid: 'user-1', name: 'Juan', email: 'juan@example.com');
+      await repository.createIfMissing(uid: 'user-2', name: 'Maria', email: 'maria@example.com');
+
+      expect(await repository.countAll(), 2);
+    });
+
+    test('countByStatus() only counts travelers with that exact status', () async {
+      await repository.createIfMissing(uid: 'user-1', name: 'Juan', email: 'juan@example.com');
+      await repository.createIfMissing(uid: 'user-2', name: 'Maria', email: 'maria@example.com');
+      await repository.setStatus('user-2', 'suspended');
+
+      expect(await repository.countByStatus('suspended'), 1);
+      expect(await repository.countByStatus('active'), 1);
+    });
+
+    test('setStatus() only changes the status field, never anything else', () async {
+      await repository.createIfMissing(uid: 'user-1', name: 'Juan', email: 'juan@example.com');
+
+      await repository.setStatus('user-1', 'suspended');
+
+      final profile = await repository.getUser('user-1');
+      expect(profile!.isSuspended, isTrue);
+      expect(profile.name, 'Juan');
+      expect(profile.email, 'juan@example.com');
+    });
+
+    test('getPage() paginates newest-first and respects pageSize', () async {
+      await repository.createIfMissing(uid: 'user-1', name: 'First', email: 'first@example.com');
+      await repository.createIfMissing(uid: 'user-2', name: 'Second', email: 'second@example.com');
+      await repository.createIfMissing(uid: 'user-3', name: 'Third', email: 'third@example.com');
+
+      final firstPage = await repository.getPage(pageSize: 2);
+      expect(firstPage.items, hasLength(2));
+      expect(firstPage.lastDoc, isNotNull);
+
+      final secondPage = await repository.getPage(pageSize: 2, startAfter: firstPage.lastDoc);
+      expect(secondPage.items, hasLength(1));
+
+      final allUids = [...firstPage.items, ...secondPage.items].map((u) => u.uid).toSet();
+      expect(allUids, {'user-1', 'user-2', 'user-3'});
+    });
+  });
 }

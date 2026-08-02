@@ -1,12 +1,14 @@
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:tripnest_ph/core/providers/favorites_provider.dart';
 import 'package:tripnest_ph/core/services/places_service.dart';
 import 'package:tripnest_ph/core/utils/function_caller.dart';
 import 'package:tripnest_ph/core/widgets/details/place_details_sheet.dart';
-import 'package:tripnest_ph/data/repositories/destination_repository.dart';
+import 'package:tripnest_ph/data/repositories/favorites_repository.dart';
 import 'package:tripnest_ph/data/repositories/festival_repository.dart';
 import 'package:tripnest_ph/data/repositories/province_repository.dart';
 import 'package:tripnest_ph/data/repositories/region_repository.dart';
@@ -32,7 +34,14 @@ FunctionCaller _fakePlacesSearchText(
   };
 }
 
-Widget _wrap(Widget child) => MaterialApp(home: child);
+// PlaceDetailsSheet's bookmark button needs a FavoritesProvider ancestor,
+// same as DestinationCard/RestaurantCard elsewhere.
+Widget _wrap(Widget child, FakeFirebaseFirestore firestore) {
+  return ChangeNotifierProvider<FavoritesProvider>(
+    create: (_) => FavoritesProvider(repository: FavoritesRepository(firestore: firestore)),
+    child: MaterialApp(home: child),
+  );
+}
 
 /// `find.text()` also matches the search field's own `EditableText` when
 /// its typed value happens to equal the string being searched for (e.g.
@@ -52,7 +61,6 @@ void main() {
     required PlacesService placesService,
   }) async {
     final screen = SearchScreen(
-      destinationRepository: DestinationRepository(firestore: firestore),
       restaurantRepository: RestaurantRepository(firestore: firestore),
       festivalRepository: FestivalRepository(firestore: firestore),
       regionRepository: RegionRepository(firestore: firestore),
@@ -60,7 +68,7 @@ void main() {
       placesService: placesService,
       searchTrendRepository: SearchTrendRepository(firestore: firestore),
     );
-    await tester.pumpWidget(_wrap(screen));
+    await tester.pumpWidget(_wrap(screen, firestore));
     await tester.pumpAndSettle();
     return screen;
   }
@@ -270,34 +278,44 @@ void main() {
   );
 
   testWidgets(
-    'shows curated destinations tagged with a category matching the query keyword',
+    'follows up a bare city-name match with real nearby places, not just the city itself',
     (tester) async {
       final firestore = FakeFirebaseFirestore();
-      // Named after neither "beach" nor the query — only surfaced because
-      // its own categoryId matches the 'beach' keyword mapping.
-      await firestore.collection('tourist_spots').doc('alona').set({
-        'name': 'Alona Beach',
-        'nameLower': 'alona beach',
-        'provinceId': 'bohol',
-        'provinceName': 'Bohol',
-        'regionId': 'region-7',
-        'categoryId': 'beaches',
-        'heroImageUrl': '',
-        'galleryImageUrls': <String>[],
-        'rating': 4.6,
-        'reviewCount': 50,
-        'status': 'published',
-      });
+      // Mirrors what Google actually returns for a bare city/town name: a
+      // single locality-type match, never a rich list of businesses (the
+      // same limitation already handled for bare province names).
       final placesService = PlacesService(
-        caller: _fakePlacesSearchText({
-          'beach, Philippines': [
-            {
-              'id': 'places/generic-beach',
-              'displayName': {'text': 'Some Random Beach'},
-              'location': {'latitude': 9.0, 'longitude': 123.0},
-            },
-          ],
-        }),
+        caller: (name, data) async {
+          if (name == 'placesSearchText') {
+            expect(data['textQuery'], 'Bacolod, Philippines');
+            return {
+              'places': [
+                {
+                  'id': 'places/bacolod-city',
+                  'displayName': {'text': 'Bacolod'},
+                  'types': ['locality', 'political'],
+                  'location': {'latitude': 10.6765, 'longitude': 122.9509},
+                },
+              ],
+            };
+          }
+          if (name == 'placesSearchNearby') {
+            expect(data['latitude'], 10.6765);
+            expect(data['longitude'], 122.9509);
+            return {
+              'places': [
+                {
+                  'id': 'places/manokan-country',
+                  'displayName': {'text': 'Manokan Country'},
+                  'types': ['restaurant'],
+                  'formattedAddress': 'Bacolod City',
+                  'location': {'latitude': 10.68, 'longitude': 122.95},
+                },
+              ],
+            };
+          }
+          fail('Unexpected function call: $name');
+        },
       );
       await buildScreen(
         tester: tester,
@@ -305,13 +323,175 @@ void main() {
         placesService: placesService,
       );
 
-      await tester.enterText(find.byType(TextField), 'beach');
+      await tester.enterText(find.byType(TextField), 'Bacolod');
       await tester.pump(const Duration(milliseconds: 400));
       await tester.pumpAndSettle();
 
-      // Curated category match shows even though the query ("beach") isn't
-      // a prefix of "Alona Beach"'s own name.
-      expect(_findTileText('Alona Beach'), findsOneWidget);
+      expect(_findTileText('Bacolod'), findsOneWidget);
+      expect(_findTileText('Manokan Country'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'follows up a bare province-name match (administrative_area_level_2) with real nearby places too',
+    (tester) async {
+      final firestore = FakeFirebaseFirestore();
+      // Mirrors what Google actually returns for a bare province name like
+      // "Guimaras": a single administrative_area_level_2 match, not the
+      // `locality` type the city-name case above uses — the fix has to
+      // catch both granularities, and use a wider radius for a province
+      // (it covers far more ground than a single city/town).
+      final placesService = PlacesService(
+        caller: (name, data) async {
+          if (name == 'placesSearchText') {
+            expect(data['textQuery'], 'Guimaras, Philippines');
+            return {
+              'places': [
+                {
+                  'id': 'places/guimaras-province',
+                  'displayName': {'text': 'Guimaras'},
+                  'types': ['administrative_area_level_2', 'political'],
+                  'location': {'latitude': 10.5929, 'longitude': 122.6325},
+                },
+              ],
+            };
+          }
+          if (name == 'placesSearchNearby') {
+            expect(data['latitude'], 10.5929);
+            expect(data['longitude'], 122.6325);
+            expect(data['radiusMeters'], 15000);
+            return {
+              'places': [
+                {
+                  'id': 'places/trappist-monastery',
+                  'displayName': {'text': 'Trappist Monastery'},
+                  'types': ['tourist_attraction'],
+                  'formattedAddress': 'Buenavista, Guimaras',
+                  'location': {'latitude': 10.6, 'longitude': 122.63},
+                },
+              ],
+            };
+          }
+          fail('Unexpected function call: $name');
+        },
+      );
+      await buildScreen(
+        tester: tester,
+        firestore: firestore,
+        placesService: placesService,
+      );
+
+      await tester.enterText(find.byType(TextField), 'Guimaras');
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.pumpAndSettle();
+
+      expect(_findTileText('Guimaras'), findsOneWidget);
+      expect(_findTileText('Trappist Monastery'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'filters out a nearby result whose address leaks into a neighboring city/province',
+    (tester) async {
+      final firestore = FakeFirebaseFirestore();
+      // Guimaras is a narrow island a few km across a strait from Iloilo
+      // City — a fixed-radius nearby search around it genuinely picks up
+      // real Iloilo City hotels too. A hotel addressed in "Iloilo City" is
+      // not a real answer to someone who searched "Guimaras", so it must be
+      // dropped even though the raw Places API happily returned it.
+      final placesService = PlacesService(
+        caller: (name, data) async {
+          if (name == 'placesSearchText') {
+            expect(data['textQuery'], 'Guimaras, Philippines');
+            return {
+              'places': [
+                {
+                  'id': 'places/guimaras-province',
+                  'displayName': {'text': 'Guimaras'},
+                  'types': ['administrative_area_level_2', 'political'],
+                  'location': {'latitude': 10.5929, 'longitude': 122.6325},
+                },
+              ],
+            };
+          }
+          if (name == 'placesSearchNearby') {
+            return {
+              'places': [
+                {
+                  'id': 'places/trappist-monastery',
+                  'displayName': {'text': 'Trappist Monastery'},
+                  'types': ['tourist_attraction'],
+                  'formattedAddress': 'Buenavista, Guimaras',
+                  'location': {'latitude': 10.6, 'longitude': 122.63},
+                },
+                {
+                  'id': 'places/robertos',
+                  'displayName': {'text': "Roberto's"},
+                  'types': ['restaurant'],
+                  'formattedAddress':
+                      '61 JM Basa St, Iloilo City Proper, Iloilo City, Iloilo',
+                  'location': {'latitude': 10.7, 'longitude': 122.56},
+                },
+              ],
+            };
+          }
+          fail('Unexpected function call: $name');
+        },
+      );
+      await buildScreen(
+        tester: tester,
+        firestore: firestore,
+        placesService: placesService,
+      );
+
+      await tester.enterText(find.byType(TextField), 'Guimaras');
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.pumpAndSettle();
+
+      expect(_findTileText('Trappist Monastery'), findsOneWidget);
+      expect(_findTileText("Roberto's"), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'does not fire a nearby-places follow-up for a whole-region match (administrative_area_level_1)',
+    (tester) async {
+      final firestore = FakeFirebaseFirestore();
+      // The area-match detection is deliberately general (any `political`
+      // place, to catch every granularity from barangay to province) — this
+      // guards that a whole region doesn't slip through that generality:
+      // it's still excluded, since a fixed-radius search can't meaningfully
+      // cover an entire region, and _matchingRegion already lists its
+      // provinces instead. `placesSearchNearby` must never be called here.
+      final placesService = PlacesService(
+        caller: (name, data) async {
+          if (name == 'placesSearchText') {
+            expect(data['textQuery'], 'Ilocos Region, Philippines');
+            return {
+              'places': [
+                {
+                  'id': 'places/ilocos-region',
+                  'displayName': {'text': 'Ilocos Region'},
+                  'types': ['administrative_area_level_1', 'political'],
+                  'location': {'latitude': 17.5, 'longitude': 120.5},
+                },
+              ],
+            };
+          }
+          fail('Unexpected function call: $name');
+        },
+      );
+      await buildScreen(
+        tester: tester,
+        firestore: firestore,
+        placesService: placesService,
+      );
+
+      await tester.enterText(find.byType(TextField), 'Ilocos Region');
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.pumpAndSettle();
+
+      expect(_findTileText('Ilocos Region'), findsOneWidget);
     },
   );
 

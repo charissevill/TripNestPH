@@ -63,4 +63,17 @@ class Validators {
     if ((value ?? '').length > max) return '$label must be $max characters or fewer';
     return null;
   }
+
+  /// A peso amount — must parse and be positive, capped at [maxAmount]
+  /// (default ₱1,000,000) to catch an obvious typo (an extra zero) rather
+  /// than a legitimately large but real price/expense.
+  static String? amount(String? value, {bool required = false, double maxAmount = 1000000}) {
+    final v = value?.trim() ?? '';
+    if (v.isEmpty) return required ? 'This field is required' : null;
+    final parsed = double.tryParse(v);
+    if (parsed == null) return 'Enter a valid amount';
+    if (parsed <= 0) return 'Amount must be greater than 0';
+    if (parsed > maxAmount) return 'Amount must be ₱${maxAmount.toStringAsFixed(0)} or less';
+    return null;
+  }
 }

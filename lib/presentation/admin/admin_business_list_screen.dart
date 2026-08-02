@@ -120,6 +120,14 @@ class _AdminBusinessListScreenState extends State<AdminBusinessListScreen> {
   }
 
   Future<void> _reactivate(Business business) async {
+    final confirmed = await showConfirmationDialog(
+      context,
+      title: 'Reactivate this listing?',
+      message:
+          '"${business.name}" will become visible to travelers on its province page again.',
+      confirmLabel: 'Reactivate',
+    );
+    if (!confirmed || !mounted) return;
     await _run(() async {
       await _syncRestaurantBeforeApproval(business);
       await _repository.setStatus(business.id, status: 'approved');

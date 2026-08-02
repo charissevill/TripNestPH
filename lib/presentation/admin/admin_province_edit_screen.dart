@@ -276,6 +276,7 @@ class _AdminProvinceEditScreenState extends State<AdminProvinceEditScreen> {
                         Expanded(
                           child: TextField(
                             controller: _newTipController,
+                            maxLength: 200,
                             decoration: const InputDecoration(
                               hintText: 'Add a travel tip...',
                             ),

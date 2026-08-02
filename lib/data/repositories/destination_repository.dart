@@ -7,13 +7,16 @@ import '../../domain/models/destination.dart';
 /// Firestore access for the `tourist_spots` collection: Home carousels,
 /// Explore/Search browsing (with pagination) and Details lookups.
 class DestinationRepository {
-  DestinationRepository({FirebaseFirestore? firestore}) : _db = firestore ?? FirebaseFirestore.instance;
+  DestinationRepository({FirebaseFirestore? firestore})
+    : _db = firestore ?? FirebaseFirestore.instance;
 
   final FirebaseFirestore _db;
 
-  CollectionReference<Map<String, dynamic>> get _collection => _db.collection(FirestorePaths.touristSpots);
+  CollectionReference<Map<String, dynamic>> get _collection =>
+      _db.collection(FirestorePaths.touristSpots);
 
-  Destination _fromDoc(QueryDocumentSnapshot<Map<String, dynamic>> doc) => Destination.fromMap(doc.id, doc.data());
+  Destination _fromDoc(QueryDocumentSnapshot<Map<String, dynamic>> doc) =>
+      Destination.fromMap(doc.id, doc.data());
 
   /// Every traveler-facing query filters to `status == 'published'` so
   /// content drafted in the Admin Portal (Phase 4) never surfaces here —
@@ -23,26 +26,43 @@ class DestinationRepository {
   /// firestore.rules requires a `list` operation to be provably
   /// published-only, so an unfiltered batch query would be rejected
   /// outright rather than just missing the drafted item.
-  Query<Map<String, dynamic>> get _publishedOnly => _collection.where('status', isEqualTo: 'published');
+  Query<Map<String, dynamic>> get _publishedOnly =>
+      _collection.where('status', isEqualTo: 'published');
 
-  Future<List<Destination>> getFeatured({int limit = 10}) => _query(
-        _publishedOnly.where('isFeatured', isEqualTo: true).limit(limit),
-      );
+  Future<List<Destination>> getFeatured({int limit = 10}) =>
+      _query(_publishedOnly.where('isFeatured', isEqualTo: true).limit(limit));
 
-  Future<List<Destination>> getHiddenGems({int limit = 10}) => _query(
-        _publishedOnly.where('isHiddenGem', isEqualTo: true).limit(limit),
-      );
+  Future<List<Destination>> getHiddenGems({int limit = 10}) =>
+      _query(_publishedOnly.where('isHiddenGem', isEqualTo: true).limit(limit));
 
   Future<List<Destination>> getPopular({int limit = 10}) => _query(
-        _publishedOnly.orderBy('reviewCount', descending: true).limit(limit),
-      );
+    _publishedOnly.orderBy('reviewCount', descending: true).limit(limit),
+  );
 
-  Future<List<Destination>> getByCategory(String categoryId, {int limit = 30}) => _query(
-        _publishedOnly.where('categoryId', isEqualTo: categoryId).limit(limit),
-      );
+  /// Total published destinations — the Admin Portal analytics dashboard's
+  /// content-coverage stat. A `count()` aggregation query, not a full
+  /// fetch, so this stays cheap as the catalog grows.
+  Future<int> countPublished() async {
+    try {
+      final result = await _publishedOnly.count().get();
+      return result.count ?? 0;
+    } catch (e) {
+      throw AppException.from(e);
+    }
+  }
+
+  Future<List<Destination>> getByCategory(
+    String categoryId, {
+    int limit = 30,
+  }) => _query(
+    _publishedOnly.where('categoryId', isEqualTo: categoryId).limit(limit),
+  );
 
   /// A page of every destination, ordered by name — used by Explore's grid.
-  Future<({List<Destination> items, DocumentSnapshot<Map<String, dynamic>>? lastDoc})> getPage({
+  Future<
+    ({List<Destination> items, DocumentSnapshot<Map<String, dynamic>>? lastDoc})
+  >
+  getPage({
     int pageSize = 20,
     DocumentSnapshot<Map<String, dynamic>>? startAfter,
   }) async {
@@ -79,8 +99,10 @@ class DestinationRepository {
       }
       final results = <Destination>[];
       for (final chunk in chunks) {
-        final snapshot =
-            await _collection.where(FieldPath.documentId, whereIn: chunk).where('status', isEqualTo: 'published').get();
+        final snapshot = await _collection
+            .where(FieldPath.documentId, whereIn: chunk)
+            .where('status', isEqualTo: 'published')
+            .get();
         results.addAll(snapshot.docs.map(_fromDoc));
       }
       return results;
@@ -108,7 +130,12 @@ class DestinationRepository {
     }
   }
 
-  Future<List<Destination>> filter({String? provinceId, String? categoryId, double? minRating, int limit = 30}) async {
+  Future<List<Destination>> filter({
+    String? provinceId,
+    String? categoryId,
+    double? minRating,
+    int limit = 30,
+  }) async {
     try {
       Query<Map<String, dynamic>> query = _publishedOnly;
       if (provinceId != null && provinceId.isNotEmpty) {
@@ -127,9 +154,16 @@ class DestinationRepository {
     }
   }
 
-  Future<void> updateAggregateRating(String id, {required double rating, required int reviewCount}) async {
+  Future<void> updateAggregateRating(
+    String id, {
+    required double rating,
+    required int reviewCount,
+  }) async {
     try {
-      await _collection.doc(id).update({'rating': rating, 'reviewCount': reviewCount});
+      await _collection.doc(id).update({
+        'rating': rating,
+        'reviewCount': reviewCount,
+      });
     } catch (e) {
       throw AppException.from(e);
     }
@@ -142,14 +176,20 @@ class DestinationRepository {
   /// Searches the full catalog rather than a pre-loaded candidate list, and
   /// stays index-cheap as the catalog grows since it never fetches more
   /// than the requested latitude band.
-  Future<List<Destination>> getNearbyLatitudeBand({required double latitude, required double radiusKm}) async {
+  Future<List<Destination>> getNearbyLatitudeBand({
+    required double latitude,
+    required double radiusKm,
+  }) async {
     try {
       final latDelta = radiusKm / 111; // ~111 km per degree of latitude
       final snapshot = await _publishedOnly
           .where('latitude', isGreaterThanOrEqualTo: latitude - latDelta)
           .where('latitude', isLessThanOrEqualTo: latitude + latDelta)
           .get();
-      return snapshot.docs.map(_fromDoc).where((d) => d.hasCoordinates).toList();
+      return snapshot.docs
+          .map(_fromDoc)
+          .where((d) => d.hasCoordinates)
+          .toList();
     } catch (e) {
       throw AppException.from(e);
     }
@@ -161,7 +201,10 @@ class DestinationRepository {
   /// in a non-published state.
   Future<List<Destination>> getAllForProvinceAdmin(String provinceId) async {
     try {
-      final snapshot = await _collection.where('provinceId', isEqualTo: provinceId).orderBy('name').get();
+      final snapshot = await _collection
+          .where('provinceId', isEqualTo: provinceId)
+          .orderBy('name')
+          .get();
       return snapshot.docs.map(_fromDoc).toList();
     } catch (e) {
       throw AppException.from(e);

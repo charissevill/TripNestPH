@@ -35,6 +35,7 @@ class RoutePaths {
   static const String whatsNew = '/settings/whats-new';
   static const String tripCalendar = '/trip-calendar';
   static const String nearbyPlaces = '/nearby-places';
+  static const String upcomingFestivals = '/upcoming-festivals';
 
   // Admin Portal — built into this app, gated by an active admin_users doc.
   static const String adminHome = '/admin';
@@ -49,6 +50,10 @@ class RoutePaths {
   static const String adminTeam = '/admin/team';
   static const String adminReportedReviews = '/admin/reported-reviews';
   static const String adminBroadcast = '/admin/broadcast';
+  static const String adminAnalytics = '/admin/analytics';
+  static const String adminUsers = '/admin/users';
+  static const String adminBulkImport = '/admin/bulk-import';
+  static const String adminBulkProvinceContent = '/admin/bulk-province-content';
   static const String myBusiness = '/my-business';
 
   // Detail routes, parameterized by id.

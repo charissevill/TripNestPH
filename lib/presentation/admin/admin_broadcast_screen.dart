@@ -4,6 +4,7 @@ import 'package:material_symbols_icons/symbols.dart';
 
 import '../../core/theme/app_spacing.dart';
 import '../../core/utils/app_exception.dart';
+import '../../core/utils/validators.dart';
 import '../../core/widgets/buttons/animated_button.dart';
 import '../../core/widgets/dialogs/confirmation_dialog.dart';
 import '../../core/widgets/dialogs/discard_changes_scope.dart';
@@ -25,6 +26,7 @@ class AdminBroadcastScreen extends StatefulWidget {
 
 class _AdminBroadcastScreenState extends State<AdminBroadcastScreen> {
   final NotificationRepository _repository = NotificationRepository();
+  final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
   final _bodyController = TextEditingController();
   NotificationCategory _category = NotificationCategory.general;
@@ -47,14 +49,9 @@ class _AdminBroadcastScreenState extends State<AdminBroadcastScreen> {
   }
 
   Future<void> _send() async {
+    if (!_formKey.currentState!.validate()) return;
     final title = _titleController.text.trim();
     final body = _bodyController.text.trim();
-    if (title.isEmpty || body.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Title and message are both required.')),
-      );
-      return;
-    }
     final confirmed = await showConfirmationDialog(
       context,
       title: 'Send this announcement?',
@@ -102,50 +99,55 @@ class _AdminBroadcastScreenState extends State<AdminBroadcastScreen> {
           title: const Text('Announcement'),
         ),
         body: SafeArea(
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.lg,
-              AppSpacing.md,
-              AppSpacing.lg,
-              AppSpacing.huge,
-            ),
-            children: [
-              TextField(
-                controller: _titleController,
-                maxLength: 100,
-                decoration: const InputDecoration(labelText: 'Title'),
+          child: Form(
+            key: _formKey,
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.lg,
+                AppSpacing.md,
+                AppSpacing.lg,
+                AppSpacing.huge,
               ),
-              const SizedBox(height: AppSpacing.md),
-              TextField(
-                controller: _bodyController,
-                maxLines: 4,
-                maxLength: 500,
-                decoration: const InputDecoration(
-                  labelText: 'Message',
-                  alignLabelWithHint: true,
+              children: [
+                TextFormField(
+                  controller: _titleController,
+                  maxLength: 100,
+                  decoration: const InputDecoration(labelText: 'Title'),
+                  validator: (v) => Validators.required(v, label: 'Title'),
                 ),
-              ),
-              const SizedBox(height: AppSpacing.md),
-              DropdownButtonFormField<NotificationCategory>(
-                initialValue: _category,
-                decoration: const InputDecoration(labelText: 'Category'),
-                items: NotificationCategory.values
-                    .map(
-                      (c) => DropdownMenuItem(value: c, child: Text(c.label)),
-                    )
-                    .toList(),
-                onChanged: (value) => setState(() {
-                  _category = value ?? _category;
-                  _dirty = true;
-                }),
-              ),
-              const SizedBox(height: AppSpacing.xxl),
-              AnimatedButton(
-                label: 'Send to Every Traveler',
-                isLoading: _sending,
-                onPressed: _send,
-              ),
-            ],
+                const SizedBox(height: AppSpacing.md),
+                TextFormField(
+                  controller: _bodyController,
+                  maxLines: 4,
+                  maxLength: 500,
+                  decoration: const InputDecoration(
+                    labelText: 'Message',
+                    alignLabelWithHint: true,
+                  ),
+                  validator: (v) => Validators.required(v, label: 'Message'),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                DropdownButtonFormField<NotificationCategory>(
+                  initialValue: _category,
+                  decoration: const InputDecoration(labelText: 'Category'),
+                  items: NotificationCategory.values
+                      .map(
+                        (c) => DropdownMenuItem(value: c, child: Text(c.label)),
+                      )
+                      .toList(),
+                  onChanged: (value) => setState(() {
+                    _category = value ?? _category;
+                    _dirty = true;
+                  }),
+                ),
+                const SizedBox(height: AppSpacing.xxl),
+                AnimatedButton(
+                  label: 'Send to Every Traveler',
+                  isLoading: _sending,
+                  onPressed: _send,
+                ),
+              ],
+            ),
           ),
         ),
       ),

@@ -150,10 +150,12 @@ class _NearbyPlacesScreenState extends State<NearbyPlacesScreen> {
       if (_searchOverride != null && _searchOverride!.trim().isNotEmpty) {
         results = await _places.searchText(textQuery: _searchOverride!.trim());
       } else if (widget._isNearbyMode && _category.includedTypes != null) {
-        results = await _places.searchNearby(
-          latitude: widget.latitude!,
-          longitude: widget.longitude!,
-          includedTypes: _category.includedTypes!,
+        results = _recognizable(
+          await _places.searchNearby(
+            latitude: widget.latitude!,
+            longitude: widget.longitude!,
+            includedTypes: _category.includedTypes!,
+          ),
         );
       } else if (widget._isNearbyMode) {
         // No dedicated Places type for this category (e.g. beaches) — text
@@ -182,6 +184,18 @@ class _NearbyPlacesScreenState extends State<NearbyPlacesScreen> {
         _loading = false;
       });
     }
+  }
+
+  /// Raw type-based Nearby Search surfaces minor, barely-documented points
+  /// Google still tags with the requested type (e.g. an unnamed arch tagged
+  /// 'tourist_attraction') with no photo and no real review history —
+  /// matches the same filter `HomeScreen`'s "Nearby You"/"Nearby
+  /// Restaurants" carousels apply, so "See All" never reveals results the
+  /// preview carousel had already hidden.
+  List<Place> _recognizable(List<Place> places) {
+    return places
+        .where((p) => p.photoNames.isNotEmpty && (p.userRatingCount ?? 0) >= 10)
+        .toList();
   }
 
   List<Place> _sorted(List<Place> places) {

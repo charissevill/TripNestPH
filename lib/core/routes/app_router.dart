@@ -2,7 +2,10 @@ import 'package:go_router/go_router.dart';
 
 import '../../domain/models/destination.dart';
 import '../../domain/models/province.dart';
+import '../../presentation/admin/admin_analytics_screen.dart';
 import '../../presentation/admin/admin_broadcast_screen.dart';
+import '../../presentation/admin/admin_bulk_import_screen.dart';
+import '../../presentation/admin/admin_bulk_province_content_screen.dart';
 import '../../presentation/admin/admin_business_list_screen.dart';
 import '../../presentation/admin/admin_festival_form_screen.dart';
 import '../../presentation/admin/admin_festival_list_screen.dart';
@@ -13,6 +16,7 @@ import '../../presentation/admin/admin_reported_reviews_screen.dart';
 import '../../presentation/admin/admin_team_screen.dart';
 import '../../presentation/admin/admin_tourist_spot_form_screen.dart';
 import '../../presentation/admin/admin_tourist_spot_list_screen.dart';
+import '../../presentation/admin/admin_user_management_screen.dart';
 import '../../presentation/business/my_business_screen.dart';
 import '../../domain/models/festival.dart';
 import '../../presentation/ai_chat/ai_chat_screen.dart';
@@ -32,6 +36,7 @@ import '../../presentation/itineraries/saved_itineraries_screen.dart';
 import '../../presentation/itineraries/trip_calendar_screen.dart';
 import '../../presentation/notifications/notifications_screen.dart';
 import '../../presentation/onboarding/onboarding_screen.dart';
+import '../../presentation/festivals/upcoming_festivals_screen.dart';
 import '../../presentation/places/nearby_places_screen.dart';
 import '../../presentation/profile/edit_profile_screen.dart';
 import '../../presentation/profile/my_photos_screen.dart';
@@ -209,6 +214,10 @@ GoRouter buildAppRouter(AuthProvider authProvider) {
         },
       ),
       GoRoute(
+        path: RoutePaths.upcomingFestivals,
+        builder: (context, state) => const UpcomingFestivalsScreen(),
+      ),
+      GoRoute(
         path: RoutePaths.adminHome,
         builder: (context, state) => const AdminHomeScreen(),
       ),
@@ -259,6 +268,22 @@ GoRouter buildAppRouter(AuthProvider authProvider) {
       GoRoute(
         path: RoutePaths.adminBroadcast,
         builder: (context, state) => const AdminBroadcastScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.adminAnalytics,
+        builder: (context, state) => const AdminAnalyticsScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.adminUsers,
+        builder: (context, state) => const AdminUserManagementScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.adminBulkImport,
+        builder: (context, state) => const AdminBulkImportScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.adminBulkProvinceContent,
+        builder: (context, state) => const AdminBulkProvinceContentScreen(),
       ),
       GoRoute(
         path: RoutePaths.adminTeam,

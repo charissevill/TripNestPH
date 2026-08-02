@@ -9,75 +9,100 @@ import 'package:provider/provider.dart';
 import '../../core/providers/auth_provider.dart';
 import '../../core/routes/route_paths.dart';
 import '../../core/services/local_preferences_service.dart';
+import '../../core/services/places_service.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/utils/app_exception.dart';
 import '../../core/widgets/banners/hero_banner.dart';
 import '../../core/widgets/cards/category_card.dart';
-import '../../core/widgets/cards/destination_card.dart';
 import '../../core/widgets/cards/festival_card.dart';
-import '../../core/widgets/cards/restaurant_card.dart';
+import '../../core/widgets/cards/place_card.dart';
 import '../../core/widgets/cards/travel_tip_card.dart';
+import '../../core/widgets/details/place_details_sheet.dart';
 import '../../core/widgets/inputs/search_bar_widget.dart';
 import '../../core/widgets/layout/section_header.dart';
 import '../../core/widgets/states/empty_state_widget.dart';
 import '../../core/widgets/states/loading_widget.dart';
 import '../../data/mock/mock_categories.dart';
-import '../../data/repositories/destination_repository.dart';
 import '../../data/repositories/festival_repository.dart';
 import '../../data/repositories/notification_repository.dart';
-import '../../data/repositories/restaurant_repository.dart';
 import '../../core/services/location_service.dart';
 import '../../data/repositories/travel_tip_repository.dart';
 import '../../domain/models/app_notification.dart';
-import '../../domain/models/destination.dart';
 import '../../domain/models/festival.dart';
-import '../../domain/models/restaurant.dart';
+import '../../domain/models/place.dart';
 import '../../domain/models/travel_tip.dart';
 import 'widgets/home_header.dart';
 import 'widgets/location_prompt_card.dart';
 
 class _HomeData {
   const _HomeData({
-    required this.featured,
-    required this.popular,
-    required this.hiddenGems,
+    required this.featuredPlaces,
     required this.popularRestaurants,
     required this.upcomingFestivals,
     required this.travelTips,
   });
 
-  final List<Destination> featured;
-  final List<Destination> popular;
-  final List<Destination> hiddenGems;
-  final List<Restaurant> popularRestaurants;
+  /// Live Google Places results — LGU-curated `tourist_spots` are
+  /// deliberately not shown on Home anymore (see the class doc on
+  /// `ExploreScreen`). Google has no separate "featured" vs. "popular"
+  /// distinction the way the old curated flags did, so this one batch
+  /// backs both the hero banner and the carousel below it, and there's no
+  /// standalone "Popular Tourist Spots" section anymore (it would just be
+  /// a near-duplicate of this one). There's also no Places analog for a
+  /// curated "Hidden Gem" flag at all, so that section is gone rather than
+  /// faked.
+  final List<Place> featuredPlaces;
+
+  final List<Place> popularRestaurants;
   final List<Festival> upcomingFestivals;
   final List<TravelTip> travelTips;
 }
 
 /// The primary landing tab: greeting, search entry point, hero carousel and
 /// a series of horizontally-scrolling discovery sections — all loaded live
-/// from Firestore.
+/// from Firestore, except the tourist-spot sections, which are live Google
+/// Places (see the class doc on `ExploreScreen` for why LGU-curated
+/// `tourist_spots` content isn't shown here).
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  const HomeScreen({
+    super.key,
+    this.placesService,
+    this.festivalRepository,
+    this.travelTipRepository,
+    this.notificationRepository,
+    this.locationService,
+  });
+
+  // Test-only overrides — production call sites never pass these (same
+  // pattern `ExploreScreen`/`SearchScreen` already use).
+  final PlacesService? placesService;
+  final FestivalRepository? festivalRepository;
+  final TravelTipRepository? travelTipRepository;
+  final NotificationRepository? notificationRepository;
+  final LocationService? locationService;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
 class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
-  final DestinationRepository _destinationRepository = DestinationRepository();
-  final RestaurantRepository _restaurantRepository = RestaurantRepository();
-  final FestivalRepository _festivalRepository = FestivalRepository();
-  final TravelTipRepository _travelTipRepository = TravelTipRepository();
-  final NotificationRepository _notificationRepository =
-      NotificationRepository();
-  final LocationService _locationService = LocationService();
+  late final PlacesService _places = widget.placesService ?? PlacesService();
+  late final FestivalRepository _festivalRepository =
+      widget.festivalRepository ?? FestivalRepository();
+  late final TravelTipRepository _travelTipRepository =
+      widget.travelTipRepository ?? TravelTipRepository();
+  late final NotificationRepository _notificationRepository =
+      widget.notificationRepository ?? NotificationRepository();
+  late final LocationService _locationService =
+      widget.locationService ?? LocationService();
   final LocalPreferencesService _preferences = LocalPreferencesService();
 
   late Future<_HomeData> _future;
   _HomeData? _lastData;
-  List<Destination> _nearby = [];
-  List<Restaurant> _nearbyRestaurants = [];
+  List<Place> _nearby = [];
+  List<Place> _nearbyRestaurants = [];
+  double? _travelerLat;
+  double? _travelerLng;
   LocationAccessStatus _nearbyStatus = LocationAccessStatus.unavailable;
   bool _locationBusy = false;
   bool _locationPromptDismissed = false;
@@ -112,96 +137,37 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   Future<_HomeData> _load() async {
-    final results = await Future.wait([
-      _destinationRepository.getFeatured(),
-      _destinationRepository.getPopular(),
-      _destinationRepository.getHiddenGems(),
-      _restaurantRepository.getPopular(),
-      _festivalRepository.getUpcoming(),
-      _travelTipRepository.getAll(),
-    ]);
+    final featuredPlacesFuture = _places.searchText(
+      textQuery: 'top tourist attractions in the Philippines',
+      maxResultCount: 20,
+    );
+    final popularRestaurantsFuture = _places.searchText(
+      textQuery: 'best restaurants in the Philippines',
+      maxResultCount: 20,
+    );
+    final upcomingFestivalsFuture = _festivalRepository.getUpcoming();
+    final travelTipsFuture = _travelTipRepository.getAll();
     final data = _HomeData(
-      featured: results[0] as List<Destination>,
-      popular: results[1] as List<Destination>,
-      hiddenGems: results[2] as List<Destination>,
-      popularRestaurants: results[3] as List<Restaurant>,
-      upcomingFestivals: results[4] as List<Festival>,
-      travelTips: results[5] as List<TravelTip>,
+      featuredPlaces: await featuredPlacesFuture,
+      popularRestaurants: await popularRestaurantsFuture,
+      upcomingFestivals: await upcomingFestivalsFuture,
+      travelTips: await travelTipsFuture,
     );
     _lastData = data;
     await _refreshNearby();
     return data;
   }
 
-  List<T> _sortByDistance<T>(
-    List<T> items,
-    double travelerLat,
-    double travelerLng, {
-    required double Function(T) lat,
-    required double Function(T) lng,
-  }) {
-    final sorted = [...items]
-      ..sort((a, b) {
-        final distanceA = _locationService.distanceKm(
-          lat1: travelerLat,
-          lng1: travelerLng,
-          lat2: lat(a),
-          lng2: lng(a),
-        );
-        final distanceB = _locationService.distanceKm(
-          lat1: travelerLat,
-          lng1: travelerLng,
-          lat2: lat(b),
-          lng2: lng(b),
-        );
-        return distanceA.compareTo(distanceB);
-      });
-    return sorted.take(8).toList();
-  }
-
-  /// Progressively widening search radii for "Nearby You" — starts tight so
-  /// genuinely close results win, but widens if the live catalog is too
-  /// sparse near the traveler to fill the carousel. Content is concentrated
-  /// around specific destinations nationwide rather than spread evenly, so
-  /// a fixed small radius could come up empty even when the database has
-  /// plenty to show a bit farther out.
-  static const List<double> _nearbyRadiusStepsKm = [50, 200, 800, 3000];
-
-  /// Searches the full published catalog (not a pre-loaded candidate list)
-  /// at increasing radii until enough results are found nearby, then sorts
-  /// that batch by real distance.
-  Future<List<T>> _fetchNearbyWithFallback<T>(
-    Future<List<T>> Function(double radiusKm) fetchLatitudeBand,
-    double travelerLat,
-    double travelerLng, {
-    required double Function(T) lat,
-    required double Function(T) lng,
-  }) async {
-    for (final radiusKm in _nearbyRadiusStepsKm) {
-      final band = await fetchLatitudeBand(radiusKm);
-      final withinCircle = band
-          .where(
-            (item) =>
-                _locationService.distanceKm(
-                  lat1: travelerLat,
-                  lng1: travelerLng,
-                  lat2: lat(item),
-                  lng2: lng(item),
-                ) <=
-                radiusKm,
-          )
-          .toList();
-      if (withinCircle.length >= 3 || radiusKm == _nearbyRadiusStepsKm.last) {
-        return _sortByDistance(
-          withinCircle,
-          travelerLat,
-          travelerLng,
-          lat: lat,
-          lng: lng,
-        );
-      }
-    }
-    return [];
+  /// Raw type-based Nearby Search (unlike a text search) surfaces minor,
+  /// barely-documented points Google still tags 'tourist_attraction' or
+  /// 'restaurant' — e.g. an unnamed arch or gate with no photo and no real
+  /// review history. Keeping only entries with at least one photo and a
+  /// handful of ratings filters those out, so "Nearby You"/"Nearby
+  /// Restaurants" only ever show places a traveler would actually recognize.
+  List<Place> _recognizable(List<Place> places) {
+    return places
+        .where((p) => p.photoNames.isNotEmpty && (p.userRatingCount ?? 0) >= 10)
+        .toList();
   }
 
   Future<void> _refreshNearby() async {
@@ -233,31 +199,32 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
     final position = result.position!;
     try {
-      final nearby = await _fetchNearbyWithFallback<Destination>(
-        (radiusKm) => _destinationRepository.getNearbyLatitudeBand(
-          latitude: position.latitude,
-          radiusKm: radiusKm,
-        ),
-        position.latitude,
-        position.longitude,
-        lat: (d) => d.latitude!,
-        lng: (d) => d.longitude!,
+      // Live Places already ranks/limits to genuinely nearby results on its
+      // own, so both carousels are a single direct nearby search each — no
+      // progressive radius-widening needed.
+      final nearbyFuture = _places.searchNearby(
+        latitude: position.latitude,
+        longitude: position.longitude,
+        includedTypes: PlaceCategory.attractions,
+        radiusMeters: 5000,
+        maxResultCount: 20,
       );
-      final nearbyRestaurants = await _fetchNearbyWithFallback<Restaurant>(
-        (radiusKm) => _restaurantRepository.getNearbyLatitudeBand(
-          latitude: position.latitude,
-          radiusKm: radiusKm,
-        ),
-        position.latitude,
-        position.longitude,
-        lat: (r) => r.latitude!,
-        lng: (r) => r.longitude!,
+      final nearbyRestaurantsFuture = _places.searchNearby(
+        latitude: position.latitude,
+        longitude: position.longitude,
+        includedTypes: PlaceCategory.dining,
+        radiusMeters: 5000,
+        maxResultCount: 20,
       );
+      final nearby = await nearbyFuture;
+      final nearbyRestaurants = await nearbyRestaurantsFuture;
       if (!mounted) return;
       setState(() {
         _locationFeatureEnabled = true;
-        _nearby = nearby;
-        _nearbyRestaurants = nearbyRestaurants;
+        _nearby = _recognizable(nearby);
+        _nearbyRestaurants = _recognizable(nearbyRestaurants);
+        _travelerLat = position.latitude;
+        _travelerLng = position.longitude;
       });
     } catch (_) {
       if (!mounted) return;
@@ -382,8 +349,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   }
                   return _HomeContent(
                     data: snapshot.data!,
+                    places: _places,
                     nearby: _nearby,
                     nearbyRestaurants: _nearbyRestaurants,
+                    travelerLat: _travelerLat,
+                    travelerLng: _travelerLng,
                     nearbyStatus: _nearbyStatus,
                     locationPromptDismissed:
                         _locationPromptDismissed || !_locationFeatureEnabled,
@@ -420,8 +390,11 @@ class _HomeLoadingSkeleton extends StatelessWidget {
 class _HomeContent extends StatelessWidget {
   const _HomeContent({
     required this.data,
+    required this.places,
     required this.nearby,
     required this.nearbyRestaurants,
+    required this.travelerLat,
+    required this.travelerLng,
     required this.nearbyStatus,
     required this.locationPromptDismissed,
     required this.locationBusy,
@@ -430,29 +403,34 @@ class _HomeContent extends StatelessWidget {
   });
 
   final _HomeData data;
-  final List<Destination> nearby;
-  final List<Restaurant> nearbyRestaurants;
+  final PlacesService places;
+  final List<Place> nearby;
+  final List<Place> nearbyRestaurants;
+  final double? travelerLat;
+  final double? travelerLng;
   final LocationAccessStatus nearbyStatus;
   final bool locationPromptDismissed;
   final bool locationBusy;
   final VoidCallback onLocationAction;
   final VoidCallback onDismissLocationPrompt;
 
+  String _photoUrl(Place p) =>
+      p.photoNames.isNotEmpty ? places.photoUrl(p.photoNames.first) : '';
+
   @override
   Widget build(BuildContext context) {
     return SliverList.list(
       children: [
         HeroBanner(
-          items: data.featured
+          items: data.featuredPlaces
               .take(4)
               .map(
-                (d) => HeroBannerItem(
-                  imageUrl: d.heroImageUrl,
-                  title: d.name,
-                  subtitle: '${d.provinceName} · ★ ${d.rating}',
+                (p) => HeroBannerItem(
+                  imageUrl: _photoUrl(p),
+                  title: p.name,
+                  subtitle: p.address.isNotEmpty ? p.address : p.categoryLabel,
                   ctaLabel: 'Explore now',
-                  onTap: () =>
-                      context.push(RoutePaths.destinationDetails(d.id)),
+                  onTap: () => showPlaceDetailsSheet(context, place: p, placesService: places),
                 ),
               )
               .toList(),
@@ -480,13 +458,21 @@ class _HomeContent extends StatelessWidget {
           ..._carouselSection(
             context,
             title: 'Nearby You',
-            subtitle: 'Closest destinations to your current location',
-            onSeeAll: () => context.go(RoutePaths.explore),
+            subtitle: 'Closest attractions to your current location',
+            onSeeAll: () => context.push(
+              RoutePaths.nearbyPlaces,
+              extra: {
+                'title': 'Nearby You',
+                'includedTypes': PlaceCategory.attractions,
+                'latitude': travelerLat,
+                'longitude': travelerLng,
+              },
+            ),
             itemCount: nearby.length,
-            itemBuilder: (context, i) => DestinationCard(
-              destination: nearby[i],
-              onTap: () =>
-                  context.push(RoutePaths.destinationDetails(nearby[i].id)),
+            itemBuilder: (context, i) => PlaceCard(
+              place: nearby[i],
+              imageUrl: _photoUrl(nearby[i]),
+              onTap: () => showPlaceDetailsSheet(context, place: nearby[i], placesService: places),
             ),
           )
         else if (!locationPromptDismissed &&
@@ -503,71 +489,51 @@ class _HomeContent extends StatelessWidget {
           context,
           title: 'Nearby Restaurants',
           subtitle: 'Good eats close to your current location',
-          onSeeAll: () => context.go(RoutePaths.explore),
+          onSeeAll: () => context.push(
+            RoutePaths.nearbyPlaces,
+            extra: {
+              'title': 'Nearby Restaurants',
+              'includedTypes': PlaceCategory.dining,
+              'latitude': travelerLat,
+              'longitude': travelerLng,
+            },
+          ),
           itemCount: nearbyRestaurants.length,
-          itemBuilder: (context, i) => RestaurantCard(
-            restaurant: nearbyRestaurants[i],
-            onTap: () => context.push(
-              RoutePaths.restaurantDetails(nearbyRestaurants[i].id),
-            ),
+          itemBuilder: (context, i) => PlaceCard(
+            place: nearbyRestaurants[i],
+            imageUrl: _photoUrl(nearbyRestaurants[i]),
+            onTap: () => showPlaceDetailsSheet(context, place: nearbyRestaurants[i], placesService: places),
           ),
         ),
         ..._carouselSection(
           context,
           title: 'Featured Destinations',
-          subtitle: 'Editor\'s picks for this season',
+          subtitle: 'Real places to explore across the Philippines',
           onSeeAll: () => context.go(RoutePaths.explore),
-          itemCount: data.featured.length,
-          itemBuilder: (context, i) => DestinationCard(
-            destination: data.featured[i],
-            onTap: () => context.push(
-              RoutePaths.destinationDetails(data.featured[i].id),
-            ),
-          ),
-        ),
-        ..._carouselSection(
-          context,
-          title: 'Popular Tourist Spots',
-          subtitle: 'Loved by thousands of travelers',
-          onSeeAll: () => context.go(RoutePaths.explore),
-          itemCount: data.popular.length,
-          itemBuilder: (context, i) => DestinationCard(
-            destination: data.popular[i],
-            onTap: () =>
-                context.push(RoutePaths.destinationDetails(data.popular[i].id)),
-          ),
-        ),
-        ..._carouselSection(
-          context,
-          title: 'Hidden Gems',
-          subtitle: 'Off the beaten path, worth the detour',
-          onSeeAll: () => context.go(RoutePaths.explore),
-          itemCount: data.hiddenGems.length,
-          itemBuilder: (context, i) => DestinationCard(
-            destination: data.hiddenGems[i],
-            onTap: () => context.push(
-              RoutePaths.destinationDetails(data.hiddenGems[i].id),
-            ),
+          itemCount: data.featuredPlaces.length,
+          itemBuilder: (context, i) => PlaceCard(
+            place: data.featuredPlaces[i],
+            imageUrl: _photoUrl(data.featuredPlaces[i]),
+            onTap: () => showPlaceDetailsSheet(context, place: data.featuredPlaces[i], placesService: places),
           ),
         ),
         ..._carouselSection(
           context,
           title: 'Popular Restaurants',
           subtitle: 'Where locals and travelers both eat well',
-          onSeeAll: () => context.go(RoutePaths.explore),
+          onSeeAll: () => context.go('${RoutePaths.explore}?category=food'),
           itemCount: data.popularRestaurants.length,
-          itemBuilder: (context, i) => RestaurantCard(
-            restaurant: data.popularRestaurants[i],
-            onTap: () => context.push(
-              RoutePaths.restaurantDetails(data.popularRestaurants[i].id),
-            ),
+          itemBuilder: (context, i) => PlaceCard(
+            place: data.popularRestaurants[i],
+            imageUrl: _photoUrl(data.popularRestaurants[i]),
+            onTap: () => showPlaceDetailsSheet(context, place: data.popularRestaurants[i], placesService: places),
           ),
         ),
         ..._carouselSection(
           context,
           title: 'Upcoming Festivals',
           subtitle: 'Plan your trip around the celebration',
-          onSeeAll: () => context.go(RoutePaths.explore),
+          onSeeAll: () => context.push(RoutePaths.upcomingFestivals),
           itemCount: data.upcomingFestivals.length,
           itemBuilder: (context, i) => FestivalCard(
             festival: data.upcomingFestivals[i],
@@ -605,7 +571,11 @@ class _HomeContent extends StatelessWidget {
               ),
             ],
           ),
-        const SizedBox(height: AppSpacing.huge),
+        // Taller than AppSpacing.huge alone — this tab also has the floating
+        // AI Chat FAB (`_AiChatFab` in `MainShellScreen`) hovering above the
+        // bottom nav bar, which the plain nav-bar clearance doesn't account
+        // for, letting the last row sit right behind it.
+        const SizedBox(height: AppSpacing.huge + AppSpacing.xxxl),
       ],
     );
   }

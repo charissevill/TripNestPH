@@ -76,10 +76,23 @@ class AdminHomeScreen extends StatelessWidget {
                 onTap: () => context.push(RoutePaths.adminProvinces),
               ),
               _AdminModuleTile(
+                icon: Symbols.edit_note_rounded,
+                label: 'Bulk Fill Province Content',
+                subtitle:
+                    'Fill overview/culture/budget for many provinces from a CSV',
+                onTap: () => context.push(RoutePaths.adminBulkProvinceContent),
+              ),
+              _AdminModuleTile(
                 icon: Symbols.place_rounded,
                 label: 'Tourist Spots',
                 subtitle: 'Add, edit or remove destinations shown to travelers',
                 onTap: () => context.push(RoutePaths.adminTouristSpots),
+              ),
+              _AdminModuleTile(
+                icon: Symbols.upload_file_rounded,
+                label: 'Bulk Import',
+                subtitle: 'Create many tourist spots at once from a CSV file',
+                onTap: () => context.push(RoutePaths.adminBulkImport),
               ),
               _AdminModuleTile(
                 icon: Symbols.celebration_rounded,
@@ -95,6 +108,20 @@ class AdminHomeScreen extends StatelessWidget {
                 subtitle:
                     'Submit or edit your business listing for admin approval',
                 onTap: () => context.push(RoutePaths.myBusiness),
+              ),
+            if (isAdmin)
+              _AdminModuleTile(
+                icon: Symbols.analytics_rounded,
+                label: 'Analytics',
+                subtitle: 'Traveler, content, business and engagement stats',
+                onTap: () => context.push(RoutePaths.adminAnalytics),
+              ),
+            if (isAdmin)
+              _AdminModuleTile(
+                icon: Symbols.person_search_rounded,
+                label: 'Travelers',
+                subtitle: 'Search and suspend/reactivate traveler accounts',
+                onTap: () => context.push(RoutePaths.adminUsers),
               ),
             if (isAdmin)
               _AdminModuleTile(

@@ -360,7 +360,7 @@ class _AdminTouristSpotFormScreenState
                 ),
                 if (_hasEntranceFee) ...[
                   const SizedBox(height: AppSpacing.sm),
-                  TextField(
+                  TextFormField(
                     controller: _entranceFeeController,
                     keyboardType: const TextInputType.numberWithOptions(
                       decimal: true,
@@ -373,6 +373,7 @@ class _AdminTouristSpotFormScreenState
                       hintText: 'e.g. 75',
                       prefixText: '₱ ',
                     ),
+                    validator: (v) => Validators.amount(v, required: true, maxAmount: 100000),
                   ),
                 ],
                 const SizedBox(height: AppSpacing.md),
@@ -537,6 +538,7 @@ class _AdminTouristSpotFormScreenState
                     Expanded(
                       child: TextField(
                         controller: _newHighlightController,
+                        maxLength: 100,
                         decoration: const InputDecoration(
                           hintText: 'Add a highlight...',
                         ),
@@ -580,6 +582,7 @@ class _AdminTouristSpotFormScreenState
                     Expanded(
                       child: TextField(
                         controller: _newTipController,
+                        maxLength: 200,
                         decoration: const InputDecoration(
                           hintText: 'Add a travel tip...',
                         ),

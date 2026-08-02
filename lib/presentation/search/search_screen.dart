@@ -10,6 +10,7 @@ import '../../core/services/places_service.dart';
 import '../../core/services/search_history_service.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
+import '../../core/utils/place_dedup.dart';
 import '../../core/widgets/dialogs/active_filter_chips.dart';
 import '../../core/widgets/dialogs/search_filter_sheet.dart';
 import '../../core/widgets/details/place_details_sheet.dart';
@@ -17,62 +18,16 @@ import '../../core/widgets/indicators/rating_widget.dart';
 import '../../core/widgets/inputs/search_bar_widget.dart';
 import '../../core/widgets/states/empty_state_widget.dart';
 import '../../core/widgets/states/loading_widget.dart';
-import '../../data/repositories/destination_repository.dart';
 import '../../data/repositories/festival_repository.dart';
 import '../../data/repositories/province_repository.dart';
 import '../../data/repositories/region_repository.dart';
 import '../../data/repositories/restaurant_repository.dart';
 import '../../data/repositories/search_trend_repository.dart';
-import '../../domain/models/destination.dart';
 import '../../domain/models/place.dart';
 import '../../domain/models/province.dart';
 import '../../domain/models/region.dart';
 
-enum _ResultType { destination, restaurant, festival, place }
-
-/// Live Places results shorter than this are skipped from the dedup name
-/// comparison — the same reasoning `itinerary_route_matcher.dart` uses:
-/// a very short name would produce meaningless/misleading containment
-/// matches against unrelated curated results.
-const int _minDedupNameLength = 4;
-
-/// Freeform words that map to one of `mockCategories`' fixed ids — lets a
-/// query like "waterfall" or "hiking" pull in curated destinations tagged
-/// with that category, not just ones whose own name happens to start with
-/// the typed word.
-const Map<String, String> _categoryKeywords = {
-  'beach': 'beaches',
-  'beaches': 'beaches',
-  'island': 'beaches',
-  'islands': 'beaches',
-  'mountain': 'mountains',
-  'mountains': 'mountains',
-  'hiking': 'mountains',
-  'hike': 'mountains',
-  'trek': 'mountains',
-  'trekking': 'mountains',
-  'historical': 'historical',
-  'history': 'historical',
-  'heritage': 'historical',
-  'museum': 'historical',
-  'museums': 'historical',
-  'landmark': 'historical',
-  'landmarks': 'historical',
-  'nature': 'nature',
-  'waterfall': 'nature',
-  'waterfalls': 'nature',
-  'forest': 'nature',
-  'jungle': 'nature',
-  'park': 'nature',
-  'parks': 'nature',
-  'food': 'food',
-  'restaurant': 'food',
-  'restaurants': 'food',
-  'cuisine': 'food',
-  'festival': 'festivals',
-  'festivals': 'festivals',
-  'fiesta': 'festivals',
-};
+enum _ResultType { restaurant, festival, place }
 
 /// Standard Wagner–Fischer edit-distance, used as a typo-tolerant fallback
 /// once an exact substring match fails (see `_closestByEditDistance`) —
@@ -128,16 +83,17 @@ class _SearchResult {
 }
 
 /// A dedicated full-screen search experience: debounced, live search across
-/// destinations, restaurants and festivals in Firestore, plus recent/
-/// popular suggestions when the field is empty. Also blends in live Google
-/// Places results for real places outside that curated catalog (see
-/// `_runSearch`), rendered in a trailing "More places" section so a real
-/// place is always findable, not just what the app happens to have saved.
+/// restaurants and festivals in Firestore (LGU-curated tourist spots are
+/// deliberately not part of this catalog search — see the class doc on
+/// `ExploreScreen`), plus recent/trending suggestions when the field is
+/// empty. Also blends in live Google Places results for real places outside
+/// that curated catalog (see `_runSearch`), rendered in a trailing "More
+/// places" section — this is now the primary way a traveler finds a real
+/// tourist spot/attraction via Search.
 class SearchScreen extends StatefulWidget {
   const SearchScreen({
     super.key,
     this.autoOpenFilter = false,
-    this.destinationRepository,
     this.restaurantRepository,
     this.festivalRepository,
     this.regionRepository,
@@ -158,7 +114,6 @@ class SearchScreen extends StatefulWidget {
   // even for tests that don't care about geography: their default
   // constructors touch `FirebaseFirestore.instance` eagerly, which throws
   // synchronously with no Firebase app registered (as in `flutter_test`).
-  final DestinationRepository? destinationRepository;
   final RestaurantRepository? restaurantRepository;
   final FestivalRepository? festivalRepository;
   final RegionRepository? regionRepository;
@@ -172,8 +127,6 @@ class SearchScreen extends StatefulWidget {
 
 class _SearchScreenState extends State<SearchScreen> {
   final TextEditingController _controller = TextEditingController();
-  late final DestinationRepository _destinationRepository =
-      widget.destinationRepository ?? DestinationRepository();
   late final RestaurantRepository _restaurantRepository =
       widget.restaurantRepository ?? RestaurantRepository();
   late final FestivalRepository _festivalRepository =
@@ -218,13 +171,7 @@ class _SearchScreenState extends State<SearchScreen> {
   /// the four hardcoded strings this used to show every user.
   List<String> _recentSearches = [];
 
-  /// Real top-reviewed destination names (`DestinationRepository.getPopular`),
-  /// in place of the four made-up category phrases this used to show.
-  List<String> _popularDestinations = [];
-
-  /// The most-searched terms across every traveler (`SearchTrendRepository`)
-  /// — distinct from [_popularDestinations], which is rating-based, not
-  /// search-volume-based.
+  /// The most-searched terms across every traveler (`SearchTrendRepository`).
   List<String> _trendingSearches = [];
 
   @override
@@ -238,16 +185,12 @@ class _SearchScreenState extends State<SearchScreen> {
     try {
       final results = await Future.wait([
         _searchHistory.getRecent(),
-        _destinationRepository.getPopular(limit: 4),
         _searchTrendRepository.getTopTrending(limit: 4),
       ]);
       if (!mounted) return;
       setState(() {
-        _recentSearches = results[0] as List<String>;
-        _popularDestinations = (results[1] as List)
-            .map((d) => d.name as String)
-            .toList();
-        _trendingSearches = results[2] as List<String>;
+        _recentSearches = results[0];
+        _trendingSearches = results[1];
       });
     } catch (_) {
       // Non-critical — the suggestions view just shows fewer/no chips.
@@ -354,38 +297,8 @@ class _SearchScreenState extends State<SearchScreen> {
     return (closest != null && bestDistance <= maxDistance) ? closest : null;
   }
 
-  /// Maps the query (or one of its words) to a curated category id via
-  /// `_categoryKeywords`, e.g. "waterfall" → 'nature' — lets a keyword
-  /// search pull in curated destinations tagged with that category
-  /// (`_runSearch`), not just ones whose own name starts with the word.
-  String? _matchingCategoryId(String trimmedQuery) {
-    final normalized = trimmedQuery.toLowerCase();
-    final direct = _categoryKeywords[normalized];
-    if (direct != null) return direct;
-    for (final word in normalized.split(RegExp(r'\s+'))) {
-      final mapped = _categoryKeywords[word];
-      if (mapped != null) return mapped;
-    }
-    return null;
-  }
-
-  List<_SearchResult> _toResults(
-    List destinations,
-    List restaurants,
-    List festivals,
-  ) {
+  List<_SearchResult> _toResults(List restaurants, List festivals) {
     return [
-      ...destinations.map(
-        (d) => _SearchResult(
-          type: _ResultType.destination,
-          id: d.id,
-          title: d.name,
-          subtitle: d.provinceName,
-          imageUrl: d.heroImageUrl,
-          rating: d.rating,
-          provinceId: d.provinceId,
-        ),
-      ),
       ...restaurants.map(
         (r) => _SearchResult(
           type: _ResultType.restaurant,
@@ -421,7 +334,6 @@ class _SearchScreenState extends State<SearchScreen> {
     unawaited(_searchTrendRepository.record(query));
     try {
       final trimmed = query.trim();
-      final destinationsFuture = _destinationRepository.searchByName(query);
       final restaurantsFuture = _restaurantRepository.searchByName(query);
       final festivalsFuture = _festivalRepository.searchByName(query);
       // A billed live API call, unlike the free Firestore prefix search
@@ -434,32 +346,73 @@ class _SearchScreenState extends State<SearchScreen> {
               maxResultCount: 10,
             )
           : Future.value(<Place>[]);
-      // "beach", "waterfall", etc. — pulls in curated destinations tagged
-      // with the matching category, not just ones named after the word.
-      final categoryId = _matchingCategoryId(trimmed);
-      final categoryFuture = categoryId != null
-          ? _destinationRepository.getByCategory(categoryId, limit: 10)
-          : Future.value(<Destination>[]);
-      final destinations = await destinationsFuture;
       final restaurants = await restaurantsFuture;
       final festivals = await festivalsFuture;
       final places = await placesFuture;
-      final categoryDestinations = await categoryFuture;
-      if (!mounted) return;
-      var curatedResults = _toResults(destinations, restaurants, festivals);
-      if (categoryDestinations.isNotEmpty) {
-        final existingDestinationIds = curatedResults
-            .where((r) => r.type == _ResultType.destination)
-            .map((r) => r.id)
-            .toSet();
-        final newCategoryMatches = categoryDestinations
-            .where((d) => !existingDestinationIds.contains(d.id))
-            .toList();
-        curatedResults = [
-          ...curatedResults,
-          ..._toResults(newCategoryMatches, const [], const []),
-        ];
+
+      // A bare place name — a barangay, town, city or province anywhere in
+      // the Philippines — resolves to just that area itself as a single
+      // result (never a rich list of businesses); the exact same Places
+      // Text Search limitation _matchingProvince/_matchingRegion above
+      // already work around for known province/region names. Google tags
+      // every administrative/geographic area with the generic `political`
+      // type regardless of its granularity (barangay, city, province, ...),
+      // which lets this catch all of them without having to enumerate every
+      // specific type string. Whichever granularity it is, follow up with a
+      // real nearby-places search centered on that area's own coordinates,
+      // so the traveler still finds actual restaurants/attractions instead
+      // of just "here's the area you typed". A whole region
+      // (`administrative_area_level_1`) or the country itself is
+      // deliberately excluded — too large an area for one fixed-radius
+      // search to cover meaningfully, and _matchingRegion above already
+      // surfaces a region's provinces instead.
+      const excludedAreaTypes = {'administrative_area_level_1', 'country'};
+      Place? areaMatch;
+      for (final p in places) {
+        if (p.types.contains('political') &&
+            !p.types.any(excludedAreaTypes.contains) &&
+            p.latitude != null &&
+            p.longitude != null) {
+          areaMatch = p;
+          break;
+        }
       }
+      // A province spans far more ground than a single city/town, so it
+      // needs a wider search radius to turn up anything at all.
+      final isProvinceLevelArea =
+          areaMatch?.types.contains('administrative_area_level_2') ?? false;
+      final nearbyAreaPlacesRaw = areaMatch != null
+          ? await _places.searchNearby(
+              latitude: areaMatch.latitude!,
+              longitude: areaMatch.longitude!,
+              includedTypes: [
+                ...PlaceCategory.attractions,
+                ...PlaceCategory.dining,
+                ...PlaceCategory.lodging,
+              ],
+              radiusMeters: isProvinceLevelArea ? 15000 : 5000,
+              maxResultCount: 10,
+            )
+          : const <Place>[];
+      // A fixed-radius search around a small or narrow area (e.g. Guimaras,
+      // an island a few km across a strait from Iloilo City) easily leaks
+      // into a neighboring city/province that happens to fall within that
+      // radius — a hotel addressed in "Iloilo City" is not a real answer to
+      // someone searching "Guimaras". Keep only results whose own address
+      // actually names the area searched for.
+      final areaNameLower = areaMatch?.name.toLowerCase();
+      final nearbyAreaPlaces = areaNameLower == null
+          ? const <Place>[]
+          : nearbyAreaPlacesRaw
+              .where((p) => p.address.toLowerCase().contains(areaNameLower))
+              .toList();
+      final seenPlaceIds = <String>{};
+      final allLivePlaces = [
+        for (final p in [...places, ...nearbyAreaPlaces])
+          if (seenPlaceIds.add(p.id)) p,
+      ];
+      if (!mounted) return;
+      var curatedResults = _toResults(restaurants, festivals);
       // Firestore's prefix-search doesn't compose with extra filters, so
       // province/rating are applied client-side on top of the text match.
       // Live Places results are exempt — provinceId/rating are Firestore-
@@ -481,8 +434,8 @@ class _SearchScreenState extends State<SearchScreen> {
       final curatedNames = curatedResults
           .map((r) => r.title.toLowerCase())
           .toSet();
-      final placeResults = places
-          .where((p) => !_isDuplicateOfCurated(p.name, curatedNames))
+      final placeResults = allLivePlaces
+          .where((p) => !isDuplicateOfCurated(p.name, curatedNames))
           .map(_placeToResult)
           .toList();
 
@@ -503,19 +456,6 @@ class _SearchScreenState extends State<SearchScreen> {
     }
   }
 
-  bool _isDuplicateOfCurated(String placeName, Set<String> curatedNamesLower) {
-    final normalized = placeName.toLowerCase().trim();
-    if (normalized.length < _minDedupNameLength) return false;
-    for (final curated in curatedNamesLower) {
-      if (curated.length < _minDedupNameLength) continue;
-      if (curated == normalized ||
-          curated.contains(normalized) ||
-          normalized.contains(curated))
-        return true;
-    }
-    return false;
-  }
-
   _SearchResult _placeToResult(Place place) {
     return _SearchResult(
       type: _ResultType.place,
@@ -534,10 +474,6 @@ class _SearchScreenState extends State<SearchScreen> {
   Future<void> _runFilterOnly() async {
     setState(() => _loading = true);
     try {
-      final destinations = await _destinationRepository.filter(
-        provinceId: _provinceId,
-        minRating: _minRating,
-      );
       final restaurants = await _restaurantRepository.filter(
         provinceId: _provinceId,
         minRating: _minRating,
@@ -548,7 +484,7 @@ class _SearchScreenState extends State<SearchScreen> {
       );
       if (!mounted) return;
       setState(() {
-        _results = _toResults(destinations, restaurants, festivals);
+        _results = _toResults(restaurants, festivals);
         // A province/region match only ever makes sense for a typed query
         // — this path runs with an empty query (filter-only browsing), so
         // any tile left over from a previous non-empty search must clear.
@@ -634,8 +570,6 @@ class _SearchScreenState extends State<SearchScreen> {
 
   void _openResult(_SearchResult result) {
     switch (result.type) {
-      case _ResultType.destination:
-        context.push(RoutePaths.destinationDetails(result.id));
       case _ResultType.restaurant:
         context.push(RoutePaths.restaurantDetails(result.id));
       case _ResultType.festival:
@@ -777,7 +711,6 @@ class _SearchScreenState extends State<SearchScreen> {
               child: _query.trim().isEmpty && !_hasFilters
                   ? _SuggestionsView(
                       recentSearches: _recentSearches,
-                      popularDestinations: _popularDestinations,
                       trendingSearches: _trendingSearches,
                       onClearRecent: _clearRecentSearches,
                       onTapSuggestion: (value) {
@@ -824,17 +757,14 @@ class _SearchScreenState extends State<SearchScreen> {
 class _SuggestionsView extends StatelessWidget {
   const _SuggestionsView({
     required this.recentSearches,
-    required this.popularDestinations,
     required this.trendingSearches,
     required this.onClearRecent,
     required this.onTapSuggestion,
   });
 
   final List<String> recentSearches;
-  final List<String> popularDestinations;
 
-  /// Real search-volume terms across every traveler (`SearchTrendRepository`)
-  /// — distinct from [popularDestinations], which is rating-based.
+  /// Real search-volume terms across every traveler (`SearchTrendRepository`).
   final List<String> trendingSearches;
   final VoidCallback onClearRecent;
   final ValueChanged<String> onTapSuggestion;
@@ -895,26 +825,6 @@ class _SuggestionsView extends StatelessWidget {
                 .toList(),
           ),
           const SizedBox(height: AppSpacing.xxl),
-        ],
-        if (popularDestinations.isNotEmpty) ...[
-          Text(
-            'Popular Destinations',
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          Wrap(
-            spacing: AppSpacing.sm,
-            runSpacing: AppSpacing.sm,
-            children: popularDestinations
-                .map(
-                  (s) => _SuggestionChip(
-                    label: s,
-                    icon: Symbols.trending_up_rounded,
-                    onTap: () => onTapSuggestion(s),
-                  ),
-                )
-                .toList(),
-          ),
         ],
       ],
     );
@@ -1135,7 +1045,11 @@ class _SearchResultTile extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  if (result.rating > 0) ...[
+                  // Live Places results have no in-app review list to back
+                  // up a star rating (unlike curated restaurants/festivals,
+                  // which do) — showing one would imply reviews the
+                  // traveler can't actually read here.
+                  if (!isLivePlace && result.rating > 0) ...[
                     const SizedBox(height: 4),
                     RatingWidget(rating: result.rating, starSize: 14),
                   ],

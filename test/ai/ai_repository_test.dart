@@ -12,7 +12,6 @@ import 'package:tripnest_ph/ai/services/openai_service.dart';
 import 'package:tripnest_ph/core/services/places_service.dart';
 import 'package:tripnest_ph/core/services/weather_service.dart';
 import 'package:tripnest_ph/core/utils/function_caller.dart';
-import 'package:tripnest_ph/data/repositories/destination_repository.dart';
 import 'package:tripnest_ph/data/repositories/province_repository.dart';
 import 'package:tripnest_ph/data/repositories/restaurant_repository.dart';
 
@@ -61,7 +60,7 @@ void main() {
   });
 
   test(
-    'generateItinerary() grounds recommendations in real Firestore ids, not the mock seed data',
+    'generateItinerary() grounds recommended restaurants in real Firestore ids, and never resolves attractions to the curated tourist_spots catalog',
     () async {
       final firestore = FakeFirebaseFirestore();
 
@@ -80,6 +79,9 @@ void main() {
         'menuHighlights': <String>[],
         'status': 'published',
       });
+      // Seeded to prove this curated destination is never resolved into
+      // `nearbyAttractionIds` anymore, even though the (faked) AI response
+      // below names it — attractions are Google Places-only now.
       await firestore.collection('tourist_spots').doc('real-destination-1').set({
         'name': 'Real Hidden Lagoon',
         'provinceId': 'palawan',
@@ -118,7 +120,6 @@ void main() {
 
       final repository = AiRepository(
         openAiService: OpenAiService(caller: caller),
-        destinationRepository: DestinationRepository(firestore: firestore),
         restaurantRepository: RestaurantRepository(firestore: firestore),
         provinceRepository: ProvinceRepository(firestore: firestore),
       );
@@ -140,15 +141,20 @@ void main() {
         coverImageUrl: '',
       );
 
-      // The whole point of the fix: these must be the real seeded Firestore
-      // document ids, never anything from the old mock_destinations.dart /
-      // mock_restaurants.dart lists.
+      // The restaurant id must be the real seeded Firestore document id,
+      // never anything from the old mock_restaurants.dart list.
       expect(itinerary.recommendedRestaurantIds, ['real-restaurant-1']);
-      expect(itinerary.nearbyAttractionIds, ['real-destination-1']);
+      // Attractions are Google Places-only now — never a curated
+      // `tourist_spots` doc id, even though "Real Hidden Lagoon" is both a
+      // real seeded destination and the exact name the AI's response used.
+      expect(itinerary.nearbyAttractionIds, isEmpty);
+      // This request has no lat/lng, so `_fetchPlaceAttractions` never ran —
+      // nothing to match the AI's attraction name against either way.
+      expect(itinerary.recommendedPlaceAttractions, isEmpty);
     },
   );
 
-  test('generateItinerary() never recommends a restaurant/destination from a different province', () async {
+  test('generateItinerary() never recommends a restaurant from a different province', () async {
     final firestore = FakeFirebaseFirestore();
     await firestore.collection('restaurants').doc('wrong-province').set({
       'name': 'Wrong Province Diner',
@@ -182,7 +188,6 @@ void main() {
 
     final repository = AiRepository(
       openAiService: OpenAiService(caller: caller),
-      destinationRepository: DestinationRepository(firestore: firestore),
       restaurantRepository: RestaurantRepository(firestore: firestore),
       provinceRepository: ProvinceRepository(firestore: firestore),
     );
@@ -239,7 +244,6 @@ void main() {
     final repository = AiRepository(
       openAiService: OpenAiService(caller: caller),
       weatherService: WeatherService(client: weatherClient),
-      destinationRepository: DestinationRepository(firestore: firestore),
       restaurantRepository: RestaurantRepository(firestore: firestore),
       provinceRepository: ProvinceRepository(firestore: firestore),
     );
@@ -290,7 +294,6 @@ void main() {
     final repository = AiRepository(
       openAiService: OpenAiService(caller: caller),
       weatherService: WeatherService(client: weatherClient),
-      destinationRepository: DestinationRepository(firestore: firestore),
       restaurantRepository: RestaurantRepository(firestore: firestore),
       provinceRepository: ProvinceRepository(firestore: firestore),
     );
@@ -372,7 +375,6 @@ void main() {
 
     final repository = AiRepository(
       openAiService: OpenAiService(caller: caller),
-      destinationRepository: DestinationRepository(firestore: firestore),
       restaurantRepository: RestaurantRepository(firestore: firestore),
       provinceRepository: ProvinceRepository(firestore: firestore),
     );
@@ -442,7 +444,6 @@ void main() {
       final repository = AiRepository(
         openAiService: OpenAiService(caller: caller),
         placesService: PlacesService(caller: placesCaller),
-        destinationRepository: DestinationRepository(firestore: firestore),
         restaurantRepository: RestaurantRepository(firestore: firestore),
         provinceRepository: ProvinceRepository(firestore: firestore),
       );
@@ -503,7 +504,6 @@ void main() {
     final repository = AiRepository(
       openAiService: OpenAiService(caller: caller),
       placesService: PlacesService(caller: _fakePlacesSearchText(const {})),
-      destinationRepository: DestinationRepository(firestore: firestore),
       restaurantRepository: RestaurantRepository(firestore: firestore),
       provinceRepository: ProvinceRepository(firestore: firestore),
     );
@@ -579,7 +579,6 @@ void main() {
         openAiService: OpenAiService(caller: caller),
         placesService: PlacesService(caller: placesCaller),
         weatherService: WeatherService(client: weatherClient),
-        destinationRepository: DestinationRepository(firestore: firestore),
         restaurantRepository: RestaurantRepository(firestore: firestore),
         provinceRepository: ProvinceRepository(firestore: firestore),
       );
@@ -638,7 +637,6 @@ void main() {
     final repository = AiRepository(
       openAiService: OpenAiService(caller: caller),
       placesService: PlacesService(caller: placesCaller),
-      destinationRepository: DestinationRepository(firestore: firestore),
       restaurantRepository: RestaurantRepository(firestore: firestore),
       provinceRepository: ProvinceRepository(firestore: firestore),
     );
@@ -670,4 +668,65 @@ void main() {
     expect(itinerary.recommendedAccommodations, hasLength(1));
     expect(itinerary.recommendedAccommodations.single.websiteUri, 'https://samplebeachresort.example.com');
   });
+
+  test(
+    'generateItinerary() resolves an AI-named attraction to a live Places recommendation, never to a Firestore id',
+    () async {
+      final firestore = FakeFirebaseFirestore();
+      final caller = _fakeAiComplete({
+        'days': [
+          {'dayNumber': 1, 'dateLabel': 'Day 1', 'activities': <Map<String, dynamic>>[]},
+        ],
+        'budgetBreakdown': <Map<String, dynamic>>[],
+        'travelTips': <String>[],
+        'totalBudget': 0,
+        'recommendedRestaurantNames': <String>[],
+        'nearbyAttractionNames': ['Real Underground River'],
+      });
+      // Same canned response for both `_fetchAccommodations` and
+      // `_fetchPlaceAttractions` (both hit `placesSearchNearby`) — harmless
+      // here since only `recommendedPlaceAttractions` is asserted below.
+      final placesCaller = _fakePlacesSearchNearby([
+        {
+          'id': 'places/real-underground-river',
+          'displayName': {'text': 'Real Underground River'},
+          'location': {'latitude': 11.1839, 'longitude': 122.0938},
+          'websiteUri': 'https://realundergroundriver.example.com',
+        },
+      ]);
+
+      final repository = AiRepository(
+        openAiService: OpenAiService(caller: caller),
+        placesService: PlacesService(caller: placesCaller),
+        restaurantRepository: RestaurantRepository(firestore: firestore),
+        provinceRepository: ProvinceRepository(firestore: firestore),
+      );
+
+      // A coordinate not reused by any other test in this file — see the
+      // cache-collision note on the accommodation-website test above.
+      final itinerary = await repository.generateItinerary(
+        const AiItineraryRequest(
+          destinationId: 'palawan-100',
+          destinationName: 'Palawan',
+          provinceId: 'palawan',
+          provinceName: 'Palawan',
+          budgetTierLabel: 'Budget',
+          budgetRange: '₱5k - ₱15k',
+          days: 1,
+          travelers: 1,
+          travelerType: 'Solo',
+          transportation: {'Flight'},
+          interests: {'Nature'},
+          latitude: 11.1839,
+          longitude: 122.0938,
+        ),
+        coverImageUrl: '',
+      );
+
+      expect(itinerary.recommendedPlaceAttractions, hasLength(1));
+      expect(itinerary.recommendedPlaceAttractions.single.name, 'Real Underground River');
+      // Never a curated Firestore doc id — attractions are Places-only now.
+      expect(itinerary.nearbyAttractionIds, isEmpty);
+    },
+  );
 }

@@ -28,6 +28,17 @@ class FestivalRepository {
   Future<List<Festival>> getUpcoming({int limit = 10}) =>
       _query(_publishedOnly.where('isUpcoming', isEqualTo: true).limit(limit));
 
+  /// Total published festivals — the Admin Portal analytics dashboard's
+  /// content-coverage stat.
+  Future<int> countPublished() async {
+    try {
+      final result = await _publishedOnly.count().get();
+      return result.count ?? 0;
+    } catch (e) {
+      throw AppException.from(e);
+    }
+  }
+
   Future<
     ({List<Festival> items, DocumentSnapshot<Map<String, dynamic>>? lastDoc})
   >

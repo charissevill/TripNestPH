@@ -46,6 +46,12 @@ class _HeroBannerState extends State<HeroBanner> {
 
   @override
   Widget build(BuildContext context) {
+    // `SmoothPageIndicator`'s `WormPainter` divides by the dot count when
+    // laying itself out — with zero items that's a division by zero
+    // (Infinity/NaN), which crashes on paint. An empty carousel (e.g. a
+    // Places API hiccup returning no results) should just render nothing.
+    if (widget.items.isEmpty) return const SizedBox.shrink();
+
     final theme = Theme.of(context);
     return Column(
       children: [

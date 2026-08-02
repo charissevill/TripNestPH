@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
+import 'package:provider/provider.dart';
 
 import '../../../domain/models/place.dart';
+import '../../providers/favorites_provider.dart';
 import '../../theme/app_spacing.dart';
-import '../indicators/rating_widget.dart';
+import '../buttons/bookmark_button.dart';
 import 'tag_chip.dart';
 import 'travel_image_frame.dart';
 
@@ -31,6 +33,7 @@ class PlaceCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final saved = context.watch<FavoritesProvider>();
 
     return SizedBox(
       width: width,
@@ -44,6 +47,18 @@ class PlaceCard extends StatelessWidget {
               imageUrl: imageUrl,
               height: imageHeight,
               topLeft: TagChip(label: place.categoryLabel, color: theme.colorScheme.primary),
+              // Signals "live web result" vs. an in-app catalog listing, same
+              // reasoning as `_SearchResultTile`'s globe icon in search_screen.dart.
+              topRight: Container(
+                width: 28,
+                height: 28,
+                decoration: const BoxDecoration(color: Colors.black26, shape: BoxShape.circle),
+                child: const Icon(
+                  Symbols.public_rounded,
+                  size: 16,
+                  color: Colors.white,
+                ),
+              ),
               bottomLeft: place.distanceMeters != null
                   ? Row(
                       mainAxisSize: MainAxisSize.min,
@@ -54,22 +69,13 @@ class PlaceCard extends StatelessWidget {
                       ],
                     )
                   : null,
-              bottomRight: place.rating != null ? RatingBadge(rating: place.rating!) : null,
+              bottomRight: BookmarkButton(
+                isSaved: saved.isPlaceSaved(place.id),
+                onTap: () => saved.togglePlace(place),
+              ),
             ),
             const SizedBox(height: AppSpacing.sm),
             Text(place.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: theme.textTheme.titleMedium),
-            const SizedBox(height: 2),
-            Row(
-              children: [
-                if (place.userRatingCount != null) ...[
-                  Text('${place.userRatingCount} reviews', style: theme.textTheme.bodySmall),
-                ],
-                if (place.userRatingCount != null && place.priceLevelLabel.isNotEmpty)
-                  Text(' · ', style: theme.textTheme.bodySmall),
-                if (place.priceLevelLabel.isNotEmpty)
-                  Text(place.priceLevelLabel, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.primary, fontWeight: FontWeight.w700)),
-              ],
-            ),
           ],
         ),
       ),

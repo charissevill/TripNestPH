@@ -7,11 +7,13 @@ import '../../core/providers/favorites_provider.dart';
 import '../../core/routes/route_paths.dart';
 import '../../core/services/places_service.dart';
 import '../../core/theme/app_spacing.dart';
+import '../../core/theme/breakpoints.dart';
 import '../../core/widgets/cards/destination_card.dart';
 import '../../core/widgets/cards/festival_card.dart';
 import '../../core/widgets/cards/place_card.dart';
 import '../../core/widgets/cards/restaurant_card.dart';
 import '../../core/widgets/details/place_details_sheet.dart';
+import '../../core/widgets/layout/max_width_container.dart';
 import '../../core/widgets/states/empty_state_widget.dart';
 import '../../core/widgets/states/loading_widget.dart';
 import '../../data/repositories/destination_repository.dart';
@@ -69,10 +71,10 @@ class _SavedScreenState extends State<SavedScreen>
         child: Column(
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.lg,
+              padding: EdgeInsets.fromLTRB(
+                MaxWidthContainer.sidePadding(context, maxWidth: 1400),
                 AppSpacing.sm,
-                AppSpacing.lg,
+                MaxWidthContainer.sidePadding(context, maxWidth: 1400),
                 AppSpacing.sm,
               ),
               child: Align(
@@ -237,13 +239,15 @@ class _SavedGrid extends StatelessWidget {
     }
     return LayoutBuilder(
       builder: (context, constraints) {
+        final columns = context.gridColumns;
+        final side = MaxWidthContainer.sidePadding(context, maxWidth: 1400);
         final cardWidth =
-            (constraints.maxWidth - AppSpacing.lg * 2 - AppSpacing.md) / 2;
+            (constraints.maxWidth - side * 2 - AppSpacing.md * (columns - 1)) / columns;
         return GridView.builder(
-          padding: const EdgeInsets.fromLTRB(
-            AppSpacing.lg,
+          padding: EdgeInsets.fromLTRB(
+            side,
             AppSpacing.md,
-            AppSpacing.lg,
+            side,
             // Taller than AppSpacing.huge alone — this tab also has the
             // floating AI Chat FAB (`_AiChatFab` in `MainShellScreen`)
             // hovering above the bottom nav bar, which the plain nav-bar
@@ -252,7 +256,7 @@ class _SavedGrid extends StatelessWidget {
             AppSpacing.huge + AppSpacing.xxxl,
           ),
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2,
+            crossAxisCount: columns,
             crossAxisSpacing: AppSpacing.md,
             mainAxisSpacing: AppSpacing.lg,
             mainAxisExtent: _gridCellExtent,

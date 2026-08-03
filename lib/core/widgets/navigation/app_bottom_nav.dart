@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_nav_bar/google_nav_bar.dart';
-import 'package:material_symbols_icons/symbols.dart';
 
 import '../../theme/app_colors.dart';
 import '../../theme/app_spacing.dart';
+import 'nav_tab_data.dart';
 
 /// The floating, rounded bottom navigation bar shared by every top-level
 /// tab (Home, Explore, AI Planner, Saved, Profile).
@@ -42,13 +42,9 @@ class AppBottomNav extends StatelessWidget {
           tabBackgroundColor: theme.colorScheme.primary,
           color: AppColors.textSecondary,
           textStyle: theme.textTheme.labelSmall?.copyWith(color: Colors.white, fontWeight: FontWeight.w700),
-          tabs: const [
-            GButton(icon: Symbols.home_rounded, text: 'Home'),
-            GButton(icon: Symbols.explore_rounded, text: 'Explore'),
-            GButton(icon: Symbols.auto_awesome_rounded, text: 'Planner'),
-            GButton(icon: Symbols.bookmark_rounded, text: 'Saved'),
-            GButton(icon: Symbols.person_rounded, text: 'Profile'),
-          ],
+          tabs: kMainNavTabs
+              .map((tab) => GButton(icon: tab.icon, text: tab.label))
+              .toList(),
         ),
       ),
     );

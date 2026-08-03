@@ -19,6 +19,7 @@ import '../../core/widgets/cards/restaurant_card.dart';
 import '../../core/widgets/cards/tag_chip.dart';
 import '../../core/widgets/carousels/nearby_places_section.dart';
 import '../../core/widgets/details/info_stat_card.dart';
+import '../../core/widgets/layout/max_width_container.dart';
 import '../../core/widgets/layout/section_header.dart';
 import '../../core/widgets/states/empty_state_widget.dart';
 import '../../core/widgets/states/loading_widget.dart';
@@ -163,6 +164,7 @@ class _ProvinceDetailsBody extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final province = data.province;
+    final sidePadding = MaxWidthContainer.sidePadding(context, maxWidth: 900);
 
     return CustomScrollView(
       slivers: [
@@ -184,10 +186,10 @@ class _ProvinceDetailsBody extends StatelessWidget {
           ),
         ),
         SliverPadding(
-          padding: const EdgeInsets.fromLTRB(
+          padding: EdgeInsets.fromLTRB(
+            sidePadding,
             AppSpacing.lg,
-            AppSpacing.lg,
-            AppSpacing.lg,
+            sidePadding,
             AppSpacing.huge,
           ),
           sliver: SliverList.list(

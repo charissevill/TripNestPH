@@ -16,6 +16,7 @@ import '../../core/widgets/dialogs/search_filter_sheet.dart';
 import '../../core/widgets/details/place_details_sheet.dart';
 import '../../core/widgets/indicators/rating_widget.dart';
 import '../../core/widgets/inputs/search_bar_widget.dart';
+import '../../core/widgets/layout/max_width_container.dart';
 import '../../core/widgets/states/empty_state_widget.dart';
 import '../../core/widgets/states/loading_widget.dart';
 import '../../data/repositories/festival_repository.dart';
@@ -603,8 +604,8 @@ class _SearchScreenState extends State<SearchScreen> {
         : _provinces.where((p) => p.regionId == regionMatch.id).toList();
 
     return ListView(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.lg,
+      padding: EdgeInsets.symmetric(
+        horizontal: MaxWidthContainer.sidePadding(context, maxWidth: 800),
         vertical: AppSpacing.sm,
       ),
       children: [
@@ -662,10 +663,10 @@ class _SearchScreenState extends State<SearchScreen> {
         child: Column(
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.lg,
+              padding: EdgeInsets.fromLTRB(
+                MaxWidthContainer.sidePadding(context, maxWidth: 800),
                 AppSpacing.sm,
-                AppSpacing.lg,
+                MaxWidthContainer.sidePadding(context, maxWidth: 800),
                 AppSpacing.md,
               ),
               child: Row(
@@ -693,10 +694,10 @@ class _SearchScreenState extends State<SearchScreen> {
             ),
             if (_hasFilters)
               Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  AppSpacing.lg,
+                padding: EdgeInsets.fromLTRB(
+                  MaxWidthContainer.sidePadding(context, maxWidth: 800),
                   0,
-                  AppSpacing.lg,
+                  MaxWidthContainer.sidePadding(context, maxWidth: 800),
                   AppSpacing.sm,
                 ),
                 child: ActiveFilterChips(
@@ -772,8 +773,8 @@ class _SuggestionsView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListView(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.lg,
+      padding: EdgeInsets.symmetric(
+        horizontal: MaxWidthContainer.sidePadding(context, maxWidth: 800),
         vertical: AppSpacing.md,
       ),
       children: [

@@ -84,6 +84,14 @@ void main() {
     );
     final favoritesProvider = FavoritesProvider(repository: FavoritesRepository(firestore: firestore));
 
+    // Pinned to a phone-sized surface — `flutter_test`'s default 800×600
+    // surface lands in the responsive shell's "medium" width tier, not
+    // "compact", which would silently exercise the desktop grid/padding
+    // path these mobile-focused assertions aren't meant to cover.
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
     await tester.pumpWidget(
       MultiProvider(
         providers: [

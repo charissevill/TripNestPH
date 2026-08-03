@@ -10,6 +10,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/utils/validators.dart';
 import '../../core/widgets/buttons/animated_button.dart';
+import '../../core/widgets/layout/max_width_container.dart';
 import 'widgets/auth_header.dart';
 import 'widgets/auth_text_field.dart';
 
@@ -56,7 +57,9 @@ class _LoginScreenState extends State<LoginScreen> {
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.xxl, AppSpacing.lg, AppSpacing.xl),
-          child: Form(
+          child: MaxWidthContainer(
+            maxWidth: 480,
+            child: Form(
             key: _formKey,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -130,6 +133,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
               ],
+            ),
             ),
           ),
         ),

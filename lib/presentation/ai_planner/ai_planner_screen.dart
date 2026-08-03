@@ -15,6 +15,7 @@ import '../../core/theme/app_spacing.dart';
 import '../../core/utils/app_exception.dart';
 import '../../core/widgets/buttons/animated_button.dart';
 import '../../core/widgets/inputs/search_bar_widget.dart';
+import '../../core/widgets/layout/max_width_container.dart';
 import '../../core/widgets/states/loading_widget.dart';
 import '../../data/repositories/destination_repository.dart';
 import '../../data/repositories/province_repository.dart';
@@ -265,13 +266,14 @@ class _AiPlannerScreenState extends State<AiPlannerScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final planner = context.watch<AiPlannerProvider>();
+    final sidePadding = MaxWidthContainer.sidePadding(context, maxWidth: 800);
     return Scaffold(
       body: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(
-            AppSpacing.lg,
+          padding: EdgeInsets.fromLTRB(
+            sidePadding,
             AppSpacing.sm,
-            AppSpacing.lg,
+            sidePadding,
             AppSpacing.huge,
           ),
           children: [
@@ -676,10 +678,10 @@ class _AiPlannerScreenState extends State<AiPlannerScreen> {
       // the bottom where it's easy to miss entirely.
       bottomNavigationBar: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(
-            AppSpacing.lg,
+          padding: EdgeInsets.fromLTRB(
+            sidePadding,
             AppSpacing.sm,
-            AppSpacing.lg,
+            sidePadding,
             AppSpacing.sm,
           ),
           child: Column(

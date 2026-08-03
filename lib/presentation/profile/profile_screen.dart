@@ -14,6 +14,7 @@ import '../../core/utils/app_exception.dart';
 import '../../core/utils/sign_out.dart';
 import '../../core/widgets/cards/destination_card.dart';
 import '../../core/widgets/dialogs/confirmation_dialog.dart';
+import '../../core/widgets/layout/max_width_container.dart';
 import '../../core/widgets/media/avatar_preview.dart';
 import '../../data/repositories/admin_repository.dart';
 import '../../data/repositories/destination_repository.dart';
@@ -98,15 +99,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
       _statsFuture = _loadStats(uid);
     }
 
+    final sidePadding = MaxWidthContainer.sidePadding(context, maxWidth: 900);
+
     return Scaffold(
       body: SafeArea(
         child: RefreshIndicator(
           onRefresh: _refresh,
           child: ListView(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.lg,
+            padding: EdgeInsets.fromLTRB(
+              sidePadding,
               AppSpacing.sm,
-              AppSpacing.lg,
+              sidePadding,
               // Taller than AppSpacing.huge alone — this tab also has the
               // floating AI Chat FAB (`_AiChatFab` in `MainShellScreen`)
               // hovering above the bottom nav bar, which the plain nav-bar

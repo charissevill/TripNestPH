@@ -9,6 +9,7 @@ import '../../core/routes/route_paths.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/widgets/buttons/animated_button.dart';
+import '../../core/widgets/layout/max_width_container.dart';
 
 class _OnboardingPageData {
   const _OnboardingPageData({required this.imageUrl, required this.title, required this.description});
@@ -84,11 +85,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               ),
             ),
             Expanded(
-              child: PageView.builder(
-                controller: _controller,
-                itemCount: _pages.length,
-                onPageChanged: (i) => setState(() => _index = i),
-                itemBuilder: (context, i) => _OnboardingSlide(data: _pages[i]),
+              child: MaxWidthContainer(
+                maxWidth: 640,
+                child: PageView.builder(
+                  controller: _controller,
+                  itemCount: _pages.length,
+                  onPageChanged: (i) => setState(() => _index = i),
+                  itemBuilder: (context, i) => _OnboardingSlide(data: _pages[i]),
+                ),
               ),
             ),
             const SizedBox(height: AppSpacing.lg),
@@ -106,9 +110,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             const SizedBox(height: AppSpacing.xl),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-              child: AnimatedButton(
-                label: _isLast ? 'Get Started' : 'Next',
-                onPressed: _next,
+              child: MaxWidthContainer(
+                maxWidth: 640,
+                child: AnimatedButton(
+                  label: _isLast ? 'Get Started' : 'Next',
+                  onPressed: _next,
+                ),
               ),
             ),
             const SizedBox(height: AppSpacing.xl),

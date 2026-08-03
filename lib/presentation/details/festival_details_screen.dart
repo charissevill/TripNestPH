@@ -24,6 +24,7 @@ import '../../core/widgets/details/info_stat_card.dart';
 import '../../core/widgets/details/map_preview.dart';
 import '../../core/widgets/details/review_section.dart';
 import '../../core/widgets/indicators/rating_widget.dart';
+import '../../core/widgets/layout/max_width_container.dart';
 import '../../core/widgets/layout/section_header.dart';
 import '../../core/widgets/states/empty_state_widget.dart';
 import '../../core/widgets/states/loading_widget.dart';
@@ -148,6 +149,7 @@ class _FestivalDetailsBody extends StatelessWidget {
     final theme = Theme.of(context);
     final festival = data.festival;
     final saved = context.watch<FavoritesProvider>();
+    final sidePadding = MaxWidthContainer.sidePadding(context, maxWidth: 900);
 
     return Scaffold(
       body: CustomScrollView(
@@ -161,10 +163,10 @@ class _FestivalDetailsBody extends StatelessWidget {
             heroTag: 'festival-${festival.id}',
           ),
           SliverPadding(
-            padding: const EdgeInsets.fromLTRB(
+            padding: EdgeInsets.fromLTRB(
+              sidePadding,
               AppSpacing.lg,
-              AppSpacing.lg,
-              AppSpacing.lg,
+              sidePadding,
               AppSpacing.huge,
             ),
             sliver: SliverList.list(
@@ -325,10 +327,10 @@ class _FestivalDetailsBody extends StatelessWidget {
       ),
       bottomNavigationBar: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(
-            AppSpacing.lg,
+          padding: EdgeInsets.fromLTRB(
+            sidePadding,
             AppSpacing.sm,
-            AppSpacing.lg,
+            sidePadding,
             AppSpacing.sm,
           ),
           child: Row(

@@ -10,6 +10,7 @@ import '../../core/routes/route_paths.dart';
 import '../../core/services/places_service.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
+import '../../core/theme/breakpoints.dart';
 import '../../core/utils/app_exception.dart';
 import '../../core/utils/place_dedup.dart';
 import '../../core/widgets/buttons/animated_button.dart';
@@ -22,6 +23,7 @@ import '../../core/widgets/details/place_details_sheet.dart';
 import '../../core/widgets/dialogs/active_filter_chips.dart';
 import '../../core/widgets/dialogs/search_filter_sheet.dart';
 import '../../core/widgets/inputs/search_bar_widget.dart';
+import '../../core/widgets/layout/max_width_container.dart';
 import '../../core/widgets/states/empty_state_widget.dart';
 import '../../core/widgets/states/loading_widget.dart';
 import '../../data/mock/mock_categories.dart';
@@ -444,16 +446,17 @@ class _ExploreScreenState extends State<ExploreScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final sidePadding = MaxWidthContainer.sidePadding(context, maxWidth: 1400);
 
     return Scaffold(
       body: SafeArea(
         child: Column(
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.lg,
+              padding: EdgeInsets.fromLTRB(
+                sidePadding,
                 AppSpacing.sm,
-                AppSpacing.lg,
+                sidePadding,
                 AppSpacing.md,
               ),
               child: Column(
@@ -491,7 +494,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                     height: 40,
                     child: ListView.separated(
                       scrollDirection: Axis.horizontal,
-                      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+                      padding: EdgeInsets.symmetric(horizontal: sidePadding),
                       itemCount: _ExploreTab.values.length,
                       separatorBuilder: (_, _) =>
                           const SizedBox(width: AppSpacing.sm),
@@ -514,7 +517,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                   ),
                 ),
                 Padding(
-                  padding: const EdgeInsets.only(right: AppSpacing.lg),
+                  padding: EdgeInsets.only(right: sidePadding),
                   child: IconButton(
                     icon: Icon(_mapMode ? Symbols.view_list_rounded : Symbols.map_rounded),
                     tooltip: _mapMode ? 'Show as list' : 'Show as map',
@@ -532,9 +535,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                 height: 106,
                 child: ListView.separated(
                   scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.lg,
-                  ),
+                  padding: EdgeInsets.symmetric(horizontal: sidePadding),
                   itemCount: mockCategories.length,
                   separatorBuilder: (_, _) =>
                       const SizedBox(width: AppSpacing.md),
@@ -767,13 +768,15 @@ class _ExploreScreenState extends State<ExploreScreen> {
       onRefresh: onRefresh,
       child: LayoutBuilder(
         builder: (context, constraints) {
+          final columns = context.gridColumns;
+          final side = MaxWidthContainer.sidePadding(context, maxWidth: 1400);
           final cardWidth =
-              (constraints.maxWidth - AppSpacing.lg * 2 - AppSpacing.md) / 2;
+              (constraints.maxWidth - side * 2 - AppSpacing.md * (columns - 1)) / columns;
           return GridView.builder(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.lg,
+            padding: EdgeInsets.fromLTRB(
+              side,
               0,
-              AppSpacing.lg,
+              side,
               // Taller than AppSpacing.huge alone — this tab also has the
               // floating AI Chat FAB (`_AiChatFab` in `MainShellScreen`)
               // hovering above the bottom nav bar, which the plain nav-bar
@@ -782,7 +785,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
               AppSpacing.huge + AppSpacing.xxxl,
             ),
             gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
+              crossAxisCount: columns,
               crossAxisSpacing: AppSpacing.md,
               mainAxisSpacing: AppSpacing.lg,
               mainAxisExtent: _gridCellExtent,

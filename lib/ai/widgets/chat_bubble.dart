@@ -51,83 +51,85 @@ class ChatBubble extends StatelessWidget {
 
     return Align(
       alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.8),
-        margin: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
-        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
-        decoration: BoxDecoration(
-          color: bubbleColor,
-          borderRadius: BorderRadius.only(
-            topLeft: const Radius.circular(AppRadius.lg),
-            topRight: const Radius.circular(AppRadius.lg),
-            bottomLeft: Radius.circular(isUser ? AppRadius.lg : AppRadius.sm),
-            bottomRight: Radius.circular(isUser ? AppRadius.sm : AppRadius.lg),
+      child: LayoutBuilder(
+        builder: (context, constraints) => Container(
+          constraints: BoxConstraints(maxWidth: constraints.maxWidth * 0.8),
+          margin: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
+          decoration: BoxDecoration(
+            color: bubbleColor,
+            borderRadius: BorderRadius.only(
+              topLeft: const Radius.circular(AppRadius.lg),
+              topRight: const Radius.circular(AppRadius.lg),
+              bottomLeft: Radius.circular(isUser ? AppRadius.lg : AppRadius.sm),
+              bottomRight: Radius.circular(isUser ? AppRadius.sm : AppRadius.lg),
+            ),
+            boxShadow: isUser ? null : AppShadows.card,
           ),
-          boxShadow: isUser ? null : AppShadows.card,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (message.isError)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 4),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Symbols.error_rounded, size: 15, color: theme.colorScheme.error),
-                    const SizedBox(width: 4),
-                    Text('Couldn\'t reply', style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.error)),
-                  ],
-                ),
-              ),
-            isUser
-                ? Text(message.content, style: theme.textTheme.bodyLarge?.copyWith(color: Colors.white))
-                : MarkdownBody(
-                    data: message.content,
-                    selectable: true,
-                    onTapLink: (text, href, title) {
-                      if (href != null) MapsLauncher.openUrl(href);
-                    },
-                    styleSheet: MarkdownStyleSheet.fromTheme(theme).copyWith(
-                      p: theme.textTheme.bodyLarge,
-                      strong: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w700),
-                      listBullet: theme.textTheme.bodyLarge,
-                      h1: theme.textTheme.titleLarge,
-                      h2: theme.textTheme.titleMedium,
-                      h3: theme.textTheme.titleSmall,
-                    ),
-                  ),
-            if (showPlannerCta) ...[
-              const SizedBox(height: AppSpacing.xs),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: OutlinedButton.icon(
-                  onPressed: onOpenPlanner,
-                  icon: const Icon(Symbols.auto_awesome_rounded, size: 16),
-                  label: const Text('Generate Full Itinerary'),
-                  style: OutlinedButton.styleFrom(
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(AppRadius.pill),
-                    ),
-                    visualDensity: VisualDensity.compact,
-                    textStyle: theme.textTheme.labelMedium,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (message.isError)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Symbols.error_rounded, size: 15, color: theme.colorScheme.error),
+                      const SizedBox(width: 4),
+                      Text('Couldn\'t reply', style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.error)),
+                    ],
                   ),
                 ),
-              ),
+              isUser
+                  ? Text(message.content, style: theme.textTheme.bodyLarge?.copyWith(color: Colors.white))
+                  : MarkdownBody(
+                      data: message.content,
+                      selectable: true,
+                      onTapLink: (text, href, title) {
+                        if (href != null) MapsLauncher.openUrl(href);
+                      },
+                      styleSheet: MarkdownStyleSheet.fromTheme(theme).copyWith(
+                        p: theme.textTheme.bodyLarge,
+                        strong: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w700),
+                        listBullet: theme.textTheme.bodyLarge,
+                        h1: theme.textTheme.titleLarge,
+                        h2: theme.textTheme.titleMedium,
+                        h3: theme.textTheme.titleSmall,
+                      ),
+                    ),
+              if (showPlannerCta) ...[
+                const SizedBox(height: AppSpacing.xs),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: OutlinedButton.icon(
+                    onPressed: onOpenPlanner,
+                    icon: const Icon(Symbols.auto_awesome_rounded, size: 16),
+                    label: const Text('Generate Full Itinerary'),
+                    style: OutlinedButton.styleFrom(
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(AppRadius.pill),
+                      ),
+                      visualDensity: VisualDensity.compact,
+                      textStyle: theme.textTheme.labelMedium,
+                    ),
+                  ),
+                ),
+              ],
+              if (!isUser && !message.isError)
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: IconButton(
+                    onPressed: () => Share.share(message.content, subject: 'TripNest PH AI Recommendation'),
+                    icon: const Icon(Symbols.ios_share_rounded, size: 16),
+                    iconSize: 16,
+                    color: theme.textTheme.bodyMedium?.color,
+                    tooltip: 'Share this recommendation',
+                  ),
+                ),
             ],
-            if (!isUser && !message.isError)
-              Align(
-                alignment: Alignment.centerRight,
-                child: IconButton(
-                  onPressed: () => Share.share(message.content, subject: 'TripNest PH AI Recommendation'),
-                  icon: const Icon(Symbols.ios_share_rounded, size: 16),
-                  iconSize: 16,
-                  color: theme.textTheme.bodyMedium?.color,
-                  tooltip: 'Share this recommendation',
-                ),
-              ),
-          ],
+          ),
         ),
       ),
     );

@@ -96,6 +96,14 @@ void main() {
       provinceRepository: ProvinceRepository(firestore: firestore),
       placesService: placesService,
     );
+    // Pinned to a phone-sized surface — same reasoning as
+    // `home_screen_test.dart`'s identical pin: the default 800×600 test
+    // surface would otherwise land in the responsive shell's "medium" tier
+    // instead of "compact".
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
     await tester.pumpWidget(_wrap(screen, firestore));
     await _settle(tester);
     return screen;

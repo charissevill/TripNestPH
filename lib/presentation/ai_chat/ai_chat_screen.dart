@@ -23,6 +23,7 @@ import '../../core/theme/app_spacing.dart';
 import '../../core/utils/province_matcher.dart';
 import '../../core/widgets/branding/app_logo.dart';
 import '../../core/widgets/dialogs/confirmation_dialog.dart';
+import '../../core/widgets/layout/max_width_container.dart';
 import '../../data/repositories/province_repository.dart';
 import '../../data/repositories/restaurant_repository.dart';
 import '../../domain/models/place.dart';
@@ -623,47 +624,58 @@ class _AiChatScreenState extends State<AiChatScreen> {
           Expanded(
             child: chat.messages.isEmpty
                 ? _EmptyState(onSuggestionTap: _send)
-                : ListView.builder(
-                    controller: _scrollController,
-                    padding: const EdgeInsets.all(AppSpacing.md),
-                    itemCount: chat.messages.length + (chat.isSending ? 1 : 0),
-                    itemBuilder: (context, i) {
-                      if (i == chat.messages.length)
-                        return const TypingIndicator();
-                      return ChatBubble(
-                        message: chat.messages[i],
-                        onOpenPlanner: () => _generateFromChat(chat.messages[i]),
-                      );
-                    },
+                : MaxWidthContainer(
+                    maxWidth: 900,
+                    child: ListView.builder(
+                      controller: _scrollController,
+                      padding: const EdgeInsets.all(AppSpacing.md),
+                      itemCount:
+                          chat.messages.length + (chat.isSending ? 1 : 0),
+                      itemBuilder: (context, i) {
+                        if (i == chat.messages.length)
+                          return const TypingIndicator();
+                        return ChatBubble(
+                          message: chat.messages[i],
+                          onOpenPlanner: () =>
+                              _generateFromChat(chat.messages[i]),
+                        );
+                      },
+                    ),
                   ),
           ),
           if (chat.messages.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-              child: SizedBox(
-                height: 40,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: 3,
-                  separatorBuilder: (_, _) =>
-                      const SizedBox(width: AppSpacing.sm),
-                  itemBuilder: (context, i) {
-                    const quickFollowUps = [
-                      'Estimate my budget',
-                      'Any hidden gems?',
-                      'Safety tips',
-                    ];
-                    return SuggestionPill(
-                      label: quickFollowUps[i],
-                      onTap: chat.isSending
-                          ? null
-                          : () => _send(quickFollowUps[i]),
-                    );
-                  },
+            MaxWidthContainer(
+              maxWidth: 900,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+                child: SizedBox(
+                  height: 40,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: 3,
+                    separatorBuilder: (_, _) =>
+                        const SizedBox(width: AppSpacing.sm),
+                    itemBuilder: (context, i) {
+                      const quickFollowUps = [
+                        'Estimate my budget',
+                        'Any hidden gems?',
+                        'Safety tips',
+                      ];
+                      return SuggestionPill(
+                        label: quickFollowUps[i],
+                        onTap: chat.isSending
+                            ? null
+                            : () => _send(quickFollowUps[i]),
+                      );
+                    },
+                  ),
                 ),
               ),
             ),
-          ChatInputBar(onSend: _send, enabled: !chat.isSending),
+          MaxWidthContainer(
+            maxWidth: 900,
+            child: ChatInputBar(onSend: _send, enabled: !chat.isSending),
+          ),
         ],
       ),
     );

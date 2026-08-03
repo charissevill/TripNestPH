@@ -19,6 +19,7 @@ import '../../core/widgets/cards/place_card.dart';
 import '../../core/widgets/cards/travel_tip_card.dart';
 import '../../core/widgets/details/place_details_sheet.dart';
 import '../../core/widgets/inputs/search_bar_widget.dart';
+import '../../core/widgets/layout/max_width_container.dart';
 import '../../core/widgets/layout/section_header.dart';
 import '../../core/widgets/states/empty_state_widget.dart';
 import '../../core/widgets/states/loading_widget.dart';
@@ -170,6 +171,20 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         .toList();
   }
 
+  /// "Nearby You"/"Nearby Restaurants" are meant to answer "what's closest
+  /// to me right now", so the closest place always leads the carousel —
+  /// distance, not the server's `rankPreference: POPULARITY` ordering,
+  /// which is about relevance/prominence, not proximity.
+  List<Place> _byDistance(List<Place> places) {
+    final sorted = [...places];
+    sorted.sort(
+      (a, b) => (a.distanceMeters ?? double.infinity).compareTo(
+        b.distanceMeters ?? double.infinity,
+      ),
+    );
+    return sorted;
+  }
+
   Future<void> _refreshNearby() async {
     // Re-read fresh each time (not cached in state) so flipping the
     // Settings toggle takes effect the next time Home refreshes, even
@@ -221,8 +236,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       if (!mounted) return;
       setState(() {
         _locationFeatureEnabled = true;
-        _nearby = _recognizable(nearby);
-        _nearbyRestaurants = _recognizable(nearbyRestaurants);
+        _nearby = _byDistance(_recognizable(nearby));
+        _nearbyRestaurants = _byDistance(_recognizable(nearbyRestaurants));
         _travelerLat = position.latitude;
         _travelerLng = position.longitude;
       });
@@ -279,6 +294,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final user = context.watch<AuthProvider>().currentUser;
     final uid = context.watch<AuthProvider>().firebaseUser?.uid;
 
+    final headerSidePadding = MaxWidthContainer.sidePadding(context, maxWidth: 1200);
+
     return Scaffold(
       body: SafeArea(
         bottom: false,
@@ -287,10 +304,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           child: CustomScrollView(
             slivers: [
               SliverPadding(
-                padding: const EdgeInsets.fromLTRB(
-                  AppSpacing.lg,
+                padding: EdgeInsets.fromLTRB(
+                  headerSidePadding,
                   AppSpacing.sm,
-                  AppSpacing.lg,
+                  headerSidePadding,
                   AppSpacing.md,
                 ),
                 sliver: SliverToBoxAdapter(
@@ -419,6 +436,7 @@ class _HomeContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final sidePadding = MaxWidthContainer.sidePadding(context, maxWidth: 1200);
     return SliverList.list(
       children: [
         HeroBanner(
@@ -440,7 +458,7 @@ class _HomeContent extends StatelessWidget {
           height: 106,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+            padding: EdgeInsets.symmetric(horizontal: sidePadding),
             itemCount: mockCategories.length,
             separatorBuilder: (_, _) => const SizedBox(width: AppSpacing.md),
             itemBuilder: (context, i) {
@@ -457,6 +475,7 @@ class _HomeContent extends StatelessWidget {
         if (nearby.isNotEmpty)
           ..._carouselSection(
             context,
+            sidePadding: sidePadding,
             title: 'Nearby You',
             subtitle: 'Closest attractions to your current location',
             onSeeAll: () => context.push(
@@ -487,6 +506,7 @@ class _HomeContent extends StatelessWidget {
         ],
         ..._carouselSection(
           context,
+          sidePadding: sidePadding,
           title: 'Nearby Restaurants',
           subtitle: 'Good eats close to your current location',
           onSeeAll: () => context.push(
@@ -507,6 +527,7 @@ class _HomeContent extends StatelessWidget {
         ),
         ..._carouselSection(
           context,
+          sidePadding: sidePadding,
           title: 'Featured Destinations',
           subtitle: 'Real places to explore across the Philippines',
           onSeeAll: () => context.go(RoutePaths.explore),
@@ -519,6 +540,7 @@ class _HomeContent extends StatelessWidget {
         ),
         ..._carouselSection(
           context,
+          sidePadding: sidePadding,
           title: 'Popular Restaurants',
           subtitle: 'Where locals and travelers both eat well',
           onSeeAll: () => context.go('${RoutePaths.explore}?category=food'),
@@ -531,6 +553,7 @@ class _HomeContent extends StatelessWidget {
         ),
         ..._carouselSection(
           context,
+          sidePadding: sidePadding,
           title: 'Upcoming Festivals',
           subtitle: 'Plan your trip around the celebration',
           onSeeAll: () => context.push(RoutePaths.upcomingFestivals),
@@ -546,9 +569,10 @@ class _HomeContent extends StatelessWidget {
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const SectionHeader(
+              SectionHeader(
                 title: 'Travel Tips',
                 subtitle: 'Good to know before you go',
+                padding: EdgeInsets.symmetric(horizontal: sidePadding),
               ),
               const SizedBox(height: AppSpacing.md),
               SizedBox(
@@ -559,9 +583,7 @@ class _HomeContent extends StatelessWidget {
                 height: 196,
                 child: ListView.separated(
                   scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.lg,
-                  ),
+                  padding: EdgeInsets.symmetric(horizontal: sidePadding),
                   itemCount: data.travelTips.length,
                   separatorBuilder: (_, _) =>
                       const SizedBox(width: AppSpacing.md),
@@ -582,6 +604,7 @@ class _HomeContent extends StatelessWidget {
 
   List<Widget> _carouselSection(
     BuildContext context, {
+    required double sidePadding,
     required String title,
     required String subtitle,
     required VoidCallback onSeeAll,
@@ -598,13 +621,14 @@ class _HomeContent extends StatelessWidget {
             subtitle: subtitle,
             actionLabel: 'See all',
             onActionTap: onSeeAll,
+            padding: EdgeInsets.symmetric(horizontal: sidePadding),
           ),
           const SizedBox(height: AppSpacing.md),
           SizedBox(
             height: 250,
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+              padding: EdgeInsets.symmetric(horizontal: sidePadding),
               itemCount: itemCount,
               separatorBuilder: (_, _) => const SizedBox(width: AppSpacing.md),
               itemBuilder: (context, i) =>

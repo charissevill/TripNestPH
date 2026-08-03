@@ -56,7 +56,9 @@ class _CredentialDialogState extends State<CredentialDialog> {
   /// One entry per [CredentialField], mirroring each field's own [CredentialField.obscure] —
   /// toggled independently by that field's show/hide icon rather than a single
   /// dialog-wide switch, since a dialog can mix a password field with a plain one.
-  late final List<bool> _obscured = widget.fields.map((f) => f.obscure).toList();
+  late final List<bool> _obscured = widget.fields
+      .map((f) => f.obscure)
+      .toList();
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
@@ -71,7 +73,8 @@ class _CredentialDialogState extends State<CredentialDialog> {
     } else {
       setState(() {
         _busy = false;
-        _error = 'Something went wrong. Please check your password and try again.';
+        _error =
+            'Something went wrong. Please check your password and try again.';
       });
     }
   }
@@ -80,45 +83,68 @@ class _CredentialDialogState extends State<CredentialDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       title: Text(widget.title),
-      content: Form(
-        key: _formKey,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            for (var i = 0; i < widget.fields.length; i++) ...[
-              TextFormField(
-                controller: widget.fields[i].controller,
-                obscureText: widget.fields[i].obscure && _obscured[i],
-                validator: widget.fields[i].validator,
-                decoration: InputDecoration(
-                  labelText: widget.fields[i].label,
-                  floatingLabelBehavior: FloatingLabelBehavior.auto,
-                  prefixIcon: widget.fields[i].icon != null ? Icon(widget.fields[i].icon, size: 20) : null,
-                  suffixIcon: widget.fields[i].obscure
-                      ? IconButton(
-                          icon: Icon(
-                            _obscured[i] ? Symbols.visibility_off_rounded : Symbols.visibility_rounded,
-                            size: 20,
-                          ),
-                          onPressed: () => setState(() => _obscured[i] = !_obscured[i]),
-                        )
-                      : null,
+      content: SingleChildScrollView(
+        child: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              for (var i = 0; i < widget.fields.length; i++) ...[
+                TextFormField(
+                  controller: widget.fields[i].controller,
+                  obscureText: widget.fields[i].obscure && _obscured[i],
+                  validator: widget.fields[i].validator,
+                  decoration: InputDecoration(
+                    labelText: widget.fields[i].label,
+                    floatingLabelBehavior: FloatingLabelBehavior.auto,
+                    prefixIcon: widget.fields[i].icon != null
+                        ? Icon(widget.fields[i].icon, size: 20)
+                        : null,
+                    suffixIcon: widget.fields[i].obscure
+                        ? IconButton(
+                            icon: Icon(
+                              _obscured[i]
+                                  ? Symbols.visibility_off_rounded
+                                  : Symbols.visibility_rounded,
+                              size: 20,
+                            ),
+                            onPressed: () =>
+                                setState(() => _obscured[i] = !_obscured[i]),
+                          )
+                        : null,
+                  ),
                 ),
-              ),
-              const SizedBox(height: AppSpacing.sm),
+                const SizedBox(height: AppSpacing.sm),
+              ],
+              if (_error != null)
+                Text(
+                  _error!,
+                  style: const TextStyle(color: AppColors.error, fontSize: 12),
+                ),
             ],
-            if (_error != null) Text(_error!, style: const TextStyle(color: AppColors.error, fontSize: 12)),
-          ],
+          ),
         ),
       ),
       actions: [
-        TextButton(onPressed: _busy ? null : () => Navigator.of(context).pop(false), child: const Text('Cancel')),
+        TextButton(
+          onPressed: _busy ? null : () => Navigator.of(context).pop(false),
+          child: const Text('Cancel'),
+        ),
         FilledButton(
-          style: widget.isDestructive ? FilledButton.styleFrom(backgroundColor: AppColors.error) : null,
+          style: widget.isDestructive
+              ? FilledButton.styleFrom(backgroundColor: AppColors.error)
+              : null,
           onPressed: _busy ? null : _submit,
           child: _busy
-              ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
+                )
               : Text(widget.confirmLabel),
         ),
       ],

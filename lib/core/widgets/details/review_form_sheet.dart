@@ -100,134 +100,138 @@ class _ReviewFormSheetState extends State<_ReviewFormSheet> {
             AppSpacing.lg,
             AppSpacing.xl,
           ),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Container(
-                    width: 44,
-                    height: 5,
-                    margin: const EdgeInsets.only(bottom: AppSpacing.lg),
-                    decoration: BoxDecoration(
-                      color: AppColors.border,
-                      borderRadius: BorderRadius.circular(AppRadius.pill),
+          child: SingleChildScrollView(
+            child: Form(
+              key: _formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 44,
+                      height: 5,
+                      margin: const EdgeInsets.only(bottom: AppSpacing.lg),
+                      decoration: BoxDecoration(
+                        color: AppColors.border,
+                        borderRadius: BorderRadius.circular(AppRadius.pill),
+                      ),
                     ),
                   ),
-                ),
-                Text(
-                  widget.isEditing ? 'Edit Your Review' : 'Write a Review',
-                  style: theme.textTheme.headlineSmall,
-                ),
-                const SizedBox(height: AppSpacing.lg),
-                Center(
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: List.generate(5, (i) {
-                      final starValue = i + 1.0;
-                      return IconButton(
-                        onPressed: () => setState(() => _rating = starValue),
-                        icon: Icon(
-                          _rating >= starValue
-                              ? Symbols.star_rounded
-                              : Symbols.star_outline_rounded,
-                          color: AppColors.accent,
-                          fill: _rating >= starValue ? 1 : 0,
-                          size: 34,
-                        ),
-                      );
-                    }),
+                  Text(
+                    widget.isEditing ? 'Edit Your Review' : 'Write a Review',
+                    style: theme.textTheme.headlineSmall,
                   ),
-                ),
-                const SizedBox(height: AppSpacing.md),
-                TextFormField(
-                  controller: _commentController,
-                  maxLines: 4,
-                  minLines: 3,
-                  maxLength: 2000,
-                  decoration: const InputDecoration(
-                    labelText: 'Comment',
-                    hintText: 'Share your experience...',
-                    floatingLabelBehavior: FloatingLabelBehavior.auto,
-                    prefixIcon: Icon(Symbols.rate_review_rounded, size: 20),
+                  const SizedBox(height: AppSpacing.lg),
+                  Center(
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: List.generate(5, (i) {
+                        final starValue = i + 1.0;
+                        return IconButton(
+                          onPressed: () => setState(() => _rating = starValue),
+                          icon: Icon(
+                            _rating >= starValue
+                                ? Symbols.star_rounded
+                                : Symbols.star_outline_rounded,
+                            color: AppColors.accent,
+                            fill: _rating >= starValue ? 1 : 0,
+                            size: 34,
+                          ),
+                        );
+                      }),
+                    ),
                   ),
-                  validator: (v) => Validators.required(v, label: 'Comment'),
-                ),
-                const SizedBox(height: AppSpacing.md),
-                Row(
-                  children: [
-                    ..._photos.map(
-                      (file) => Padding(
-                        padding: const EdgeInsets.only(right: AppSpacing.sm),
-                        child: Stack(
-                          children: [
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(AppRadius.md),
-                              child: Image.file(
-                                file,
-                                width: 64,
-                                height: 64,
-                                fit: BoxFit.cover,
+                  const SizedBox(height: AppSpacing.md),
+                  TextFormField(
+                    controller: _commentController,
+                    maxLines: 4,
+                    minLines: 3,
+                    maxLength: 2000,
+                    decoration: const InputDecoration(
+                      labelText: 'Comment',
+                      hintText: 'Share your experience...',
+                      floatingLabelBehavior: FloatingLabelBehavior.auto,
+                      prefixIcon: Icon(Symbols.rate_review_rounded, size: 20),
+                    ),
+                    validator: (v) => Validators.required(v, label: 'Comment'),
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  Row(
+                    children: [
+                      ..._photos.map(
+                        (file) => Padding(
+                          padding: const EdgeInsets.only(right: AppSpacing.sm),
+                          child: Stack(
+                            children: [
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(
+                                  AppRadius.md,
+                                ),
+                                child: Image.file(
+                                  file,
+                                  width: 64,
+                                  height: 64,
+                                  fit: BoxFit.cover,
+                                ),
                               ),
-                            ),
-                            Positioned(
-                              top: -6,
-                              right: -6,
-                              child: GestureDetector(
-                                onTap: () =>
-                                    setState(() => _photos.remove(file)),
-                                child: const CircleAvatar(
-                                  radius: 10,
-                                  backgroundColor: AppColors.error,
-                                  child: Icon(
-                                    Symbols.close_rounded,
-                                    size: 12,
-                                    color: Colors.white,
+                              Positioned(
+                                top: -6,
+                                right: -6,
+                                child: GestureDetector(
+                                  onTap: () =>
+                                      setState(() => _photos.remove(file)),
+                                  child: const CircleAvatar(
+                                    radius: 10,
+                                    backgroundColor: AppColors.error,
+                                    child: Icon(
+                                      Symbols.close_rounded,
+                                      size: 12,
+                                      color: Colors.white,
+                                    ),
                                   ),
                                 ),
                               ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      if (_photos.length < 3)
+                        InkWell(
+                          onTap: _pickPhoto,
+                          borderRadius: BorderRadius.circular(AppRadius.md),
+                          child: Container(
+                            width: 64,
+                            height: 64,
+                            decoration: BoxDecoration(
+                              color: AppColors.background,
+                              borderRadius: BorderRadius.circular(AppRadius.md),
+                              border: Border.all(color: AppColors.border),
                             ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    if (_photos.length < 3)
-                      InkWell(
-                        onTap: _pickPhoto,
-                        borderRadius: BorderRadius.circular(AppRadius.md),
-                        child: Container(
-                          width: 64,
-                          height: 64,
-                          decoration: BoxDecoration(
-                            color: AppColors.background,
-                            borderRadius: BorderRadius.circular(AppRadius.md),
-                            border: Border.all(color: AppColors.border),
-                          ),
-                          child: const Icon(
-                            Symbols.add_a_photo_rounded,
-                            color: AppColors.textSecondary,
+                            child: const Icon(
+                              Symbols.add_a_photo_rounded,
+                              color: AppColors.textSecondary,
+                            ),
                           ),
                         ),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: AppSpacing.xl),
-                AnimatedButton(
-                  label: widget.isEditing ? 'Update Review' : 'Submit Review',
-                  onPressed: () {
-                    if (!_formKey.currentState!.validate()) return;
-                    Navigator.of(context).pop(
-                      ReviewFormResult(
-                        rating: _rating,
-                        comment: _commentController.text.trim(),
-                        newPhotos: _photos,
-                      ),
-                    );
-                  },
-                ),
-              ],
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.xl),
+                  AnimatedButton(
+                    label: widget.isEditing ? 'Update Review' : 'Submit Review',
+                    onPressed: () {
+                      if (!_formKey.currentState!.validate()) return;
+                      Navigator.of(context).pop(
+                        ReviewFormResult(
+                          rating: _rating,
+                          comment: _commentController.text.trim(),
+                          newPhotos: _photos,
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
             ),
           ),
         ),

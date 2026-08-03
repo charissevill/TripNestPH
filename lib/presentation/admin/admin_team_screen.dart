@@ -52,66 +52,74 @@ class _AdminTeamScreenState extends State<AdminTeamScreen> {
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
           title: const Text('Invite to Admin Portal'),
-          content: Form(
-            key: dialogFormKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextFormField(
-                  controller: emailController,
-                  autofocus: true,
-                  keyboardType: TextInputType.emailAddress,
-                  decoration: const InputDecoration(
-                    labelText: 'Email',
-                    hintText: 'Must already have a TripNest account',
-                    prefixIcon: Icon(Symbols.mail_rounded, size: 20),
+          content: SingleChildScrollView(
+            child: Form(
+              key: dialogFormKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextFormField(
+                    controller: emailController,
+                    autofocus: true,
+                    keyboardType: TextInputType.emailAddress,
+                    decoration: const InputDecoration(
+                      labelText: 'Email',
+                      hintText: 'Must already have a TripNest account',
+                      prefixIcon: Icon(Symbols.mail_rounded, size: 20),
+                    ),
+                    validator: Validators.email,
                   ),
-                  validator: Validators.email,
-                ),
-                const SizedBox(height: AppSpacing.md),
-                DropdownButtonFormField<String>(
-                  initialValue: role,
-                  decoration: const InputDecoration(labelText: 'Role'),
-                  items: const [
-                    DropdownMenuItem(
-                      value: AdminRole.admin,
-                      child: Text('Admin'),
-                    ),
-                    DropdownMenuItem(
-                      value: AdminRole.lgu,
-                      child: Text('LGU Officer'),
-                    ),
-                    DropdownMenuItem(
-                      value: AdminRole.businessOwner,
-                      child: Text('Business Owner'),
+                  const SizedBox(height: AppSpacing.md),
+                  DropdownButtonFormField<String>(
+                    initialValue: role,
+                    decoration: const InputDecoration(labelText: 'Role'),
+                    items: const [
+                      DropdownMenuItem(
+                        value: AdminRole.admin,
+                        child: Text('Admin'),
+                      ),
+                      DropdownMenuItem(
+                        value: AdminRole.lgu,
+                        child: Text('LGU Officer'),
+                      ),
+                      DropdownMenuItem(
+                        value: AdminRole.businessOwner,
+                        child: Text('Business Owner'),
+                      ),
+                    ],
+                    onChanged: (value) => setDialogState(() {
+                      role = value ?? role;
+                      if (role != AdminRole.lgu) province = null;
+                    }),
+                  ),
+                  // An LGU account is scoped to exactly one province — see
+                  // `AdminUser.provinceId`'s doc comment — so this is required
+                  // (not optional) whenever that role is picked above.
+                  if (role == AdminRole.lgu) ...[
+                    const SizedBox(height: AppSpacing.md),
+                    DropdownButtonFormField<Province>(
+                      initialValue: province,
+                      isExpanded: true,
+                      decoration: const InputDecoration(
+                        labelText: 'Province',
+                        hintText: 'Which province will they manage?',
+                        prefixIcon: Icon(Symbols.public_rounded, size: 20),
+                      ),
+                      items: provinces
+                          .map(
+                            (p) =>
+                                DropdownMenuItem(value: p, child: Text(p.name)),
+                          )
+                          .toList(),
+                      onChanged: (value) =>
+                          setDialogState(() => province = value),
+                      validator: (v) => v == null
+                          ? 'Pick the province this officer manages'
+                          : null,
                     ),
                   ],
-                  onChanged: (value) => setDialogState(() {
-                    role = value ?? role;
-                    if (role != AdminRole.lgu) province = null;
-                  }),
-                ),
-                // An LGU account is scoped to exactly one province — see
-                // `AdminUser.provinceId`'s doc comment — so this is required
-                // (not optional) whenever that role is picked above.
-                if (role == AdminRole.lgu) ...[
-                  const SizedBox(height: AppSpacing.md),
-                  DropdownButtonFormField<Province>(
-                    initialValue: province,
-                    isExpanded: true,
-                    decoration: const InputDecoration(
-                      labelText: 'Province',
-                      hintText: 'Which province will they manage?',
-                      prefixIcon: Icon(Symbols.public_rounded, size: 20),
-                    ),
-                    items: provinces
-                        .map((p) => DropdownMenuItem(value: p, child: Text(p.name)))
-                        .toList(),
-                    onChanged: (value) => setDialogState(() => province = value),
-                    validator: (v) => v == null ? 'Pick the province this officer manages' : null,
-                  ),
                 ],
-              ],
+              ),
             ),
           ),
           actions: [

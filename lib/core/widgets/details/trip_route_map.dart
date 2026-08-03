@@ -109,7 +109,8 @@ class _TripRouteMapState extends State<TripRouteMap> {
                     markerId: MarkerId('${stop.time}-${stop.name}'),
                     position: LatLng(stop.latitude, stop.longitude),
                     infoWindow: InfoWindow(
-                      title: '${stop.time}: ${stop.name}',
+                      title: stop.name,
+                      snippet: stop.time,
                       onTap: () {
                         if (stop.destinationId != null) {
                           context.push(RoutePaths.destinationDetails(stop.destinationId!));

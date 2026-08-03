@@ -17,6 +17,19 @@ final RegExp _dayHeaderPattern = RegExp(r'day\s*\d+', caseSensitive: false);
 bool _looksLikeItinerary(String content) =>
     _dayHeaderPattern.allMatches(content).length >= 2;
 
+/// Strips the leading `Destination: <place>, <province>` line
+/// `ChatPrompts.systemPrompt()` asks the model to open a day-by-day reply
+/// with — it exists so `AiChatScreen._generateFromChat` can reliably parse
+/// the exact place the AI committed to, not to be read by the traveler, so
+/// it's hidden from both the rendered bubble and anything shared from it.
+final RegExp _destinationLinePattern = RegExp(
+  r'^Destination:.*\n?',
+  multiLine: true,
+);
+
+String _visibleContent(String content) =>
+    content.replaceFirst(_destinationLinePattern, '').trimLeft();
+
 /// One chat turn. User messages are a solid-primary bubble on the right;
 /// assistant messages are a surface-colored bubble on the left with
 /// markdown rendering (bold place names, bullet lists, headers for
@@ -37,6 +50,7 @@ class ChatBubble extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isUser = message.isUser;
+    final visibleContent = isUser ? message.content : _visibleContent(message.content);
     final showPlannerCta =
         !isUser &&
         !message.isError &&
@@ -83,9 +97,9 @@ class ChatBubble extends StatelessWidget {
                   ),
                 ),
               isUser
-                  ? Text(message.content, style: theme.textTheme.bodyLarge?.copyWith(color: Colors.white))
+                  ? Text(visibleContent, style: theme.textTheme.bodyLarge?.copyWith(color: Colors.white))
                   : MarkdownBody(
-                      data: message.content,
+                      data: visibleContent,
                       selectable: true,
                       onTapLink: (text, href, title) {
                         if (href != null) MapsLauncher.openUrl(href);
@@ -121,7 +135,7 @@ class ChatBubble extends StatelessWidget {
                 Align(
                   alignment: Alignment.centerRight,
                   child: IconButton(
-                    onPressed: () => Share.share(message.content, subject: 'TripNest PH AI Recommendation'),
+                    onPressed: () => Share.share(visibleContent, subject: 'TripNest PH AI Recommendation'),
                     icon: const Icon(Symbols.ios_share_rounded, size: 16),
                     iconSize: 16,
                     color: theme.textTheme.bodyMedium?.color,

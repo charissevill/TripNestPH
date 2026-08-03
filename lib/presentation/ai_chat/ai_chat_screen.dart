@@ -464,6 +464,25 @@ class _AiChatScreenState extends State<AiChatScreen> {
     );
   }
 
+  /// A day-by-day reply states its exact destination on a leading
+  /// `Destination: <place>, <province>` line (see
+  /// `ChatPrompts.systemPrompt`'s formatting rules) — parsed here so
+  /// [_generateFromChat] searches Places for the specific place the AI
+  /// actually recommended, not just the traveler's own (often vaguer)
+  /// original prompt, which used to risk resolving to an unrelated place
+  /// entirely (e.g. "plan a relaxing beach trip" matching a random beach
+  /// with no connection to what the AI actually suggested). Returns null
+  /// for a reply saved before this line existed, so [_generateFromChat]
+  /// falls back to its previous, still-correct-for-clear-prompts behavior.
+  String? _extractStatedDestination(String content) {
+    final match = RegExp(
+      r'^Destination:\s*(.+)$',
+      multiLine: true,
+    ).firstMatch(content);
+    final destination = match?.group(1)?.trim();
+    return (destination == null || destination.isEmpty) ? null : destination;
+  }
+
   Set<String> _extractInterests(String text) {
     final lower = text.toLowerCase();
     final interests = <String>{};
@@ -537,7 +556,9 @@ class _AiChatScreenState extends State<AiChatScreen> {
     );
 
     try {
-      final places = await _places.searchText(textQuery: '$userPrompt, Philippines');
+      final statedDestination = _extractStatedDestination(assistantMessage.content);
+      final destinationQuery = statedDestination ?? userPrompt;
+      final places = await _places.searchText(textQuery: '$destinationQuery, Philippines');
       final place = places.isNotEmpty ? places.first : null;
       if (place == null) {
         if (!mounted) return;

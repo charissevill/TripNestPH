@@ -19,6 +19,7 @@ class AiItineraryRequest {
     this.accommodationName,
     this.accommodationLatitude,
     this.accommodationLongitude,
+    this.priorConversationContext,
   });
 
   final String destinationId;
@@ -50,4 +51,13 @@ class AiItineraryRequest {
   final String? accommodationName;
   final double? accommodationLatitude;
   final double? accommodationLongitude;
+
+  /// Set by `AiChatScreen._generateFromChat` to the assistant's own reply
+  /// when "Generate Full Itinerary" is tapped from a chat conversation —
+  /// the itinerary-generation prompt is otherwise a completely separate AI
+  /// call with no knowledge of what was actually discussed in chat, so
+  /// without this the generated day plan could recommend different
+  /// restaurants/attractions than the ones the traveler just read. Null for
+  /// a Planner-form-built request, which has no prior conversation to match.
+  final String? priorConversationContext;
 }

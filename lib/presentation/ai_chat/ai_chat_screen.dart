@@ -595,6 +595,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
           interests: _extractInterests(combinedText),
           latitude: place.latitude,
           longitude: place.longitude,
+          priorConversationContext: assistantMessage.content,
         ),
         coverImageUrl: place.photoNames.isNotEmpty ? _places.photoUrl(place.photoNames.first) : province.heroImageUrl,
       );

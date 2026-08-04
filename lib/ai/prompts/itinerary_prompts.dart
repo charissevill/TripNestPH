@@ -75,8 +75,17 @@ Rules:
     double? provinceBudgetMin,
     double? provinceBudgetMax,
     String? accommodationName,
+    String? priorConversationContext,
   }) {
     return '''
+${priorConversationContext != null && priorConversationContext.isNotEmpty ? '''
+The traveler already discussed this exact trip with our AI Travel Assistant, which replied:
+"""
+$priorConversationContext
+"""
+Build this itinerary to genuinely match that reply — reuse the same specific real places for activities wherever they fit, instead of substituting different ones. Only pick something else for a slot if nothing already mentioned fits the traveler's stated budget/interests, or if the lists below don't include a good match.
+
+''' : ''}
 Plan a trip with these details:
 - Destination: ${request.destinationName}, ${request.provinceName}, Philippines
 - Trip length: ${request.days} day(s)

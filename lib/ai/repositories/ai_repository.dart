@@ -152,6 +152,7 @@ class AiRepository {
       'transportation': request.transportation.toList()..sort(),
       'interests': request.interests.toList()..sort(),
       'accommodationName': request.accommodationName,
+      'priorConversationContext': request.priorConversationContext,
     });
 
     // "Regenerate" on the result screen deliberately skips the cache lookup
@@ -180,6 +181,7 @@ class AiRepository {
               provinceBudgetMin: province?.estimatedDailyBudgetMin,
               provinceBudgetMax: province?.estimatedDailyBudgetMax,
               accommodationName: request.accommodationName,
+              priorConversationContext: request.priorConversationContext,
             ),
           },
         ],

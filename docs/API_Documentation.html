@@ -153,6 +153,32 @@ body rather than URL parameters. Proxied through a Cloud Function for the same k
 }</pre>
 <p><span class="file-ref">functions/index.js</span> — <code>exports.placesSearchText</code></p>
 
+<h3>API 5 – Google Maps SDK (map display)</h3>
+<p><strong>Purpose:</strong> Renders the actual interactive map — pins, zoom, pan — shown on every destination's
+details page (a single-location preview) and on a generated itinerary's day view (multiple stops connected by a
+route line). This is a native rendering SDK rather than a plain JSON REST call the app's own code makes directly,
+tied to the same Google Cloud project/API key as the other Google APIs above.</p>
+<p><span class="file-ref">lib/core/widgets/details/map_preview.dart</span>,
+<span class="file-ref">lib/core/widgets/details/trip_route_map.dart</span></p>
+
+<h3>API 6 – Google Routes API (proxied) ⭐ POST</h3>
+<p><strong>Purpose:</strong> Computes a real, road-following route (not just a straight line) between an
+itinerary's stops, plus per-leg travel time and distance, shown under the map on a generated itinerary's day
+view. Complements API 5 — the SDK draws the map, this API supplies the real route to draw on it.</p>
+<p><strong>HTTP Method:</strong> POST</p>
+<p><strong>Endpoint:</strong><br>
+<code>https://routes.googleapis.com/directions/v2:computeRoutes</code></p>
+<p><strong>Request body sent (shortened):</strong></p>
+<pre>{
+  "origin": { "location": { "latLng": { "latitude": 16.93, "longitude": 121.14 } } },
+  "destination": { "location": { "latLng": { "latitude": 16.85, "longitude": 121.20 } } },
+  "travelMode": "DRIVE",
+  "polylineQuality": "OVERVIEW"
+}</pre>
+<p><strong>Sample JSON response fields used:</strong> <code>routes[0].polyline.encodedPolyline</code>,
+<code>routes[0].legs[].duration</code>, <code>routes[0].legs[].distanceMeters</code></p>
+<p><span class="file-ref">functions/index.js</span> — <code>exports.computeTripRoute</code></p>
+
 <h2>3. HTTP GET Request</h2>
 <p>The application uses HTTP GET requests to retrieve data from the external APIs.</p>
 <p>The process works as follows:</p>
@@ -248,6 +274,7 @@ confirming the data is truly live rather than cached or static.</p>
   <tr><td><code>api.open-meteo.com/v1/forecast</code> (<code>daily=</code>)</td><td>Multi-day forecast for AI-generated itineraries</td><td>GET</td></tr>
   <tr><td><code>.../placesPhoto</code></td><td>Real destination/restaurant photos (Google Places, proxied)</td><td>GET</td></tr>
   <tr><td><code>places.googleapis.com/v1/places:searchText</code></td><td>Live location search (province/place/category), proxied</td><td>POST</td></tr>
+  <tr><td><code>routes.googleapis.com/directions/v2:computeRoutes</code></td><td>Real road-following route + travel time between itinerary stops, proxied</td><td>POST</td></tr>
 </table>
 <p>Using multiple endpoints allows TripNest PH to provide more comprehensive, genuinely live information instead
 of relying on a single external data source or static, hand-entered content.</p>
@@ -288,18 +315,24 @@ a malformed response, instead of silently failing).</p>
 </div>
 
 <div class="screenshot-box">
+  <img src="screenshot_map.png" alt="Map display on a destination's details page">
+  <div class="caption"><strong>Figure 4.</strong> The "Location" map on a destination's details page (API 5 —
+    Google Maps SDK), pinned to the destination's real coordinates.</div>
+</div>
+
+<div class="screenshot-box">
   <img src="screenshot_search_filter.png" alt="Search and filter functionality">
-  <div class="caption"><strong>Figure 4.</strong> API data filtered based on the user's search — searching
+  <div class="caption"><strong>Figure 5.</strong> API data filtered based on the user's search — searching
     "Ifugao" returns a matching Province Guide plus live Places results.</div>
 </div>
 
 <div class="screenshot-box">
   <img src="screenshot_refresh.png" alt="Dynamic refresh button">
-  <div class="caption"><strong>Figure 5.</strong> The Refresh icon (top-right of the weather card) that
+  <div class="caption"><strong>Figure 6.</strong> The Refresh icon (top-right of the weather card) that
     dynamically re-fetches live data without reloading the application.</div>
 </div>
 
-<p><strong>Figure 6 (Error Handling) — not pictured:</strong> reliably forcing a live network failure on the
+<p><strong>Figure 7 (Error Handling) — not pictured:</strong> reliably forcing a live network failure on the
 physical test device also disconnects its wireless debugging session, so this was verified by code review instead
 (see Section 9) rather than a live screenshot.</p>
 

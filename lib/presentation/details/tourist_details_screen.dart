@@ -22,6 +22,7 @@ import '../../core/widgets/states/loading_widget.dart';
 import '../../core/widgets/cards/restaurant_card.dart';
 import '../../core/widgets/cards/tag_chip.dart';
 import '../../core/widgets/carousels/nearby_places_section.dart';
+import '../../core/widgets/details/current_weather_card.dart';
 import '../../core/widgets/details/details_gallery_app_bar.dart';
 import '../../core/widgets/details/info_stat_card.dart';
 import '../../core/widgets/details/map_preview.dart';
@@ -257,6 +258,14 @@ class _TouristDetailsBody extends StatelessWidget {
                     ),
                   ],
                 ),
+                if (destination.hasCoordinates) ...[
+                  const SizedBox(height: AppSpacing.lg),
+                  CurrentWeatherCard(
+                    locationLabel: destination.name,
+                    latitude: destination.latitude!,
+                    longitude: destination.longitude!,
+                  ),
+                ],
                 const SizedBox(height: AppSpacing.xxl),
                 Text('Highlights', style: theme.textTheme.titleLarge),
                 const SizedBox(height: AppSpacing.sm),

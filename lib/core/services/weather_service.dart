@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 
+import '../../domain/models/current_weather.dart';
 import '../../domain/models/itinerary.dart';
 
 /// Fetches a real multi-day forecast from Open-Meteo (free, no API key
@@ -59,6 +60,48 @@ class WeatherService {
     } catch (_) {
       return const [];
     }
+  }
+
+  /// The live "right now" reading for a single point — used by
+  /// [CurrentWeatherCard] on a destination's details page. Unlike
+  /// [getForecast] (best-effort, always succeeds with an empty list),
+  /// this throws on failure so the card can show a real error state with a
+  /// retry action, since surfacing that failure clearly is the point here.
+  Future<CurrentWeather> getCurrentWeather({
+    required double latitude,
+    required double longitude,
+  }) async {
+    final uri = Uri.parse(
+      'https://api.open-meteo.com/v1/forecast'
+      '?latitude=$latitude&longitude=$longitude'
+      '&current=temperature_2m,relative_humidity_2m,weather_code'
+      '&timezone=auto',
+    );
+
+    final response = await _client.get(uri).timeout(const Duration(seconds: 10));
+    if (response.statusCode != 200) {
+      throw Exception('Weather service returned ${response.statusCode}');
+    }
+
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    final current = json['current'] as Map<String, dynamic>?;
+    if (current == null) {
+      throw const FormatException('Unexpected response shape from weather API');
+    }
+
+    final temperature = (current['temperature_2m'] as num?)?.toDouble();
+    final humidity = (current['relative_humidity_2m'] as num?)?.round();
+    final code = (current['weather_code'] as num?)?.toInt();
+    if (temperature == null || humidity == null || code == null) {
+      throw const FormatException('Missing fields in weather API response');
+    }
+
+    return CurrentWeather(
+      temperature: temperature,
+      condition: _conditionFor(code),
+      humidity: humidity,
+      iconKey: _iconKeyFor(code),
+    );
   }
 
   /// WMO weather-interpretation codes, as used by Open-Meteo.

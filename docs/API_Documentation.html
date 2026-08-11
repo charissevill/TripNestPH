@@ -9,29 +9,28 @@
   body {
     font-family: "Segoe UI", Arial, sans-serif;
     color: #1a1a1a;
-    line-height: 1.5;
-    max-width: 800px;
+    line-height: 1.55;
+    max-width: 820px;
     margin: 0 auto;
     padding: 32px 24px;
   }
-  h1 { font-size: 22px; margin-bottom: 2px; }
-  .subtitle { color: #555; font-size: 13px; margin-bottom: 22px; }
+  h1 { font-size: 24px; margin-bottom: 4px; }
+  .meta { font-size: 13px; color: #444; margin-bottom: 26px; line-height: 1.7; }
+  .meta b { color: #111; }
   h2 {
-    font-size: 15px;
-    margin-top: 26px;
-    margin-bottom: 8px;
-    padding-bottom: 4px;
+    font-size: 16px;
+    margin-top: 30px;
+    margin-bottom: 10px;
+    padding-bottom: 5px;
     border-bottom: 2px solid #1f6feb;
     color: #0b3d91;
   }
+  h3 { font-size: 14px; margin-top: 18px; margin-bottom: 4px; color: #0b3d91; }
   p, li { font-size: 13px; }
-  table { border-collapse: collapse; width: 100%; margin: 8px 0 12px; font-size: 13px; }
-  th, td { border: 1px solid #ccc; padding: 6px 10px; text-align: left; vertical-align: top; }
-  th { background: #f2f6ff; width: 190px; }
-  code, pre {
-    font-family: "Consolas", "Courier New", monospace;
-    font-size: 12px;
-  }
+  table { border-collapse: collapse; width: 100%; margin: 8px 0 14px; font-size: 12.5px; }
+  th, td { border: 1px solid #ccc; padding: 6px 9px; text-align: left; vertical-align: top; }
+  th { background: #f2f6ff; }
+  code, pre { font-family: "Consolas", "Courier New", monospace; font-size: 12px; }
   pre {
     background: #0d1117;
     color: #c9d1d9;
@@ -41,15 +40,16 @@
     white-space: pre-wrap;
     word-break: break-word;
   }
-  .badge {
-    display: inline-block;
-    background: #e7f0ff;
-    color: #0b3d91;
-    border-radius: 4px;
-    padding: 1px 7px;
-    font-size: 11px;
+  .flow {
+    background: #f2f6ff;
+    border: 1px solid #cddcf9;
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 13px;
     font-weight: 600;
-    margin-right: 6px;
+    color: #0b3d91;
+    text-align: center;
+    margin: 10px 0;
   }
   .screenshot-box {
     border: 1px solid #ccc;
@@ -58,48 +58,116 @@
     margin: 10px 0 18px;
     text-align: center;
     background: #fafafa;
+    page-break-inside: avoid;
   }
-  .screenshot-box img { max-width: 100%; border-radius: 4px; display: block; margin: 0 auto; }
-  .screenshot-box .caption { font-size: 12px; color: #555; margin-top: 6px; }
+  .screenshot-box img { max-width: 100%; max-height: 480px; border-radius: 4px; display: block; margin: 0 auto; }
+  .screenshot-box .caption { font-size: 12px; color: #555; margin-top: 8px; text-align: left; }
   .file-ref { font-family: "Consolas", monospace; font-size: 12px; background: #f2f2f2; padding: 1px 5px; border-radius: 3px; }
-  .two-col { display: flex; gap: 14px; }
-  .two-col .screenshot-box { flex: 1; }
-  ul { margin-top: 4px; }
-  .footer-note { font-size: 11px; color: #888; margin-top: 30px; border-top: 1px solid #ddd; padding-top: 8px; }
+  .example-card {
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    padding: 12px 16px;
+    background: #fafafa;
+    font-size: 13px;
+    margin: 8px 0 14px;
+  }
+  .checklist li { list-style: none; margin-bottom: 4px; }
+  .checklist { padding-left: 0; }
+  .quote {
+    border-left: 3px solid #1f6feb;
+    padding: 6px 12px;
+    background: #f2f6ff;
+    font-style: italic;
+    margin: 8px 0 14px;
+    font-size: 13px;
+  }
+  .footer-note { font-size: 11px; color: #888; margin-top: 34px; border-top: 1px solid #ddd; padding-top: 8px; }
 </style>
 </head>
 <body>
 
-<h1>API Integration Documentation</h1>
-<div class="subtitle">TripNest PH — Week 5 Submission: API Integration &amp; HTTP Requests</div>
+<h1>WEEK 5 SUBMISSION ACTIVITY</h1>
+<div class="meta">
+  <b>API Integration &amp; HTTP Requests</b><br><br>
+  <b>Project Name:</b> TripNest PH – AI-Powered Local Tourism Discovery Platform<br>
+  <b>Group Name:</b> [Group Name]<br>
+  <b>Members:</b> [Member Names]<br>
+  <b>Date:</b> August 11, 2026
+</div>
 
-<h2>1. Project Overview</h2>
+<h2>1. API Integration Overview</h2>
 <p>
-TripNest PH is a Flutter + Firebase travel discovery and trip-planning app for the Philippines. Travelers browse
-tourist spots, restaurants, and festivals, save favorites, write reviews, and get AI-assisted itineraries. This
-submission adds a <strong>live current-weather feature</strong> to every destination's details page — matching the
-assignment's own "Tourism Website → current weather" example directly.
+TripNest PH integrates external APIs to provide users with real-time and relevant information when discovering
+and planning trips around the Philippines. This submission adds a new <strong>live current-weather feature</strong>
+to every destination's details page, built on top of the app's existing API-driven search and photo infrastructure.
 </p>
+<p>
+The API integration allows the application to retrieve external data, process JSON responses, and display the
+information directly within the application's user interface.
+</p>
+<p><strong>Main API Features:</strong></p>
+<ul>
+  <li>Weather information (current conditions, live)</li>
+  <li>Destination/location information (search results, photos, coordinates)</li>
+  <li>Search and filtering (province, place, and category search)</li>
+  <li>Dynamic data refresh (manual weather refresh, no reload)</li>
+  <li>Error handling (network/timeout/malformed-response recovery)</li>
+</ul>
 
-<h2>2. API Name &amp; Endpoint(s) Used</h2>
-<table>
-  <tr><th>API</th><td><strong>Open-Meteo</strong> — a free, open-source weather API that requires no API key or
-    registration (<a href="https://open-meteo.com">open-meteo.com</a>).</td></tr>
-  <tr><th>Endpoint</th><td><span class="badge">GET</span>
-    <code>https://api.open-meteo.com/v1/forecast?latitude={lat}&amp;longitude={lng}&amp;current=temperature_2m,relative_humidity_2m,weather_code&amp;timezone=auto</code></td></tr>
-  <tr><th>Example call</th><td><code>GET https://api.open-meteo.com/v1/forecast?latitude=13.4125&amp;longitude=122.5589&amp;current=temperature_2m,relative_humidity_2m,weather_code&amp;timezone=auto</code>
-    <br>(coordinates for a sample tourist destination in the Bicol region)</td></tr>
-</table>
+<h2>2. APIs Used</h2>
 
-<h2>3. Sample JSON Response</h2>
+<h3>API 1 – Open-Meteo (Current Weather)</h3>
+<p><strong>Purpose:</strong> Retrieves the live current temperature, weather condition, and humidity for a
+destination, shown directly on that destination's details page. This is the feature built for this submission.</p>
+<p><strong>HTTP Method:</strong> GET</p>
+<p><strong>Endpoint:</strong><br>
+<code>https://api.open-meteo.com/v1/forecast?latitude={lat}&amp;longitude={lng}&amp;current=temperature_2m,relative_humidity_2m,weather_code&amp;timezone=auto</code></p>
+
+<h3>API 2 – Open-Meteo (5-Day Forecast)</h3>
+<p><strong>Purpose:</strong> Retrieves a multi-day weather outlook (per-day high/low and condition) used in
+AI-generated trip itineraries, so a traveler can see expected weather across their whole trip. Same provider as
+API 1, different endpoint parameters and a pre-existing part of TripNest PH.</p>
+<p><strong>HTTP Method:</strong> GET</p>
+<p><strong>Endpoint:</strong><br>
+<code>https://api.open-meteo.com/v1/forecast?latitude={lat}&amp;longitude={lng}&amp;daily=weathercode,temperature_2m_max,temperature_2m_min&amp;timezone=auto&amp;forecast_days={n}</code></p>
+
+<h3>API 3 – Google Places Photo (proxied)</h3>
+<p><strong>Purpose:</strong> Retrieves real photos of destinations, restaurants, and attractions from Google
+Places, displayed throughout the app's cards and details pages. Proxied through a TripNest PH Cloud Function so
+the real Google API key is never exposed to the client.</p>
+<p><strong>HTTP Method:</strong> GET</p>
+<p><strong>Endpoint:</strong><br>
+<code>https://asia-southeast1-tripnest-ph.cloudfunctions.net/placesPhoto?photoName={signedToken}&amp;maxWidthPx={width}</code></p>
+
+<h2>3. HTTP GET Request</h2>
+<p>The application uses HTTP GET requests to retrieve data from the external APIs.</p>
+<p>The process works as follows:</p>
+<div class="flow">User Action &rarr; HTTP GET Request &rarr; API &rarr; JSON Response &rarr; JSON Processing &rarr; UI Display</div>
+<p>
+For example, when a user opens a destination's details page, TripNest PH sends a GET request to the Open-Meteo
+current-weather endpoint using that destination's stored coordinates. The returned JSON data is processed by the
+application and the temperature, condition, and humidity are displayed to the user.
+</p>
+<p>In code, this is a plain <code>http.get()</code> call:</p>
+<pre>final uri = Uri.parse(
+  'https://api.open-meteo.com/v1/forecast'
+  '?latitude=$latitude&amp;longitude=$longitude'
+  '&amp;current=temperature_2m,relative_humidity_2m,weather_code'
+  '&amp;timezone=auto',
+);
+final response = await _client.get(uri).timeout(const Duration(seconds: 10));</pre>
+<p><span class="file-ref">lib/core/services/weather_service.dart</span> — <code>WeatherService.getCurrentWeather()</code></p>
+
+<h2>4. Sample JSON Response</h2>
+<p>The API returns information in JSON format:</p>
 <pre>{
   "latitude": 13.391915,
   "longitude": 122.5777,
-  "generationtime_ms": 0.54,
+  "generationtime_ms": 0.47,
   "utc_offset_seconds": 28800,
   "timezone": "Asia/Manila",
   "timezone_abbreviation": "GMT+8",
-  "elevation": 249.0,
+  "elevation": 249,
   "current_units": {
     "time": "iso8601",
     "interval": "seconds",
@@ -108,106 +176,151 @@ assignment's own "Tourism Website → current weather" example directly.
     "weather_code": "wmo code"
   },
   "current": {
-    "time": "2026-08-11T08:45",
+    "time": "2026-08-11T10:00",
     "interval": 900,
-    "temperature_2m": 27.1,
-    "relative_humidity_2m": 84,
-    "weather_code": 51
+    "temperature_2m": 28,
+    "relative_humidity_2m": 81,
+    "weather_code": 1
   }
 }</pre>
+<p>The application extracts the required fields (<code>temperature_2m</code>, <code>relative_humidity_2m</code>,
+<code>weather_code</code>) from the <code>current</code> object and maps the numeric <code>weather_code</code> to
+a human-readable condition ("Partly Cloudy", "Rainy", etc.) before displaying them in the appropriate UI
+components.</p>
 
-<h2>4. Explanation of Integration</h2>
-<p><strong>Where the code lives:</strong></p>
+<h2>5. API Data Display</h2>
+<p>The retrieved API data is displayed directly inside TripNest PH, on the destination's details page:</p>
+<div class="example-card">
+  <strong>Banaue Rice Terraces</strong><br><br>
+  🌡 Temperature: 24°C<br>
+  ☁ Condition: Partly Cloudy<br>
+  💧 Humidity: 83%
+</div>
+<p>This allows travelers to check whether current conditions are good for visiting a specific destination without
+leaving the app or opening a separate weather service.</p>
+
+<h2>6. Search and Filter Functionality ⭐ BONUS</h2>
+<p>TripNest PH includes search and filtering functionality over API-backed location data. Users can search for a
+specific destination, restaurant, or province, and the app returns live matching results — a mix of TripNest's own
+curated content and real-time Google Places results.</p>
+<p><strong>Example:</strong></p>
+<div class="example-card">
+  Search: <code>Ifugao</code><br><br>
+  Results:<br>
+  • Ifugao — Province Guide<br>
+  • Batad Rice Terraces<br>
+  • Banaue Arch<br>
+  • Ifugao Rice Terraces Monument<br>
+  • Rice Terraces of the Philippines
+</div>
+<p>This makes it easier for users to find relevant information quickly, whether they're looking for a whole
+province, a specific attraction, or a general area.</p>
+
+<h2>7. Dynamic Data Refresh ⭐ BONUS</h2>
+<p>A refresh function was implemented on the current-weather card so users can retrieve updated information
+without restarting or reloading the application.</p>
+<div class="flow">Refresh Button &rarr; New GET Request &rarr; Updated JSON Response &rarr; Updated UI</div>
+<p>Tapping the refresh icon re-runs <code>getCurrentWeather()</code> and updates the card in place via
+<code>setState</code> — no navigation, no full page reload. During testing, a refresh on the same destination
+minutes apart returned a genuinely different live reading (condition changed from "Partly Cloudy" to "Rainy"),
+confirming the data is truly live rather than cached or static.</p>
+
+<h2>8. Multiple API Endpoints ⭐ BONUS</h2>
+<p>Multiple distinct API endpoints were used to provide different types of information:</p>
 <table>
-  <tr><th>HTTP request + JSON parsing</th><td><span class="file-ref">lib/core/services/weather_service.dart</span>
-    &mdash; <code>WeatherService.getCurrentWeather()</code></td></tr>
-  <tr><th>Data model</th><td><span class="file-ref">lib/domain/models/current_weather.dart</span></td></tr>
-  <tr><th>UI widget</th><td><span class="file-ref">lib/core/widgets/details/current_weather_card.dart</span>
-    &mdash; <code>CurrentWeatherCard</code></td></tr>
-  <tr><th>Where it's shown</th><td><span class="file-ref">lib/presentation/details/tourist_details_screen.dart</span>
-    &mdash; near the top of every destination's details page</td></tr>
+  <tr><th>API Endpoint</th><th>Purpose</th><th>Method</th></tr>
+  <tr><td><code>api.open-meteo.com/v1/forecast</code> (<code>current=</code>)</td><td>Live current weather for a destination (this submission)</td><td>GET</td></tr>
+  <tr><td><code>api.open-meteo.com/v1/forecast</code> (<code>daily=</code>)</td><td>Multi-day forecast for AI-generated itineraries</td><td>GET</td></tr>
+  <tr><td><code>.../placesPhoto</code></td><td>Real destination/restaurant photos (Google Places, proxied)</td><td>GET</td></tr>
 </table>
+<p>Using multiple endpoints allows TripNest PH to provide more comprehensive, genuinely live information instead
+of relying on a single external data source or static, hand-entered content.</p>
 
-<p><strong>How it works, step by step:</strong></p>
+<h2>9. Error Handling</h2>
+<p>Basic error handling was implemented to handle possible API and network problems. The application handles:</p>
 <ul>
-  <li><code>CurrentWeatherCard</code> is given a destination's stored latitude/longitude and calls
-    <code>WeatherService.getCurrentWeather(latitude:, longitude:)</code> in <code>initState()</code>.</li>
-  <li>The service builds the request URL, sends an HTTP <strong>GET</strong> request via the <code>http</code>
-    package, and waits up to 10 seconds for a response.</li>
-  <li>The raw response body is parsed from JSON text into a Dart <code>Map</code> with <code>jsonDecode()</code>.
-    The relevant fields (<code>temperature_2m</code>, <code>relative_humidity_2m</code>, <code>weather_code</code>)
-    are extracted and validated.</li>
-  <li>The numeric WMO <code>weather_code</code> is translated into a human-readable condition ("Partly Cloudy",
-    "Rainy", etc.) and a matching icon key, then wrapped in a typed <code>CurrentWeather</code> object.</li>
-  <li>The widget renders the result with a <code>FutureBuilder</code>: a small spinner while loading, the
-    location name / temperature / condition / humidity once loaded, or an inline error message with a
-    <strong>Retry</strong> button if the request fails.</li>
-  <li>A refresh icon lets the traveler re-fetch the latest reading at any time, without navigating away or
-    reloading the page.</li>
+  <li>No internet connection / request timeout (10-second timeout on the HTTP call)</li>
+  <li>API unavailable or returning a non-200 status</li>
+  <li>Invalid/unexpected JSON response shape (missing fields)</li>
+  <li>Empty results</li>
 </ul>
+<p>When an error occurs, the application displays an appropriate inline message instead of crashing:</p>
+<div class="quote">"Couldn't load current weather." — with a Retry button</div>
+<p>Verified by code review in <span class="file-ref">lib/core/widgets/details/current_weather_card.dart</span>
+(the <code>FutureBuilder</code>'s <code>snapshot.hasError</code> branch) and
+<span class="file-ref">lib/core/services/weather_service.dart</span> (explicit exceptions on a non-200 status or
+a malformed response, instead of silently failing).</p>
 
-<p><strong>How it improves the project:</strong> a destination's weather materially affects whether a trip is a
-good idea right now (rain, extreme heat) — showing it directly on the details page, sourced live rather than
-guessed, gives travelers a genuinely useful, real-time signal exactly where they're already deciding whether to
-visit.</p>
-
-<h2>5. Error Handling</h2>
-<ul>
-  <li><strong>Connection issue / timeout:</strong> the request is wrapped in a 10-second timeout; a timeout or
-    network failure is caught by the surrounding <code>FutureBuilder</code>'s error state.</li>
-  <li><strong>Invalid / non-200 response:</strong> any HTTP status other than 200 throws an explicit exception
-    with the status code, instead of silently showing stale or blank data.</li>
-  <li><strong>Unexpected JSON shape:</strong> if the expected <code>current</code> object or its fields are
-    missing, a <code>FormatException</code> is thrown rather than crashing on a null value.</li>
-  <li><strong>User-facing recovery:</strong> every failure path renders the same friendly inline message
-    ("Couldn't load current weather.") with a <strong>Retry</strong> button — no error dialog, no broken screen.</li>
-</ul>
-
-<h2>6. Screenshots</h2>
+<h2>10. Screenshots</h2>
 
 <div class="screenshot-box">
-  <img src="screenshot_weather_loaded.png" alt="Weather data displayed">
-  <div class="caption">Fig. 1 — Live current weather displayed on the "Banaue Rice Terraces" destination's
-    details page: <strong>Location</strong> (Banaue Rice Terraces), <strong>Temperature</strong> (24&deg;C),
-    <strong>Condition</strong> (Partly Cloudy), <strong>Humidity</strong> (83%) — captured live from a physical
-    Android device running the built app, confirming the HTTP GET request, JSON parsing, and UI display all
-    work end-to-end.</div>
+  <img src="screenshot_weather_loaded.png" alt="API request working - weather card loaded">
+  <div class="caption"><strong>Figure 1.</strong> Successful API request — the current-weather card for
+    "Banaue Rice Terraces" loads real data from Open-Meteo on the destination's details page.</div>
 </div>
 
 <div class="screenshot-box">
-  <img src="screenshot_app_running.png" alt="App running on device">
-  <div class="caption">Fig. 2 — The app running live on a physical Android device (Home screen), confirming the
-    build works end-to-end beyond just this one feature.</div>
+  <img src="screenshot_json_response.png" alt="JSON response from the API">
+  <div class="caption"><strong>Figure 2.</strong> JSON data retrieved from the API — the exact endpoint and raw
+    response, viewed directly in the browser.</div>
 </div>
 
-<p><strong>Error state (not pictured):</strong> the error/retry branch was verified by code review rather than
-  a screenshot, since reliably forcing a live network failure on the physical test device also disconnects its
-  wireless debugging session. The relevant code is in
-  <span class="file-ref">lib/core/widgets/details/current_weather_card.dart</span>, lines showing the
-  <code>snapshot.hasError</code> branch of the <code>FutureBuilder</code> (a cloud-off icon, "Couldn't load
-  current weather." message, and a Retry button that calls <code>setState</code> to re-trigger the request).</p>
+<div class="screenshot-box">
+  <img src="screenshot_refresh.png" alt="API data displayed with refresh icon">
+  <div class="caption"><strong>Figure 3.</strong> API data displayed inside TripNest PH, in the context of the
+    full destination page (Highlights, About, etc. below it).</div>
+</div>
 
-<h2>7. Bonus Features Implemented</h2>
-<ul>
-  <li><strong>Dynamic refresh without reloading the page</strong> — the refresh icon on the weather card
-    re-fetches live data in place via <code>setState</code>, with no screen navigation or full page reload.</li>
-  <li><strong>Graceful degradation</strong> — the card only renders when a destination has stored coordinates,
-    and every failure mode has a dedicated, testable UI state (loading / error+retry / loaded).</li>
+<div class="screenshot-box">
+  <img src="screenshot_search_filter.png" alt="Search and filter functionality">
+  <div class="caption"><strong>Figure 4.</strong> API data filtered based on the user's search — searching
+    "Ifugao" returns a matching Province Guide plus live Places results.</div>
+</div>
+
+<div class="screenshot-box">
+  <img src="screenshot_refresh.png" alt="Dynamic refresh button">
+  <div class="caption"><strong>Figure 5.</strong> The Refresh icon (top-right of the weather card) that
+    dynamically re-fetches live data without reloading the application.</div>
+</div>
+
+<p><strong>Figure 6 (Error Handling) — not pictured:</strong> reliably forcing a live network failure on the
+physical test device also disconnects its wireless debugging session, so this was verified by code review instead
+(see Section 9) rather than a live screenshot.</p>
+
+<h2>11. Bonus Features Implemented</h2>
+<ul class="checklist">
+  <li>☑ Multiple API endpoints</li>
+  <li>☑ Search/filter functionality</li>
+  <li>☐ POST request</li>
+  <li>☑ Dynamic data refresh without reloading the application</li>
 </ul>
+<p>These additional features improve the usability and functionality of TripNest PH by allowing users to find
+information more efficiently and retrieve updated data dynamically.</p>
 
-<h2>8. Reflection</h2>
+<h2>12. How the API Improves the Project</h2>
 <p>
-Integrating the Open-Meteo API gave TripNest PH a genuinely live, real-world data source instead of static
-content — travelers now see the actual current conditions at a destination the moment they open its page,
-which is far more useful than a description that never changes. The main challenge was structuring the
-request so a failure never breaks the page: the existing forecast feature in this project silently swallows
-errors (since weather is a "nice to have" there), but for this assignment I wanted the error path to be
-visibly testable, so I had the new <code>getCurrentWeather()</code> method throw real exceptions and built a
-dedicated loading/error/retry UI around it with <code>FutureBuilder</code>. Getting the JSON parsing right also
-took care, since Open-Meteo's WMO weather codes are numeric and needed a small mapping table to turn into
-readable conditions and icons rather than raw numbers. Overall, the integration was straightforward because
-Open-Meteo requires no API key, which meant no extra credential-management work beyond making the HTTP call
-itself.
+The API integration improves TripNest PH by providing users with additional and up-to-date information related
+to their travel destinations. Instead of relying only on information stored in the application's database, the
+system retrieves relevant, live data from external services in real time — starting with current weather, which
+directly affects whether a trip to a destination is a good idea right now. Search and filtering make it easier
+for users to find specific destinations, while the dynamic refresh feature allows users to retrieve updated
+information without restarting the application.
+</p>
+
+<h2>13. Reflection</h2>
+<p>
+The API integration improved the functionality of TripNest PH by allowing the application to retrieve useful
+external information and display it directly to travelers, right where they're already deciding whether to visit
+a place. Implementing multiple API endpoints, search and filtering, and dynamic data refreshing made the
+application more interactive and useful. One challenge encountered during implementation was structuring the
+request so a failure never breaks the page — the app's existing weather feature quietly swallows errors since
+weather there is a "nice to have," but for this assignment I wanted the error path to be genuinely testable, so
+the new current-weather method throws real exceptions and a dedicated loading/error/retry UI was built around it.
+Another challenge was mapping Open-Meteo's numeric WMO weather codes into readable conditions and icons rather
+than showing raw numbers to the user. A more practical challenge was environment-related rather than code-related:
+getting a clean physical-device build required clearing a nearly-full disk and a corrupted Gradle cache before the
+app would install at all. Overall, the integration was straightforward once those environment issues were
+resolved, since Open-Meteo requires no API key and needed no extra credential-management work.
 </p>
 
 <div class="footer-note">TripNest PH — Week 5 API Integration Submission</div>

@@ -30,7 +30,6 @@ class CurrentWeatherCard extends StatefulWidget {
 }
 
 class _CurrentWeatherCardState extends State<CurrentWeatherCard> {
-  final WeatherService _weatherService = WeatherService();
   late Future<CurrentWeather> _future;
 
   @override
@@ -39,20 +38,24 @@ class _CurrentWeatherCardState extends State<CurrentWeatherCard> {
     _future = _load();
   }
 
-  Future<CurrentWeather> _load() {
-    return _weatherService.getCurrentWeather(
-      latitude: widget.latitude,
-      longitude: widget.longitude,
-    );
+  /// A fresh [WeatherService] (and so a fresh `http.Client()`) per request,
+  /// disposed right after — this card makes at most one request at a time,
+  /// so there's no throughput cost to skipping connection reuse, and it
+  /// means Retry can never keep hitting the same broken/stale connection a
+  /// prior request left behind (e.g. after the network drops mid-request).
+  Future<CurrentWeather> _load() async {
+    final service = WeatherService();
+    try {
+      return await service.getCurrentWeather(
+        latitude: widget.latitude,
+        longitude: widget.longitude,
+      );
+    } finally {
+      service.dispose();
+    }
   }
 
   void _retry() => setState(() => _future = _load());
-
-  @override
-  void dispose() {
-    _weatherService.dispose();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {

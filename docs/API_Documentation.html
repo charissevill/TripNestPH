@@ -289,10 +289,11 @@ of relying on a single external data source or static, hand-entered content.</p>
 </ul>
 <p>When an error occurs, the application displays an appropriate inline message instead of crashing:</p>
 <div class="quote">"Couldn't load current weather." — with a Retry button</div>
-<p>Verified by code review in <span class="file-ref">lib/core/widgets/details/current_weather_card.dart</span>
-(the <code>FutureBuilder</code>'s <code>snapshot.hasError</code> branch) and
-<span class="file-ref">lib/core/services/weather_service.dart</span> (explicit exceptions on a non-200 status or
-a malformed response, instead of silently failing).</p>
+<p>Verified live on a physical device by disabling its Wi-Fi and mobile data, then opening a destination's
+details page (see Figure 7, Section 10) — implemented in
+<span class="file-ref">lib/core/widgets/details/current_weather_card.dart</span> (the <code>FutureBuilder</code>'s
+<code>snapshot.hasError</code> branch) and <span class="file-ref">lib/core/services/weather_service.dart</span>
+(explicit exceptions on a non-200 status or a malformed response, instead of silently failing).</p>
 
 <h2>10. Screenshots</h2>
 
@@ -332,9 +333,12 @@ a malformed response, instead of silently failing).</p>
     dynamically re-fetches live data without reloading the application.</div>
 </div>
 
-<p><strong>Figure 7 (Error Handling) — not pictured:</strong> reliably forcing a live network failure on the
-physical test device also disconnects its wireless debugging session, so this was verified by code review instead
-(see Section 9) rather than a live screenshot.</p>
+<div class="screenshot-box">
+  <img src="screenshot_error.png" alt="Error state when the weather request fails">
+  <div class="caption"><strong>Figure 7.</strong> Error handling — with the device's network disabled, the
+    weather card shows "Couldn't load current weather." with a cloud-off icon and a Retry action instead of
+    crashing or showing a blank state.</div>
+</div>
 
 <h2>11. Bonus Features Implemented</h2>
 <ul class="checklist">

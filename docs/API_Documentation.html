@@ -139,6 +139,20 @@ the real Google API key is never exposed to the client.</p>
 <p><strong>Endpoint:</strong><br>
 <code>https://asia-southeast1-tripnest-ph.cloudfunctions.net/placesPhoto?photoName={signedToken}&amp;maxWidthPx={width}</code></p>
 
+<h3>API 4 – Google Places Text Search (proxied) ⭐ POST</h3>
+<p><strong>Purpose:</strong> Powers the app's live location search (Section 6) — resolving a free-text query like
+"Ifugao" or "beaches in Palawan" into real places, since Places API (New) requires the query as a JSON request
+body rather than URL parameters. Proxied through a Cloud Function for the same key-security reason as API 3.</p>
+<p><strong>HTTP Method:</strong> POST</p>
+<p><strong>Endpoint:</strong><br>
+<code>https://places.googleapis.com/v1/places:searchText</code></p>
+<p><strong>Request body sent:</strong></p>
+<pre>{
+  "textQuery": "Ifugao",
+  "maxResultCount": 20
+}</pre>
+<p><span class="file-ref">functions/index.js</span> — <code>exports.placesSearchText</code></p>
+
 <h2>3. HTTP GET Request</h2>
 <p>The application uses HTTP GET requests to retrieve data from the external APIs.</p>
 <p>The process works as follows:</p>
@@ -202,7 +216,8 @@ leaving the app or opening a separate weather service.</p>
 <h2>6. Search and Filter Functionality ⭐ BONUS</h2>
 <p>TripNest PH includes search and filtering functionality over API-backed location data. Users can search for a
 specific destination, restaurant, or province, and the app returns live matching results — a mix of TripNest's own
-curated content and real-time Google Places results.</p>
+curated content and real-time Google Places results, fetched via the POST-based Places Text Search endpoint
+(API 4, Section 2).</p>
 <p><strong>Example:</strong></p>
 <div class="example-card">
   Search: <code>Ifugao</code><br><br>
@@ -232,6 +247,7 @@ confirming the data is truly live rather than cached or static.</p>
   <tr><td><code>api.open-meteo.com/v1/forecast</code> (<code>current=</code>)</td><td>Live current weather for a destination (this submission)</td><td>GET</td></tr>
   <tr><td><code>api.open-meteo.com/v1/forecast</code> (<code>daily=</code>)</td><td>Multi-day forecast for AI-generated itineraries</td><td>GET</td></tr>
   <tr><td><code>.../placesPhoto</code></td><td>Real destination/restaurant photos (Google Places, proxied)</td><td>GET</td></tr>
+  <tr><td><code>places.googleapis.com/v1/places:searchText</code></td><td>Live location search (province/place/category), proxied</td><td>POST</td></tr>
 </table>
 <p>Using multiple endpoints allows TripNest PH to provide more comprehensive, genuinely live information instead
 of relying on a single external data source or static, hand-entered content.</p>
@@ -291,7 +307,7 @@ physical test device also disconnects its wireless debugging session, so this wa
 <ul class="checklist">
   <li>☑ Multiple API endpoints</li>
   <li>☑ Search/filter functionality</li>
-  <li>☐ POST request</li>
+  <li>☑ POST request (Google Places Text Search — see API 4, Section 2)</li>
   <li>☑ Dynamic data refresh without reloading the application</li>
 </ul>
 <p>These additional features improve the usability and functionality of TripNest PH by allowing users to find

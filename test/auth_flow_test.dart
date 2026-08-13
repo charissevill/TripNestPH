@@ -71,8 +71,11 @@ void main() {
       expect(find.text('Welcome back'), findsOneWidget);
       expect(find.text('Sign In'), findsWidgets);
 
-      // Move to Register.
-      await tester.tap(find.text('Sign Up'));
+      // Move to Register. StrokedText layers a stroke-only copy behind the
+      // filled one for legibility over the auth background image, so two
+      // "Sign Up" Text widgets exist at the exact same spot — .first taps
+      // either, both resolve to the same on-screen location.
+      await tester.tap(find.text('Sign Up').first);
       await _settle(tester);
       expect(find.text('Create your account'), findsOneWidget);
 

@@ -10,6 +10,7 @@ import '../../core/theme/app_spacing.dart';
 import '../../core/utils/validators.dart';
 import '../../core/widgets/buttons/animated_button.dart';
 import '../../core/widgets/layout/max_width_container.dart';
+import '../../core/widgets/text/stroked_text.dart';
 import 'widgets/auth_header.dart';
 import 'widgets/auth_text_field.dart';
 
@@ -43,7 +44,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     final auth = context.read<AuthProvider>();
-    final name = '${_firstNameController.text.trim()} ${_lastNameController.text.trim()}'.trim();
+    final name =
+        '${_firstNameController.text.trim()} ${_lastNameController.text.trim()}'
+            .trim();
     final ok = await auth.register(
       name: name,
       email: _emailController.text,
@@ -58,97 +61,151 @@ class _RegisterScreenState extends State<RegisterScreen> {
     final auth = context.watch<AuthProvider>();
 
     return Scaffold(
-      appBar: AppBar(leading: IconButton(icon: const Icon(Symbols.arrow_back_rounded), onPressed: () => context.pop())),
-      body: SafeArea(
-        top: false,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(AppSpacing.lg, 0, AppSpacing.lg, AppSpacing.xl),
-          child: MaxWidthContainer(
-            maxWidth: 480,
-            child: Form(
-              key: _formKey,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                const AuthHeader(title: 'Create your account', subtitle: 'Start planning unforgettable Philippine trips.'),
-                const SizedBox(height: AppSpacing.xxxl),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: AuthTextField(
-                          label: 'First Name',
-                          controller: _firstNameController,
-                          icon: Symbols.person_rounded,
-                          textInputAction: TextInputAction.next,
-                          autofillHints: const [AutofillHints.givenName],
-                          validator: Validators.name,
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          Image.asset('assets/images/bg.png', fit: BoxFit.cover),
+          SafeArea(
+            child: Column(
+              children: [
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: IconButton(
+                    icon: const Icon(Symbols.arrow_back_rounded),
+                    onPressed: () => context.pop(),
+                  ),
+                ),
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(
+                      AppSpacing.lg,
+                      0,
+                      AppSpacing.lg,
+                      AppSpacing.xl,
+                    ),
+                    child: MaxWidthContainer(
+                      maxWidth: 480,
+                      child: Form(
+                        key: _formKey,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const AuthHeader(
+                              title: 'Create your account',
+                              subtitle:
+                                  'Start planning unforgettable Philippine trips.',
+                            ),
+                            const SizedBox(height: AppSpacing.xxxl),
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(
+                                  child: AuthTextField(
+                                    label: 'First Name',
+                                    controller: _firstNameController,
+                                    icon: Symbols.person_rounded,
+                                    textInputAction: TextInputAction.next,
+                                    autofillHints: const [
+                                      AutofillHints.givenName,
+                                    ],
+                                    validator: Validators.name,
+                                  ),
+                                ),
+                                const SizedBox(width: AppSpacing.md),
+                                Expanded(
+                                  child: AuthTextField(
+                                    label: 'Last Name',
+                                    controller: _lastNameController,
+                                    icon: Symbols.person_rounded,
+                                    textInputAction: TextInputAction.next,
+                                    autofillHints: const [
+                                      AutofillHints.familyName,
+                                    ],
+                                    validator: Validators.name,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: AppSpacing.lg),
+                            AuthTextField(
+                              label: 'Email',
+                              controller: _emailController,
+                              icon: Symbols.mail_rounded,
+                              keyboardType: TextInputType.emailAddress,
+                              textInputAction: TextInputAction.next,
+                              autofillHints: const [AutofillHints.email],
+                              validator: Validators.email,
+                            ),
+                            const SizedBox(height: AppSpacing.lg),
+                            AuthTextField(
+                              label: 'Password',
+                              controller: _passwordController,
+                              icon: Symbols.lock_rounded,
+                              obscureText: true,
+                              textInputAction: TextInputAction.next,
+                              validator: Validators.password,
+                            ),
+                            const SizedBox(height: AppSpacing.lg),
+                            AuthTextField(
+                              label: 'Confirm Password',
+                              controller: _confirmPasswordController,
+                              icon: Symbols.lock_rounded,
+                              obscureText: true,
+                              textInputAction: TextInputAction.done,
+                              validator: (v) => Validators.confirmPassword(
+                                v,
+                                _passwordController.text,
+                              ),
+                              onFieldSubmitted: (_) => _submit(),
+                            ),
+                            if (auth.errorMessage != null) ...[
+                              const SizedBox(height: AppSpacing.sm),
+                              Text(
+                                auth.errorMessage!,
+                                style: const TextStyle(color: AppColors.error),
+                              ),
+                            ],
+                            const SizedBox(height: AppSpacing.xl),
+                            AnimatedButton(
+                              label: 'Create Account',
+                              isLoading: auth.isBusy,
+                              onPressed: auth.isBusy ? null : _submit,
+                            ),
+                            const SizedBox(height: AppSpacing.xxl),
+                            Center(
+                              child: Wrap(
+                                alignment: WrapAlignment.center,
+                                crossAxisAlignment: WrapCrossAlignment.center,
+                                children: [
+                                  StrokedText(
+                                    'Already have an account?',
+                                    style: theme.textTheme.bodyMedium!.copyWith(
+                                      color: Colors.white,
+                                    ),
+                                    strokeColor: AppColors.primaryDark,
+                                  ),
+                                  TextButton(
+                                    onPressed: () => context.pop(),
+                                    child: StrokedText(
+                                      'Sign In',
+                                      style: theme.textTheme.labelLarge!
+                                          .copyWith(color: Colors.white),
+                                      strokeColor: AppColors.primaryDark,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                      const SizedBox(width: AppSpacing.md),
-                      Expanded(
-                        child: AuthTextField(
-                          label: 'Last Name',
-                          controller: _lastNameController,
-                          icon: Symbols.person_rounded,
-                          textInputAction: TextInputAction.next,
-                          autofillHints: const [AutofillHints.familyName],
-                          validator: Validators.name,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: AppSpacing.lg),
-                  AuthTextField(
-                    label: 'Email',
-                    controller: _emailController,
-                    icon: Symbols.mail_rounded,
-                    keyboardType: TextInputType.emailAddress,
-                    textInputAction: TextInputAction.next,
-                    autofillHints: const [AutofillHints.email],
-                    validator: Validators.email,
-                  ),
-                  const SizedBox(height: AppSpacing.lg),
-                  AuthTextField(
-                    label: 'Password',
-                    controller: _passwordController,
-                    icon: Symbols.lock_rounded,
-                    obscureText: true,
-                    textInputAction: TextInputAction.next,
-                    validator: Validators.password,
-                  ),
-                  const SizedBox(height: AppSpacing.lg),
-                  AuthTextField(
-                    label: 'Confirm Password',
-                    controller: _confirmPasswordController,
-                    icon: Symbols.lock_rounded,
-                    obscureText: true,
-                    textInputAction: TextInputAction.done,
-                    validator: (v) => Validators.confirmPassword(v, _passwordController.text),
-                    onFieldSubmitted: (_) => _submit(),
-                  ),
-                  if (auth.errorMessage != null) ...[
-                    const SizedBox(height: AppSpacing.sm),
-                    Text(auth.errorMessage!, style: const TextStyle(color: AppColors.error)),
-                  ],
-                  const SizedBox(height: AppSpacing.xl),
-                  AnimatedButton(label: 'Create Account', isLoading: auth.isBusy, onPressed: auth.isBusy ? null : _submit),
-                  const SizedBox(height: AppSpacing.xxl),
-                  Center(
-                    child: Wrap(
-                      alignment: WrapAlignment.center,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [
-                        Text('Already have an account?', style: theme.textTheme.bodyMedium),
-                        TextButton(onPressed: () => context.pop(), child: const Text('Sign In')),
-                      ],
                     ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
-        ),
+        ],
       ),
     );
   }

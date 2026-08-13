@@ -37,7 +37,6 @@ import '../../core/widgets/cards/travel_image_frame.dart';
 import '../../core/widgets/details/trip_route_map.dart';
 import '../../core/widgets/indicators/rating_widget.dart';
 import '../../core/widgets/layout/section_header.dart';
-import '../../data/mock/mock_itinerary.dart';
 import '../../data/repositories/expense_repository.dart';
 import '../../data/repositories/itinerary_repository.dart';
 import '../../data/repositories/province_repository.dart';
@@ -50,14 +49,14 @@ import '../../domain/models/saved_itinerary.dart';
 
 /// The trip-planner result: a day-by-day timeline, budget breakdown, weather
 /// outlook, recommendations and travel tips. Can either show a freshly
-/// generated [mockItinerary] (real AI generation arrives in Phase 3) or a
-/// previously [SavedItinerary] opened from "Saved Trips".
+/// AI-generated [Itinerary] or a previously [SavedItinerary] opened from
+/// "Saved Trips".
 class GeneratedItineraryScreen extends StatefulWidget {
-  GeneratedItineraryScreen({
+  const GeneratedItineraryScreen({
     super.key,
-    Itinerary? itinerary,
+    required this.itinerary,
     this.savedItineraryId,
-  }) : itinerary = itinerary ?? mockItinerary;
+  });
 
   final Itinerary itinerary;
 
@@ -364,7 +363,9 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
     final today = DateTime.now();
     final todayDate = DateTime(today.year, today.month, today.day);
     final tripDate = DateTime(startDate.year, startDate.month, startDate.day);
-    final daysUntilTrip = tripDate.isBefore(todayDate) ? 0 : tripDate.difference(todayDate).inDays;
+    final daysUntilTrip = tripDate.isBefore(todayDate)
+        ? 0
+        : tripDate.difference(todayDate).inDays;
     final forecastWindow = daysUntilTrip + widget.itinerary.totalDays;
 
     if (forecastWindow > 16) {
@@ -377,7 +378,9 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
       longitude: longitude,
       days: forecastWindow,
     );
-    final forTrip = forecast.length > daysUntilTrip ? forecast.sublist(daysUntilTrip) : const <WeatherForecast>[];
+    final forTrip = forecast.length > daysUntilTrip
+        ? forecast.sublist(daysUntilTrip)
+        : const <WeatherForecast>[];
     if (mounted) setState(() => _weatherOverride = forTrip);
   }
 
@@ -396,24 +399,34 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
   Future<void> _regenerate() async {
     setState(() => _regenerating = true);
     try {
-      final places = await _places.searchText(textQuery: '${widget.itinerary.destinationName}, Philippines');
+      final places = await _places.searchText(
+        textQuery: '${widget.itinerary.destinationName}, Philippines',
+      );
       final place = places.isNotEmpty ? places.first : null;
       if (place == null) {
-        _showRegenerateError('Couldn\'t find that destination again — try Regenerate once more, or start a new trip from the Planner.');
+        _showRegenerateError(
+          'Couldn\'t find that destination again — try Regenerate once more, or start a new trip from the Planner.',
+        );
         return;
       }
 
       final provinces = await ProvinceRepository().getAll();
       final province = matchProvinceByAddress(place.address, provinces);
       if (province == null) {
-        _showRegenerateError('Couldn\'t match "${place.name}" to a province — try again shortly.');
+        _showRegenerateError(
+          'Couldn\'t match "${place.name}" to a province — try again shortly.',
+        );
         return;
       }
 
       if (!mounted) return;
       final travelers = widget.itinerary.travelers;
-      final travelerType = travelers <= 1 ? 'Solo' : (travelers == 2 ? 'Couple' : 'Friends');
-      final (budgetTierLabel, budgetRange) = _inferBudgetTier(widget.itinerary.totalBudget);
+      final travelerType = travelers <= 1
+          ? 'Solo'
+          : (travelers == 2 ? 'Couple' : 'Friends');
+      final (budgetTierLabel, budgetRange) = _inferBudgetTier(
+        widget.itinerary.totalBudget,
+      );
 
       final planner = context.read<AiPlannerProvider>();
       final itinerary = await planner.generate(
@@ -431,11 +444,15 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
           interests: const {'Beaches', 'Food'},
           latitude: place.latitude,
           longitude: place.longitude,
-          accommodationName: widget.itinerary.accommodationName.isNotEmpty ? widget.itinerary.accommodationName : null,
+          accommodationName: widget.itinerary.accommodationName.isNotEmpty
+              ? widget.itinerary.accommodationName
+              : null,
         ),
         coverImageUrl: widget.itinerary.coverImageUrl.isNotEmpty
             ? widget.itinerary.coverImageUrl
-            : (place.photoNames.isNotEmpty ? _places.photoUrl(place.photoNames.first) : province.heroImageUrl),
+            : (place.photoNames.isNotEmpty
+                  ? _places.photoUrl(place.photoNames.first)
+                  : province.heroImageUrl),
         // Skips the cached-response short-circuit — otherwise an identical
         // reconstructed request would just hand back this same itinerary,
         // defeating the point of "Regenerate".
@@ -444,12 +461,20 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
 
       if (!mounted) return;
       if (itinerary != null) {
-        context.pushReplacement(RoutePaths.generatedItinerary, extra: {'itinerary': itinerary});
+        context.pushReplacement(
+          RoutePaths.generatedItinerary,
+          extra: {'itinerary': itinerary},
+        );
       } else {
-        _showRegenerateError(planner.errorMessage ?? 'Couldn\'t regenerate your itinerary. Please try again.');
+        _showRegenerateError(
+          planner.errorMessage ??
+              'Couldn\'t regenerate your itinerary. Please try again.',
+        );
       }
     } catch (_) {
-      _showRegenerateError('Something went wrong regenerating that itinerary. Please try again.');
+      _showRegenerateError(
+        'Something went wrong regenerating that itinerary. Please try again.',
+      );
     } finally {
       if (mounted) setState(() => _regenerating = false);
     }
@@ -669,7 +694,11 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
             ),
             FilledButton(
               onPressed: () {
-                final amountError = Validators.amount(amountController.text, required: true, maxAmount: 500000);
+                final amountError = Validators.amount(
+                  amountController.text,
+                  required: true,
+                  maxAmount: 500000,
+                );
                 if (amountError != null) {
                   setDialogState(() => errorText = amountError);
                   return;
@@ -1345,7 +1374,9 @@ class _ActionButtonGrid extends StatelessWidget {
           children: [
             for (var j = 0; j < perRow; j++) ...[
               if (j > 0) const SizedBox(width: AppSpacing.sm),
-              Expanded(child: j < rowButtons.length ? rowButtons[j] : const SizedBox()),
+              Expanded(
+                child: j < rowButtons.length ? rowButtons[j] : const SizedBox(),
+              ),
             ],
           ],
         ),

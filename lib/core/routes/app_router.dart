@@ -175,7 +175,10 @@ GoRouter buildAppRouter(AuthProvider authProvider) {
         builder: (context, state) {
           final extra = state.extra as Map<String, dynamic>?;
           return GeneratedItineraryScreen(
-            itinerary: extra?['itinerary'] as Itinerary?,
+            // Every navigation to this route must pass a real itinerary —
+            // throwing here on a missing one surfaces a caller bug loudly
+            // instead of silently substituting sample trip data.
+            itinerary: extra?['itinerary'] as Itinerary,
             savedItineraryId: extra?['savedId'] as String?,
           );
         },

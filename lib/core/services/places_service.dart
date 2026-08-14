@@ -47,6 +47,15 @@ class PlacesService {
 
   static const String _photoBaseUrl = 'https://asia-southeast1-tripnest-ph.cloudfunctions.net/placesPhoto';
 
+  /// Rounds a coordinate to ~111m of precision for cache-key purposes only
+  /// (never for the actual API call, which keeps full GPS precision).
+  /// `Geolocator.getCurrentPosition` returns a slightly different reading
+  /// almost every call, so keying the 24h cache off raw full-precision
+  /// lat/lng meant a stationary traveler refreshing seconds apart almost
+  /// never hit the cache at all — this coarsens the key well under a 5km+
+  /// search radius, where that much drift can't meaningfully change results.
+  static double _roundForCacheKey(double coordinate) => (coordinate * 1000).round() / 1000;
+
   /// Live nearby businesses around a known point (a destination's stored
   /// coordinates, for example) — use [searchText] instead when there's no
   /// single coordinate to search around (e.g. a whole province).
@@ -56,9 +65,12 @@ class PlacesService {
     required List<String> includedTypes,
     double radiusMeters = 5000,
     int maxResultCount = 20,
+    // See searchText's doc for what this changes.
+    bool rethrowOnError = false,
   }) async {
     final sortedTypes = [...includedTypes]..sort();
-    final signature = 'nearby|$latitude|$longitude|${sortedTypes.join(',')}|$radiusMeters';
+    final signature =
+        'nearby|${_roundForCacheKey(latitude)}|${_roundForCacheKey(longitude)}|${sortedTypes.join(',')}|$radiusMeters';
 
     final cached = await _cache.get(signature);
     if (cached != null) return cached;
@@ -77,6 +89,7 @@ class PlacesService {
       await _cache.set(signature, places);
       return places;
     } catch (_) {
+      if (rethrowOnError) rethrow;
       return const [];
     }
   }
@@ -93,8 +106,16 @@ class PlacesService {
     double? biasLatitude,
     double? biasLongitude,
     double biasRadiusMeters = 15000,
+    // Every failure (network, rate limit, quota) is otherwise swallowed
+    // into an empty list — fine for a purely supplementary caller, but a
+    // screen with its own error+Retry UI (Explore's Destinations tab,
+    // NearbyPlacesScreen) needs to actually see a real outage instead of it
+    // rendering identically to "zero results" with no way to retry.
+    bool rethrowOnError = false,
   }) async {
-    final signature = 'text|$textQuery|$maxResultCount|$biasLatitude|$biasLongitude';
+    final roundedBiasLat = biasLatitude == null ? null : _roundForCacheKey(biasLatitude);
+    final roundedBiasLng = biasLongitude == null ? null : _roundForCacheKey(biasLongitude);
+    final signature = 'text|$textQuery|$maxResultCount|$roundedBiasLat|$roundedBiasLng';
 
     final cached = await _cache.get(signature);
     if (cached != null) return cached;
@@ -114,6 +135,7 @@ class PlacesService {
       await _cache.set(signature, places);
       return places;
     } catch (_) {
+      if (rethrowOnError) rethrow;
       return const [];
     }
   }

@@ -123,6 +123,11 @@ class _ExploreScreenState extends State<ExploreScreen> {
   List<Place>? _destinationPlaces;
   bool _loadingDestinations = false;
   Object? _destinationsError;
+  // Bumped by every reset load; a completing request only ever applies its
+  // result if it's still the latest one — otherwise a slow request from
+  // before a filter/category change would land after, and silently
+  // overwrite, the fresher one that superseded it.
+  int _destinationsRequestId = 0;
 
   List<Restaurant>? _restaurants;
   DocumentSnapshot<Map<String, dynamic>>? _restaurantsCursor;
@@ -130,12 +135,14 @@ class _ExploreScreenState extends State<ExploreScreen> {
   bool _loadingRestaurants = false;
   Object? _restaurantsError;
   List<Place> _liveRestaurantPlaces = [];
+  int _restaurantsRequestId = 0;
 
   List<Festival>? _festivals;
   DocumentSnapshot<Map<String, dynamic>>? _festivalsCursor;
   bool _festivalsHasMore = true;
   bool _loadingFestivals = false;
   Object? _festivalsError;
+  int _festivalsRequestId = 0;
 
   List<Object>? get _restaurantItems =>
       _restaurants == null ? null : [..._liveRestaurantPlaces, ..._restaurants!];
@@ -254,7 +261,18 @@ class _ExploreScreenState extends State<ExploreScreen> {
       _festivalsCursor = null;
       _festivalsHasMore = true;
     });
-    _ensureLoaded(_tab);
+    // Forces a fresh load for the active tab regardless of whether a
+    // previous request is still in flight — _ensureLoaded's "only if not
+    // already loaded" guard is for lazy tab-switching, not for this
+    // "the filters just changed, the old request is now wrong" case.
+    switch (_tab) {
+      case _ExploreTab.destinations:
+        _loadDestinations(reset: true);
+      case _ExploreTab.restaurants:
+        _loadRestaurants(reset: true);
+      case _ExploreTab.festivals:
+        _loadFestivals(reset: true);
+    }
   }
 
   @override
@@ -298,7 +316,12 @@ class _ExploreScreenState extends State<ExploreScreen> {
   /// load, so this never re-fires on its own once loaded (there's no "Load
   /// More" for this tab).
   Future<void> _loadDestinations({bool reset = false}) async {
-    if (_loadingDestinations) return;
+    // A reset always proceeds even if a previous load is still in flight —
+    // otherwise a filter/category change applied mid-load would be silently
+    // dropped by this guard, and the stale in-flight request's result would
+    // land moments later with nothing to correct it.
+    if (_loadingDestinations && !reset) return;
+    final requestId = ++_destinationsRequestId;
     setState(() {
       _loadingDestinations = true;
       _destinationsError = null;
@@ -308,6 +331,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
       final places = await _places.searchText(
         textQuery: _destinationsTextQuery(),
         maxResultCount: 20,
+        rethrowOnError: true,
       );
       final filtered = _provinceName == null
           ? places
@@ -315,13 +339,13 @@ class _ExploreScreenState extends State<ExploreScreen> {
               .where((p) => p.address.toLowerCase().contains(_provinceName!.toLowerCase()))
               .toList();
 
-      if (!mounted) return;
+      if (!mounted || requestId != _destinationsRequestId) return;
       setState(() {
         _destinationPlaces = filtered;
         _loadingDestinations = false;
       });
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted || requestId != _destinationsRequestId) return;
       setState(() {
         _destinationsError = e;
         _loadingDestinations = false;
@@ -330,7 +354,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
   }
 
   Future<void> _loadRestaurants({bool reset = false}) async {
-    if (_loadingRestaurants) return;
+    if (_loadingRestaurants && !reset) return;
+    final requestId = ++_restaurantsRequestId;
     final needsLiveFetch = reset || _restaurants == null;
     setState(() {
       _loadingRestaurants = true;
@@ -370,15 +395,18 @@ class _ExploreScreenState extends State<ExploreScreen> {
 
       var livePlaces = await livePlacesFuture;
       final List<Restaurant> allRestaurants = [...(_restaurants ?? []), ...page];
-      if (needsLiveFetch) {
-        livePlaces = _filterLivePlaces(
-          livePlaces,
-          areaName: _provinceName,
-          curatedNamesLower: allRestaurants.map((r) => r.name.toLowerCase()).toSet(),
-        );
-      }
+      // Re-run every time, not just on a fresh fetch: a "Load More" tap
+      // pages in more curated restaurants, and a live Places result shown
+      // earlier can duplicate one of those — re-filtering against the now-
+      // fuller curated set (idempotent for names already excluded) catches
+      // it instead of only ever checking against the first page.
+      livePlaces = _filterLivePlaces(
+        livePlaces,
+        areaName: _provinceName,
+        curatedNamesLower: allRestaurants.map((r) => r.name.toLowerCase()).toSet(),
+      );
 
-      if (!mounted) return;
+      if (!mounted || requestId != _restaurantsRequestId) return;
       setState(() {
         _restaurants = allRestaurants;
         _restaurantsCursor = cursor;
@@ -387,7 +415,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
         _loadingRestaurants = false;
       });
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted || requestId != _restaurantsRequestId) return;
       setState(() {
         _restaurantsError = e;
         _loadingRestaurants = false;
@@ -396,7 +424,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
   }
 
   Future<void> _loadFestivals({bool reset = false}) async {
-    if (_loadingFestivals) return;
+    if (_loadingFestivals && !reset) return;
+    final requestId = ++_festivalsRequestId;
     setState(() {
       _loadingFestivals = true;
       _festivalsError = null;
@@ -427,7 +456,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
         cursor = result.lastDoc;
         hasMore = result.items.length == _pageSize;
       }
-      if (!mounted) return;
+      if (!mounted || requestId != _festivalsRequestId) return;
       setState(() {
         _festivals = [...(_festivals ?? []), ...page];
         _festivalsCursor = cursor;
@@ -435,7 +464,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
         _loadingFestivals = false;
       });
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted || requestId != _festivalsRequestId) return;
       setState(() {
         _festivalsError = e;
         _loadingFestivals = false;
@@ -545,6 +574,20 @@ class _ExploreScreenState extends State<ExploreScreen> {
                       category: category,
                       isSelected: _selectedCategory == category.id,
                       onTap: () {
+                        // Food/Festivals have no Places search phrase (see
+                        // _placesCategoryPhrase) — they're not Destinations
+                        // filters at all, they're a shortcut to the other
+                        // two tabs, exactly like _applyInitialCategory
+                        // already treats them coming in from a deep link.
+                        // Filtering by them here used to silently no-op.
+                        if (category.id == 'food' || category.id == 'festivals') {
+                          setState(() {
+                            _tab = category.id == 'food' ? _ExploreTab.restaurants : _ExploreTab.festivals;
+                            _selectedCategory = null;
+                          });
+                          _ensureLoaded(_tab);
+                          return;
+                        }
                         setState(
                           () => _selectedCategory =
                               _selectedCategory == category.id

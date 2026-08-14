@@ -142,9 +142,19 @@ class _SearchScreenState extends State<SearchScreen> {
   final SearchHistoryService _searchHistory = SearchHistoryService();
 
   Timer? _debounce;
+  // A longer, separate debounce for recording Recent/Trending searches —
+  // decoupled from the search debounce so pausing mid-typing doesn't record
+  // an incomplete prefix as its own history/trend entry (see _recordSearch).
+  Timer? _recordDebounce;
   String _query = '';
   List<_SearchResult> _results = [];
   bool _loading = false;
+  // Shared by _runSearch and _runFilterOnly, both of which can be triggered
+  // independently (typing vs. applying a filter) and race against each
+  // other over the network — only the result of whichever call is still
+  // the latest by the time it completes is ever applied, regardless of
+  // which one's response actually arrives last.
+  int _searchRequestId = 0;
 
   /// Set when the typed query matches a province name (e.g. "Cebu") —
   /// neither the curated destination/restaurant/festival search nor the
@@ -227,6 +237,7 @@ class _SearchScreenState extends State<SearchScreen> {
   void _onChanged(String value) {
     setState(() => _query = value);
     _debounce?.cancel();
+    _recordDebounce?.cancel();
     if (value.trim().isEmpty) {
       if (_hasFilters) {
         _runFilterOnly();
@@ -243,6 +254,23 @@ class _SearchScreenState extends State<SearchScreen> {
       const Duration(milliseconds: 350),
       () => _runSearch(value),
     );
+    // Recorded only after a longer pause than the search itself — pausing
+    // mid-word ("Pala" for 350ms before continuing to "Palawan") used to
+    // record the incomplete prefix as its own Recent/Trending entry,
+    // separate from the finished query.
+    _recordDebounce = Timer(
+      const Duration(milliseconds: 900),
+      () => _recordSearch(value),
+    );
+  }
+
+  void _recordSearch(String query) {
+    unawaited(
+      _searchHistory.record(query).then((updated) {
+        if (mounted) setState(() => _recentSearches = updated);
+      }),
+    );
+    unawaited(_searchTrendRepository.record(query));
   }
 
   /// First province whose name contains the query — provinces are few
@@ -326,13 +354,8 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   Future<void> _runSearch(String query) async {
+    final requestId = ++_searchRequestId;
     setState(() => _loading = true);
-    unawaited(
-      _searchHistory.record(query).then((updated) {
-        if (mounted) setState(() => _recentSearches = updated);
-      }),
-    );
-    unawaited(_searchTrendRepository.record(query));
     try {
       final trimmed = query.trim();
       final restaurantsFuture = _restaurantRepository.searchByName(query);
@@ -340,10 +363,13 @@ class _SearchScreenState extends State<SearchScreen> {
       // A billed live API call, unlike the free Firestore prefix search
       // above — skip it for very short prefixes so every keystroke doesn't
       // fire one. `searchText` never throws (see `PlacesService`), so this
-      // is safe to await alongside the try/catch below.
+      // is safe to await alongside the try/catch below. Scoped to the
+      // active province filter (when set) the same way the curated results
+      // below already are — otherwise "More places" stayed nationwide even
+      // while every other section had narrowed to one province.
       final placesFuture = trimmed.length >= 3
           ? _places.searchText(
-              textQuery: '$trimmed, Philippines',
+              textQuery: _provinceName != null ? '$trimmed, $_provinceName, Philippines' : '$trimmed, Philippines',
               maxResultCount: 10,
             )
           : Future.value(<Place>[]);
@@ -412,7 +438,7 @@ class _SearchScreenState extends State<SearchScreen> {
         for (final p in [...places, ...nearbyAreaPlaces])
           if (seenPlaceIds.add(p.id)) p,
       ];
-      if (!mounted) return;
+      if (!mounted || requestId != _searchRequestId) return;
       var curatedResults = _toResults(restaurants, festivals);
       // Firestore's prefix-search doesn't compose with extra filters, so
       // province/rating are applied client-side on top of the text match.
@@ -447,7 +473,7 @@ class _SearchScreenState extends State<SearchScreen> {
         _loading = false;
       });
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted || requestId != _searchRequestId) return;
       setState(() {
         _results = [];
         _provinceMatch = null;
@@ -473,6 +499,7 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   Future<void> _runFilterOnly() async {
+    final requestId = ++_searchRequestId;
     setState(() => _loading = true);
     try {
       final restaurants = await _restaurantRepository.filter(
@@ -483,7 +510,7 @@ class _SearchScreenState extends State<SearchScreen> {
         provinceId: _provinceId,
         minRating: _minRating,
       );
-      if (!mounted) return;
+      if (!mounted || requestId != _searchRequestId) return;
       setState(() {
         _results = _toResults(restaurants, festivals);
         // A province/region match only ever makes sense for a typed query
@@ -494,7 +521,7 @@ class _SearchScreenState extends State<SearchScreen> {
         _loading = false;
       });
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted || requestId != _searchRequestId) return;
       setState(() {
         _results = [];
         _provinceMatch = null;
@@ -652,6 +679,7 @@ class _SearchScreenState extends State<SearchScreen> {
   @override
   void dispose() {
     _debounce?.cancel();
+    _recordDebounce?.cancel();
     _controller.dispose();
     super.dispose();
   }

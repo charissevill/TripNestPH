@@ -119,7 +119,12 @@ class _NearbyPlacesScreenState extends State<NearbyPlacesScreen> {
         c.includedTypes!.first == widget.includedTypes!.first,
     orElse: () => _categories.first,
   );
-  _SortOption _sort = _SortOption.relevance;
+  // Defaults to Distance in nearby-mode (a known lat/lng to sort against) —
+  // matching the carousel that opened this screen via "See all", which
+  // already sorts nearest-first. Area/text mode has no reference point, so
+  // it stays Relevance (Distance isn't even offered there — see the sort
+  // dropdown below).
+  late _SortOption _sort = widget._isNearbyMode ? _SortOption.distance : _SortOption.relevance;
   String? _searchOverride;
   Timer? _debounce;
 
@@ -148,13 +153,14 @@ class _NearbyPlacesScreenState extends State<NearbyPlacesScreen> {
     try {
       List<Place> results;
       if (_searchOverride != null && _searchOverride!.trim().isNotEmpty) {
-        results = await _places.searchText(textQuery: _searchOverride!.trim());
+        results = await _places.searchText(textQuery: _searchOverride!.trim(), rethrowOnError: true);
       } else if (widget._isNearbyMode && _category.includedTypes != null) {
         results = _recognizable(
           await _places.searchNearby(
             latitude: widget.latitude!,
             longitude: widget.longitude!,
             includedTypes: _category.includedTypes!,
+            rethrowOnError: true,
           ),
         );
       } else if (widget._isNearbyMode) {
@@ -165,11 +171,13 @@ class _NearbyPlacesScreenState extends State<NearbyPlacesScreen> {
           textQuery: _category.searchPhrase,
           biasLatitude: widget.latitude,
           biasLongitude: widget.longitude,
+          rethrowOnError: true,
         );
       } else {
         results = await _places.searchText(
           textQuery:
               '${_category.searchPhrase} in ${widget.areaLabel}, Philippines',
+          rethrowOnError: true,
         );
       }
       if (!mounted) return;
@@ -322,20 +330,25 @@ class _NearbyPlacesScreenState extends State<NearbyPlacesScreen> {
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: AppColors.textPrimary,
                     ),
-                    items: const [
-                      DropdownMenuItem(
+                    items: [
+                      const DropdownMenuItem(
                         value: _SortOption.relevance,
                         child: Text('Relevance'),
                       ),
-                      DropdownMenuItem(
-                        value: _SortOption.distance,
-                        child: Text('Distance'),
-                      ),
-                      DropdownMenuItem(
+                      // Only meaningful with a known coordinate to measure
+                      // from — offering it in area/text mode used to sort
+                      // by nothing (every result compared equal) with no
+                      // indication that's what was happening.
+                      if (widget._isNearbyMode)
+                        const DropdownMenuItem(
+                          value: _SortOption.distance,
+                          child: Text('Distance'),
+                        ),
+                      const DropdownMenuItem(
                         value: _SortOption.rating,
                         child: Text('Rating'),
                       ),
-                      DropdownMenuItem(
+                      const DropdownMenuItem(
                         value: _SortOption.reviewCount,
                         child: Text('Popularity'),
                       ),

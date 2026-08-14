@@ -12,6 +12,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/utils/place_dedup.dart';
 import '../../core/widgets/dialogs/active_filter_chips.dart';
+import '../../core/widgets/dialogs/confirmation_dialog.dart';
 import '../../core/widgets/dialogs/search_filter_sheet.dart';
 import '../../core/widgets/details/place_details_sheet.dart';
 import '../../core/widgets/indicators/rating_widget.dart';
@@ -209,6 +210,15 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   Future<void> _clearRecentSearches() async {
+    final confirmed = await showConfirmationDialog(
+      context,
+      title: 'Clear Recent Searches?',
+      message:
+          'This removes your recent search history. It doesn\'t affect your favorites or reviews.',
+      confirmLabel: 'Clear',
+      isDestructive: true,
+    );
+    if (!confirmed || !mounted) return;
     await _searchHistory.clear();
     if (mounted) setState(() => _recentSearches = []);
   }
@@ -369,7 +379,9 @@ class _SearchScreenState extends State<SearchScreen> {
       // while every other section had narrowed to one province.
       final placesFuture = trimmed.length >= 3
           ? _places.searchText(
-              textQuery: _provinceName != null ? '$trimmed, $_provinceName, Philippines' : '$trimmed, Philippines',
+              textQuery: _provinceName != null
+                  ? '$trimmed, $_provinceName, Philippines'
+                  : '$trimmed, Philippines',
               maxResultCount: 10,
             )
           : Future.value(<Place>[]);
@@ -431,8 +443,8 @@ class _SearchScreenState extends State<SearchScreen> {
       final nearbyAreaPlaces = areaNameLower == null
           ? const <Place>[]
           : nearbyAreaPlacesRaw
-              .where((p) => p.address.toLowerCase().contains(areaNameLower))
-              .toList();
+                .where((p) => p.address.toLowerCase().contains(areaNameLower))
+                .toList();
       final seenPlaceIds = <String>{};
       final allLivePlaces = [
         for (final p in [...places, ...nearbyAreaPlaces])

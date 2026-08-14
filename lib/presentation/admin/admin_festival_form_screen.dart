@@ -50,6 +50,16 @@ class _AdminFestivalFormScreenState extends State<AdminFestivalFormScreen> {
   late final _descController = TextEditingController(
     text: widget.existing?.description ?? '',
   );
+  // Same reasoning as AdminTouristSpotFormScreen: this form previously had
+  // no way to set coordinates on a brand-new festival at all, silently
+  // breaking the map/directions on the details screen for every one an
+  // admin created.
+  late final _latitudeController = TextEditingController(
+    text: widget.existing?.latitude?.toString() ?? '',
+  );
+  late final _longitudeController = TextEditingController(
+    text: widget.existing?.longitude?.toString() ?? '',
+  );
   final _newHighlightController = TextEditingController();
 
   /// Picked via [_pickDate] below. Null means "not picked/changed in this
@@ -79,7 +89,7 @@ class _AdminFestivalFormScreenState extends State<AdminFestivalFormScreen> {
     super.initState();
     _startDate = widget.existing?.startDate;
     _endDate = widget.existing?.endDate;
-    for (final c in [_nameController, _descController]) {
+    for (final c in [_nameController, _descController, _latitudeController, _longitudeController]) {
       c.addListener(() => setState(() => _dirty = true));
     }
     _provincesFuture = ProvinceRepository().getAll().then((provinces) {
@@ -115,6 +125,8 @@ class _AdminFestivalFormScreenState extends State<AdminFestivalFormScreen> {
     for (final c in [
       _nameController,
       _descController,
+      _latitudeController,
+      _longitudeController,
       _newHighlightController,
     ]) {
       c.dispose();
@@ -221,8 +233,8 @@ class _AdminFestivalFormScreenState extends State<AdminFestivalFormScreen> {
       registrationLink: widget.existing?.registrationLink ?? '',
       venue: widget.existing?.venue ?? '',
       facebookUrl: widget.existing?.facebookUrl ?? '',
-      latitude: widget.existing?.latitude,
-      longitude: widget.existing?.longitude,
+      latitude: double.tryParse(_latitudeController.text.trim()),
+      longitude: double.tryParse(_longitudeController.text.trim()),
     );
 
     try {
@@ -348,6 +360,43 @@ class _AdminFestivalFormScreenState extends State<AdminFestivalFormScreen> {
                           prefixIcon: Icon(Symbols.calendar_month_rounded),
                         ),
                         child: Text(_dateDisplayText),
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: TextFormField(
+                            controller: _latitudeController,
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
+                            decoration: const InputDecoration(
+                              labelText: 'Latitude (optional)',
+                              hintText: 'e.g. 14.5995',
+                              prefixIcon: Icon(Symbols.location_on_rounded, size: 20),
+                            ),
+                            validator: Validators.latitude,
+                          ),
+                        ),
+                        const SizedBox(width: AppSpacing.md),
+                        Expanded(
+                          child: TextFormField(
+                            controller: _longitudeController,
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
+                            decoration: const InputDecoration(
+                              labelText: 'Longitude (optional)',
+                              hintText: 'e.g. 120.9842',
+                            ),
+                            validator: Validators.longitude,
+                          ),
+                        ),
+                      ],
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.only(top: AppSpacing.xs),
+                      child: Text(
+                        'Powers the map and "Get Directions" on the details screen — leave blank and those sections just won\'t show.',
+                        style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
                       ),
                     ),
                     const SizedBox(height: AppSpacing.md),

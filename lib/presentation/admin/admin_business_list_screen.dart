@@ -8,10 +8,13 @@ import '../../core/widgets/dialogs/confirmation_dialog.dart';
 import '../../core/widgets/states/empty_state_widget.dart';
 import '../../core/widgets/states/loading_widget.dart';
 import '../../data/repositories/business_repository.dart';
+import '../../data/repositories/favorites_repository.dart';
 import '../../data/repositories/notification_repository.dart';
 import '../../data/repositories/restaurant_repository.dart';
+import '../../data/repositories/review_repository.dart';
 import '../../domain/models/app_notification.dart';
 import '../../domain/models/business.dart';
+import '../../domain/models/review.dart';
 
 /// Admin-only approval queue for `businessOwner` self-service listings —
 /// approve, reject (with a reason the owner sees), suspend an already
@@ -27,6 +30,8 @@ class AdminBusinessListScreen extends StatefulWidget {
 class _AdminBusinessListScreenState extends State<AdminBusinessListScreen> {
   final BusinessRepository _repository = BusinessRepository();
   final RestaurantRepository _restaurantRepository = RestaurantRepository();
+  final ReviewRepository _reviewRepository = ReviewRepository();
+  final FavoritesRepository _favoritesRepository = FavoritesRepository();
 
   /// For a [Business.isFoodAndDining] listing, materializes (or
   /// re-publishes) its mirrored `restaurants` doc *before* the business
@@ -205,6 +210,12 @@ class _AdminBusinessListScreenState extends State<AdminBusinessListScreen> {
       await _repository.delete(business.id);
       if (business.restaurantId.isNotEmpty) {
         await _restaurantRepository.delete(business.restaurantId);
+        // Otherwise these survive as dangling references to a restaurant
+        // id that no longer resolves to anything, surfaced only
+        // defensively elsewhere (e.g. the moderation queue's "This review
+        // no longer exists").
+        await _reviewRepository.deleteAllForTarget(business.restaurantId, ReviewTargetType.restaurant);
+        await _favoritesRepository.deleteAllForItem(FavoriteType.restaurant, business.restaurantId);
       }
     });
   }

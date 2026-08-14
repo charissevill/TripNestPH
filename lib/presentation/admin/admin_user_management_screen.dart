@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -42,6 +44,13 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
   Object? _error;
   String _query = '';
 
+  // A server-side lookup to back up the local-page filter below, which only
+  // ever searched whatever had already been scrolled into _users — a
+  // traveler beyond the first page showed as "No matches" even though the
+  // account genuinely existed.
+  List<AppUser> _serverSearchResults = [];
+  Timer? _searchDebounce;
+
   @override
   void initState() {
     super.initState();
@@ -51,7 +60,26 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
   @override
   void dispose() {
     _searchController.dispose();
+    _searchDebounce?.cancel();
     super.dispose();
+  }
+
+  void _onSearchChanged(String value) {
+    setState(() => _query = value);
+    _searchDebounce?.cancel();
+    final normalized = value.trim().toLowerCase();
+    if (normalized.isEmpty) {
+      setState(() => _serverSearchResults = []);
+      return;
+    }
+    _searchDebounce = Timer(const Duration(milliseconds: 350), () async {
+      try {
+        final results = await _repository.searchByEmailPrefix(normalized);
+        if (mounted) setState(() => _serverSearchResults = results);
+      } catch (_) {
+        // Best-effort — the local-page filter below still works either way.
+      }
+    });
   }
 
   Future<void> _loadMore() async {
@@ -84,13 +112,19 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
   List<AppUser> get _filteredUsers {
     final normalized = _query.trim().toLowerCase();
     if (normalized.isEmpty) return _users;
-    return _users
+    final localMatches = _users
         .where(
           (u) =>
               u.name.toLowerCase().contains(normalized) ||
               u.email.toLowerCase().contains(normalized),
         )
         .toList();
+    final seenUids = localMatches.map((u) => u.uid).toSet();
+    return [
+      ...localMatches,
+      for (final u in _serverSearchResults)
+        if (seenUids.add(u.uid)) u,
+    ];
   }
 
   Future<void> _toggleSuspend(AppUser user) async {
@@ -160,7 +194,7 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
               ),
               child: TextField(
                 controller: _searchController,
-                onChanged: (v) => setState(() => _query = v),
+                onChanged: _onSearchChanged,
                 decoration: const InputDecoration(
                   labelText: 'Search by name or email',
                   prefixIcon: Icon(Symbols.search_rounded),

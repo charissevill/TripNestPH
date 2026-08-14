@@ -8,8 +8,10 @@ import '../../core/utils/app_exception.dart';
 import '../../core/widgets/dialogs/confirmation_dialog.dart';
 import '../../core/widgets/states/empty_state_widget.dart';
 import '../../core/widgets/states/loading_widget.dart';
+import '../../data/repositories/notification_repository.dart';
 import '../../data/repositories/review_repository.dart';
 import '../../data/repositories/review_report_repository.dart';
+import '../../domain/models/app_notification.dart';
 import '../../domain/models/review.dart';
 import '../../domain/models/review_report.dart';
 
@@ -30,6 +32,7 @@ class _AdminReportedReviewsScreenState
     extends State<AdminReportedReviewsScreen> {
   final ReviewReportRepository _reportRepository = ReviewReportRepository();
   final ReviewRepository _reviewRepository = ReviewRepository();
+  final NotificationRepository _notificationRepository = NotificationRepository();
 
   Future<void> _dismiss(ReviewReport report) async {
     final confirmed = await showConfirmationDialog(
@@ -66,7 +69,24 @@ class _AdminReportedReviewsScreenState
     if (!confirmed || !mounted) return;
     try {
       await _reviewRepository.setHidden(review, hidden);
-      if (hidden) await _reportRepository.dismiss(report.id);
+      if (hidden) {
+        await _reportRepository.dismiss(report.id);
+        // The review otherwise just vanished from the listing's page with
+        // no trace back to the person who wrote it — no notification, no
+        // "My Reviews" flag, nothing.
+        try {
+          await _notificationRepository.createForUser(
+            userId: review.userId,
+            title: 'Your review was hidden',
+            body: 'A review you wrote didn\'t meet our community guidelines and is no longer visible to other travelers.',
+            category: NotificationCategory.general,
+            relatedId: review.targetId,
+          );
+        } catch (_) {
+          // Best-effort — the review is hidden either way; a failed
+          // notification shouldn't undo the moderation action itself.
+        }
+      }
     } catch (e) {
       if (mounted)
         ScaffoldMessenger.of(

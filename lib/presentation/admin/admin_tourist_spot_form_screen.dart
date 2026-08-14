@@ -89,6 +89,18 @@ class _AdminTouristSpotFormScreenState
   late final _facebookController = TextEditingController(
     text: widget.existing?.facebookUrl ?? '',
   );
+  // A brand-new listing had no way to set these at all before — the
+  // everyday single-listing form only ever carried over whatever
+  // widget.existing already had (always null for "create"), silently
+  // breaking the weather card, map, "Get Directions" and Nearby sections on
+  // the traveler-facing details screen for every admin-created spot. The
+  // separate CSV bulk-import path could set them, but this form couldn't.
+  late final _latitudeController = TextEditingController(
+    text: widget.existing?.latitude?.toString() ?? '',
+  );
+  late final _longitudeController = TextEditingController(
+    text: widget.existing?.longitude?.toString() ?? '',
+  );
   final _newHighlightController = TextEditingController();
   final _newTipController = TextEditingController();
 
@@ -137,6 +149,8 @@ class _AdminTouristSpotFormScreenState
       _phoneController,
       _websiteController,
       _facebookController,
+      _latitudeController,
+      _longitudeController,
     ]) {
       c.addListener(() => setState(() => _dirty = true));
     }
@@ -152,6 +166,8 @@ class _AdminTouristSpotFormScreenState
       _phoneController,
       _websiteController,
       _facebookController,
+      _latitudeController,
+      _longitudeController,
       _newHighlightController,
       _newTipController,
     ]) {
@@ -215,8 +231,8 @@ class _AdminTouristSpotFormScreenState
       highlights: _highlights,
       isFeatured: _isFeatured,
       isHiddenGem: _isHiddenGem,
-      latitude: widget.existing?.latitude,
-      longitude: widget.existing?.longitude,
+      latitude: double.tryParse(_latitudeController.text.trim()),
+      longitude: double.tryParse(_longitudeController.text.trim()),
       phoneNumber: _phoneController.text.trim(),
       websiteUrl: _websiteController.text.trim(),
       facebookUrl: _facebookController.text.trim(),
@@ -328,6 +344,43 @@ class _AdminTouristSpotFormScreenState
                     _additionalGalleryUrls = urls;
                     _dirty = true;
                   }),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: TextFormField(
+                        controller: _latitudeController,
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
+                        decoration: const InputDecoration(
+                          labelText: 'Latitude (optional)',
+                          hintText: 'e.g. 14.5995',
+                          prefixIcon: Icon(Symbols.location_on_rounded, size: 20),
+                        ),
+                        validator: Validators.latitude,
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.md),
+                    Expanded(
+                      child: TextFormField(
+                        controller: _longitudeController,
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
+                        decoration: const InputDecoration(
+                          labelText: 'Longitude (optional)',
+                          hintText: 'e.g. 120.9842',
+                        ),
+                        validator: Validators.longitude,
+                      ),
+                    ),
+                  ],
+                ),
+                Padding(
+                  padding: const EdgeInsets.only(top: AppSpacing.xs),
+                  child: Text(
+                    'Powers the weather card, map and "Get Directions" on the details screen — leave blank and those sections just won\'t show.',
+                    style: theme.textTheme.bodySmall?.copyWith(color: AppColors.textTertiary),
+                  ),
                 ),
                 const SizedBox(height: AppSpacing.md),
                 TextFormField(

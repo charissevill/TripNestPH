@@ -117,4 +117,21 @@ class FavoritesRepository {
       throw AppException.from(e);
     }
   }
+
+  /// Removes every traveler's favorite pointing at [itemId] — admin cleanup
+  /// when a listing itself is deleted (see AdminBusinessListScreen), so
+  /// those favorites don't become permanently dangling references to an id
+  /// that no longer resolves to anything.
+  Future<void> deleteAllForItem(FavoriteType type, String itemId) async {
+    try {
+      final snapshot = await _collection.where('itemType', isEqualTo: type.name).where('itemId', isEqualTo: itemId).get();
+      final batch = _db.batch();
+      for (final doc in snapshot.docs) {
+        batch.delete(doc.reference);
+      }
+      await batch.commit();
+    } catch (e) {
+      throw AppException.from(e);
+    }
+  }
 }

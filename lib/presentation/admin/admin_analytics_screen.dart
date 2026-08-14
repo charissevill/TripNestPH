@@ -132,6 +132,7 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
       savedTripCount: 0,
       pendingReportCount: 0,
       popularDestinations: popular.take(5).toList(),
+      provinceStatsCapped: destinations.length >= 500 || restaurants.length >= 500 || festivals.length >= 500,
     );
   }
 
@@ -288,7 +289,7 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
                           child: _StatCard(
                             icon: Symbols.place_rounded,
                             label: 'Tourist Spots',
-                            value: '${stats.publishedDestinationCount}',
+                            value: '${stats.publishedDestinationCount}${stats.provinceStatsCapped ? '+' : ''}',
                           ),
                         ),
                         const SizedBox(width: AppSpacing.sm),
@@ -296,7 +297,7 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
                           child: _StatCard(
                             icon: Symbols.restaurant_rounded,
                             label: 'Restaurants',
-                            value: '${stats.publishedRestaurantCount}',
+                            value: '${stats.publishedRestaurantCount}${stats.provinceStatsCapped ? '+' : ''}',
                           ),
                         ),
                       ],
@@ -305,7 +306,7 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
                     _StatCard(
                       icon: Symbols.celebration_rounded,
                       label: 'Festivals',
-                      value: '${stats.publishedFestivalCount}',
+                      value: '${stats.publishedFestivalCount}${stats.provinceStatsCapped ? '+' : ''}',
                     ),
                   ] else ...[
                     const SizedBox(height: AppSpacing.sm),
@@ -427,6 +428,7 @@ class _DashboardStats {
     required this.pendingReportCount,
     required this.popularDestinations,
     this.scopedProvinceName,
+    this.provinceStatsCapped = false,
   });
 
   final int travelerCount;
@@ -434,6 +436,15 @@ class _DashboardStats {
   final int publishedDestinationCount;
   final int publishedRestaurantCount;
   final int publishedFestivalCount;
+
+  /// True once any of the three province-scoped counts above hit the 500
+  /// query limit exactly — a coincidence at exactly 500 real listings is
+  /// vanishingly unlikely, and this is only ever a hint to add a "+" to the
+  /// displayed number, not a value anything else depends on. Without this,
+  /// the stat just silently froze at 500 forever past that point, with
+  /// nothing distinguishing "there are exactly 500" from "there are at
+  /// least 500."
+  final bool provinceStatsCapped;
   final int provinceCount;
   final int provinceWithContentCount;
   final int pendingBusinessCount;

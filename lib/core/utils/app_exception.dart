@@ -1,4 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/services.dart' show PlatformException;
 
 /// A user-facing error message derived from whatever backend exception was
 /// thrown, so screens never have to interpret raw Firebase error codes.
@@ -16,6 +17,14 @@ class AppException implements Exception {
     if (error is AppException) return error;
     if (error is FirebaseAuthException) return AppException(_authMessage(error));
     if (error is FirebaseException) return AppException(_firestoreOrStorageMessage(error));
+    // Google Sign-In throws this natively (Play Services unavailable,
+    // account picker error, native network failure) rather than a
+    // FirebaseAuthException — surfacing its message beats the generic
+    // fallback, since it's usually specific enough to point at a fix (e.g.
+    // "Play Services is out of date").
+    if (error is PlatformException) {
+      return AppException(error.message ?? 'Something went wrong. Please try again.');
+    }
     return const AppException('Something went wrong. Please try again.');
   }
 

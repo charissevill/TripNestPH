@@ -39,8 +39,11 @@ class _SplashScreenState extends State<SplashScreen> {
       context.go(RoutePaths.login);
       return;
     }
-    await _preferences.setHasSeenOnboarding(true);
-    if (!mounted) return;
+    // Deliberately NOT marked seen here — only once the traveler actually
+    // exits onboarding (Skip or Get Started, in onboarding_screen.dart).
+    // Marking it here meant the app being killed while onboarding was still
+    // showing would permanently skip it on next launch, for someone who
+    // never actually saw it.
     context.go(RoutePaths.onboarding);
   }
 

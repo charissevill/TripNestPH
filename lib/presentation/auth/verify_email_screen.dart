@@ -23,8 +23,16 @@ class VerifyEmailScreen extends StatefulWidget {
 }
 
 class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
+  // 30 polls at 4s apart = 2 minutes of automatic checking before giving up
+  // and leaving it to the manual "I've verified" / "Resend" buttons —
+  // otherwise a traveler who leaves this screen open drains battery/network
+  // indefinitely with no escalation ever offered.
+  static const _maxPollAttempts = 30;
+
   Timer? _pollTimer;
+  int _pollAttempts = 0;
   bool _justResent = false;
+  bool _gaveUpPolling = false;
 
   @override
   void initState() {
@@ -40,9 +48,16 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
 
   Future<void> _checkVerified() async {
     final auth = context.read<AuthProvider>();
+    if (auth.isBusy) return;
     await auth.refreshEmailVerified();
     if (auth.isEmailVerified && mounted) {
       context.go(RoutePaths.home);
+      return;
+    }
+    _pollAttempts++;
+    if (_pollAttempts >= _maxPollAttempts && mounted) {
+      _pollTimer?.cancel();
+      setState(() => _gaveUpPolling = true);
     }
   }
 
@@ -87,6 +102,17 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
                 if (_justResent) ...[
                   const SizedBox(height: AppSpacing.sm),
                   Text('Verification email resent.', style: theme.textTheme.bodySmall?.copyWith(color: AppColors.secondary)),
+                ],
+                if (_gaveUpPolling) ...[
+                  const SizedBox(height: AppSpacing.sm),
+                  Text(
+                    'Still waiting? Check your spam folder, or tap Resend Email below.',
+                    style: theme.textTheme.bodySmall,
+                  ),
+                ],
+                if (auth.errorMessage != null) ...[
+                  const SizedBox(height: AppSpacing.sm),
+                  Text(auth.errorMessage!, style: const TextStyle(color: AppColors.error)),
                 ],
                 const SizedBox(height: AppSpacing.xl),
                 AnimatedButton(label: 'I\'ve verified my email', isLoading: auth.isBusy, onPressed: auth.isBusy ? null : _checkVerified),

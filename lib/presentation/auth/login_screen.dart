@@ -100,6 +100,14 @@ class _LoginScreenState extends State<LoginScreen> {
                         obscureText: true,
                         textInputAction: TextInputAction.done,
                         autofillHints: const [AutofillHints.password],
+                        // Deliberately not Validators.password (8-char
+                        // minimum): that policy only applies to NEW
+                        // passwords being set (Register/Change Password).
+                        // Enforcing it here too would block sign-in for any
+                        // account whose real password predates the policy
+                        // or is otherwise shorter — the account's actual
+                        // password is whatever Firebase Auth has on file,
+                        // not whatever this form's validator allows.
                         validator: (v) => (v == null || v.isEmpty)
                             ? 'Password is required'
                             : null,

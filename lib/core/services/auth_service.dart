@@ -20,7 +20,17 @@ class AuthService {
     try {
       final credential = await _auth.createUserWithEmailAndPassword(email: email.trim(), password: password);
       await credential.user?.updateDisplayName(name.trim());
-      await credential.user?.sendEmailVerification();
+      // Best-effort, not fatal: the Auth account already exists at this
+      // point (irreversible without a separate delete), and the router
+      // redirects to Verify Email based on that account existing regardless
+      // of whether this call throws. Letting a network blip here fail the
+      // whole registerWithEmail call used to land the traveler on "We sent
+      // a verification link" while ALSO showing a registration error — and
+      // no email had actually been sent. The Resend button on that screen
+      // is the real recovery path if this particular send didn't go out.
+      try {
+        await credential.user?.sendEmailVerification();
+      } catch (_) {}
       return credential.user!;
     } on FirebaseAuthException catch (e) {
       throw AppException.from(e);
@@ -54,10 +64,17 @@ class AuthService {
     }
   }
 
+  /// Deliberately indistinguishable from a genuine send: if the Firebase
+  /// project doesn't have Email Enumeration Protection enabled server-side,
+  /// propagating `user-not-found` here would let anyone learn which emails
+  /// have accounts one attempt at a time. Every other failure (bad network,
+  /// rate-limited, etc.) still surfaces normally, since those are actionable
+  /// for the traveler without revealing anything about the email itself.
   Future<void> sendPasswordResetEmail(String email) async {
     try {
       await _auth.sendPasswordResetEmail(email: email.trim());
     } on FirebaseAuthException catch (e) {
+      if (e.code == 'user-not-found') return;
       throw AppException.from(e);
     }
   }

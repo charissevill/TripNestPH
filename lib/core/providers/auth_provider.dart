@@ -6,10 +6,14 @@ import 'package:flutter/material.dart';
 import '../../data/repositories/admin_repository.dart';
 import '../../data/repositories/favorites_repository.dart';
 import '../../data/repositories/itinerary_repository.dart';
+import '../../data/repositories/notification_repository.dart';
 import '../../data/repositories/review_repository.dart';
+import '../../data/repositories/trip_photo_repository.dart';
 import '../../data/repositories/user_repository.dart';
+import '../../domain/models/admin_user.dart';
 import '../../domain/models/app_user.dart';
 import '../services/auth_service.dart';
+import '../services/storage_service.dart';
 import '../utils/app_exception.dart';
 import '../utils/view_status.dart';
 
@@ -24,13 +28,30 @@ class AuthProvider extends ChangeNotifier {
     ItineraryRepository? itineraryRepository,
     ReviewRepository? reviewRepository,
     AdminRepository? adminRepository,
+    TripPhotoRepository? tripPhotoRepository,
+    NotificationRepository? notificationRepository,
+    StorageService? storageService,
   })  : _authService = authService ?? AuthService(),
         _userRepository = userRepository ?? UserRepository(),
         _favoritesRepositoryOverride = favoritesRepository,
         _itineraryRepositoryOverride = itineraryRepository,
         _reviewRepositoryOverride = reviewRepository,
-        _adminRepositoryOverride = adminRepository {
-    _authSubscription = _authService.authStateChanges.listen(_onAuthStateChanged);
+        _adminRepositoryOverride = adminRepository,
+        _tripPhotoRepositoryOverride = tripPhotoRepository,
+        _notificationRepositoryOverride = notificationRepository,
+        _storageServiceOverride = storageService {
+    _authSubscription = _authService.authStateChanges.listen(
+      _onAuthStateChanged,
+      // Without this, a stream error (unlikely, but possible from the
+      // underlying platform channel) would be an unhandled async error
+      // that silently never reaches _onAuthStateChanged's own try/catch —
+      // surfacing it here at least unsticks the loading state instead of
+      // leaving the app spinning forever.
+      onError: (_) {
+        _status = ViewStatus.loaded;
+        notifyListeners();
+      },
+    );
   }
 
   final AuthService _authService;
@@ -44,10 +65,16 @@ class AuthProvider extends ChangeNotifier {
   final ItineraryRepository? _itineraryRepositoryOverride;
   final ReviewRepository? _reviewRepositoryOverride;
   final AdminRepository? _adminRepositoryOverride;
+  final TripPhotoRepository? _tripPhotoRepositoryOverride;
+  final NotificationRepository? _notificationRepositoryOverride;
+  final StorageService? _storageServiceOverride;
   FavoritesRepository? _favoritesRepositoryInstance;
   ItineraryRepository? _itineraryRepositoryInstance;
   ReviewRepository? _reviewRepositoryInstance;
   AdminRepository? _adminRepositoryInstance;
+  TripPhotoRepository? _tripPhotoRepositoryInstance;
+  NotificationRepository? _notificationRepositoryInstance;
+  StorageService? _storageServiceInstance;
 
   FavoritesRepository get _favoritesRepository =>
       _favoritesRepositoryOverride ?? (_favoritesRepositoryInstance ??= FavoritesRepository());
@@ -55,9 +82,15 @@ class AuthProvider extends ChangeNotifier {
       _itineraryRepositoryOverride ?? (_itineraryRepositoryInstance ??= ItineraryRepository());
   ReviewRepository get _reviewRepository => _reviewRepositoryOverride ?? (_reviewRepositoryInstance ??= ReviewRepository());
   AdminRepository get _adminRepository => _adminRepositoryOverride ?? (_adminRepositoryInstance ??= AdminRepository());
+  TripPhotoRepository get _tripPhotoRepository =>
+      _tripPhotoRepositoryOverride ?? (_tripPhotoRepositoryInstance ??= TripPhotoRepository());
+  NotificationRepository get _notificationRepository =>
+      _notificationRepositoryOverride ?? (_notificationRepositoryInstance ??= NotificationRepository());
+  StorageService get _storageService => _storageServiceOverride ?? (_storageServiceInstance ??= StorageService());
 
   late final StreamSubscription<User?> _authSubscription;
   StreamSubscription<AppUser?>? _profileSubscription;
+  StreamSubscription<AdminUser?>? _adminStatusSubscription;
 
   User? _firebaseUser;
   AppUser? _appUser;
@@ -75,18 +108,29 @@ class AuthProvider extends ChangeNotifier {
   Future<void> _onAuthStateChanged(User? user) async {
     _firebaseUser = user;
     _profileSubscription?.cancel();
+    _adminStatusSubscription?.cancel();
     if (user == null) {
       _appUser = null;
       _status = ViewStatus.loaded;
       notifyListeners();
       return;
     }
-    await _userRepository.createIfMissing(
-      uid: user.uid,
-      name: user.displayName ?? 'Traveler',
-      email: user.email ?? '',
-      photoUrl: user.photoURL ?? '',
-    );
+    try {
+      await _userRepository.createIfMissing(
+        uid: user.uid,
+        name: user.displayName ?? 'Traveler',
+        email: user.email ?? '',
+        photoUrl: user.photoURL ?? '',
+      );
+    } catch (e) {
+      // A failed profile-create (offline, permission-denied, etc.) must
+      // never leave the app stuck mid-sign-in: surface it and fall through
+      // to streamUser below regardless — if the doc genuinely doesn't
+      // exist, that stream just emits null and _status still reaches
+      // ViewStatus.loaded so the UI can show a real "couldn't load your
+      // profile" state instead of spinning forever.
+      errorMessage = AppException.from(e).message;
+    }
     unawaited(_syncAdminClaimsBestEffort());
     _profileSubscription = _userRepository.streamUser(user.uid).listen((profile) async {
       // Enforced live, not just at sign-in: if an admin suspends this
@@ -106,10 +150,41 @@ class AuthProvider extends ChangeNotifier {
       if (profile != null && profile.photoUrl.isEmpty && (user.photoURL ?? '').isNotEmpty) {
         await _userRepository.updateProfile(user.uid, {'photoUrl': user.photoURL});
       }
+      // Mirrors a confirmed email change into Firestore. changeEmail() uses
+      // verifyBeforeUpdateEmail, so Firebase Auth's own email only updates
+      // once the traveler clicks the link in their new inbox — at which
+      // point the app isn't necessarily running to write it through. This
+      // catches the mismatch on the next sign-in/token-refresh instead of
+      // leaving the Firestore profile permanently stale.
+      if (profile != null && user.email != null && user.email!.isNotEmpty && profile.email != user.email) {
+        await _userRepository.updateProfile(user.uid, {'email': user.email});
+      }
       _appUser = profile;
       _status = ViewStatus.loaded;
       notifyListeners();
     });
+    // Same "enforced live" reasoning as the traveler-suspension listener
+    // above, for an Admin Portal / business-owner account: revoking their
+    // admin_users doc alone doesn't touch their already-cached ID token's
+    // custom claims (those only refresh via syncMyAdminClaims, which can
+    // only ever run for the caller's own account, up to an hour later
+    // otherwise) — so without this, a just-suspended business owner could
+    // keep using their still-open session (e.g. uploading gallery photos)
+    // for the rest of that token's life. Forcing a sign-out here means
+    // their next sign-in mints a fresh token with correctly-revoked claims.
+    try {
+      _adminStatusSubscription = _adminRepository.streamSelf(user.uid).listen((admin) async {
+        if (admin != null && !admin.isActive) {
+          await _authService.signOut();
+        }
+      });
+    } catch (_) {
+      // Must never break sign-in itself — same reasoning as
+      // _syncAdminClaimsBestEffort just above (a test harness with no real
+      // Firebase project throws constructing AdminRepository at all, and a
+      // Cloud Functions hiccup shouldn't block an ordinary traveler with no
+      // admin_users doc from signing in either).
+    }
   }
 
   /// Picks up any Admin Portal role/status claim change (see
@@ -133,6 +208,11 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<bool> _run(Future<void> Function() action) async {
+    // Re-entrancy guard: without this, a slow in-flight call (e.g. a poll
+    // timer firing again before the previous reload() returns) could start
+    // a second overlapping action, whose completion would then clobber
+    // errorMessage/isBusy state the first call's caller is still relying on.
+    if (_busy) return false;
     _busy = true;
     errorMessage = null;
     notifyListeners();
@@ -219,6 +299,12 @@ class AuthProvider extends ChangeNotifier {
         for (final review in reviews) {
           await _reviewRepository.deleteReview(review);
         }
+        final photos = await _tripPhotoRepository.getAllForUser(uid);
+        for (final photo in photos) {
+          await _storageService.deleteByUrl(photo.photoUrl);
+        }
+        await _tripPhotoRepository.deleteAllForUser(uid);
+        await _notificationRepository.deleteAllForUser(uid);
         await _favoritesRepository.deleteAllForUser(uid);
         await _itineraryRepository.deleteAllForUser(uid);
         await _userRepository.deleteAccountData(uid);
@@ -233,6 +319,7 @@ class AuthProvider extends ChangeNotifier {
   void dispose() {
     _authSubscription.cancel();
     _profileSubscription?.cancel();
+    _adminStatusSubscription?.cancel();
     super.dispose();
   }
 }

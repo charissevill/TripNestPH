@@ -3,7 +3,11 @@
 class Validators {
   Validators._();
 
-  static final RegExp _emailPattern = RegExp(r'^[\w\.\-\+]+@[\w\-]+\.[\w\-\.]+$');
+  // No leading/trailing/consecutive dots in either the local part or the
+  // domain (the previous pattern let "a@b.com." and "a@b..com" through —
+  // obviously malformed, even though Firebase itself would still reject
+  // them server-side with invalid-email).
+  static final RegExp _emailPattern = RegExp(r'^[\w+-]+(\.[\w+-]+)*@[\w-]+(\.[\w-]+)+$');
 
   static String? email(String? value) {
     final v = value?.trim() ?? '';
@@ -28,6 +32,7 @@ class Validators {
     final v = value?.trim() ?? '';
     if (v.isEmpty) return 'Name is required';
     if (v.length < 2) return 'Name is too short';
+    if (v.length > 60) return 'Name must be 60 characters or fewer';
     return null;
   }
 
@@ -56,6 +61,27 @@ class Validators {
     if (v.isEmpty) return required ? 'This field is required' : null;
     final digitsOnly = v.replaceAll(RegExp(r'[\s\-\(\)]'), '');
     if (!RegExp(r'^\+?\d{7,15}$').hasMatch(digitsOnly)) return 'Enter a valid phone number';
+    return null;
+  }
+
+  /// Optional (an admin listing can be saved without coordinates and still
+  /// work — it just loses the weather card/map/directions on the details
+  /// screen), but if something was typed, it must be a real latitude.
+  static String? latitude(String? value) {
+    final v = value?.trim() ?? '';
+    if (v.isEmpty) return null;
+    final parsed = double.tryParse(v);
+    if (parsed == null) return 'Enter a valid latitude';
+    if (parsed < -90 || parsed > 90) return 'Latitude must be between -90 and 90';
+    return null;
+  }
+
+  static String? longitude(String? value) {
+    final v = value?.trim() ?? '';
+    if (v.isEmpty) return null;
+    final parsed = double.tryParse(v);
+    if (parsed == null) return 'Enter a valid longitude';
+    if (parsed < -180 || parsed > 180) return 'Longitude must be between -180 and 180';
     return null;
   }
 

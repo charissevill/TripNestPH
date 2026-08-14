@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -6,6 +8,7 @@ import 'package:smooth_page_indicator/smooth_page_indicator.dart';
 
 import '../../core/constants/app_images.dart';
 import '../../core/routes/route_paths.dart';
+import '../../core/services/local_preferences_service.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/widgets/buttons/animated_button.dart';
@@ -49,13 +52,21 @@ class OnboardingScreen extends StatefulWidget {
 
 class _OnboardingScreenState extends State<OnboardingScreen> {
   final PageController _controller = PageController();
+  final LocalPreferencesService _preferences = LocalPreferencesService();
   int _index = 0;
 
   bool get _isLast => _index == _pages.length - 1;
 
+  void _finish() {
+    // Marked seen only here — once onboarding is actually exited — not on
+    // splash simply navigating to it (see splash_screen.dart).
+    unawaited(_preferences.setHasSeenOnboarding(true));
+    context.go(RoutePaths.home);
+  }
+
   void _next() {
     if (_isLast) {
-      context.go(RoutePaths.home);
+      _finish();
     } else {
       _controller.nextPage(duration: const Duration(milliseconds: 380), curve: Curves.easeOutCubic);
     }
@@ -79,7 +90,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.sm),
                 child: TextButton(
-                  onPressed: () => context.go(RoutePaths.home),
+                  onPressed: _finish,
                   child: const Text('Skip'),
                 ),
               ),

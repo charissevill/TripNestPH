@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:material_symbols_icons/symbols.dart';
@@ -16,11 +17,18 @@ class ReviewFormResult {
   const ReviewFormResult({
     required this.rating,
     required this.comment,
+    required this.keptPhotoUrls,
     required this.newPhotos,
   });
 
   final double rating;
   final String comment;
+
+  /// The subset of the review's existing remote photos the traveler chose
+  /// to keep — anything from the original list NOT in here was removed.
+  final List<String> keptPhotoUrls;
+
+  /// Freshly picked local files to upload and append to [keptPhotoUrls].
   final List<File> newPhotos;
 }
 
@@ -28,6 +36,7 @@ Future<ReviewFormResult?> showReviewFormSheet(
   BuildContext context, {
   double initialRating = 5,
   String initialComment = '',
+  List<String> initialPhotoUrls = const [],
   bool isEditing = false,
 }) {
   return showModalBottomSheet<ReviewFormResult>(
@@ -37,6 +46,7 @@ Future<ReviewFormResult?> showReviewFormSheet(
     builder: (context) => _ReviewFormSheet(
       initialRating: initialRating,
       initialComment: initialComment,
+      initialPhotoUrls: initialPhotoUrls,
       isEditing: isEditing,
     ),
   );
@@ -46,11 +56,13 @@ class _ReviewFormSheet extends StatefulWidget {
   const _ReviewFormSheet({
     required this.initialRating,
     required this.initialComment,
+    required this.initialPhotoUrls,
     required this.isEditing,
   });
 
   final double initialRating;
   final String initialComment;
+  final List<String> initialPhotoUrls;
   final bool isEditing;
 
   @override
@@ -58,21 +70,26 @@ class _ReviewFormSheet extends StatefulWidget {
 }
 
 class _ReviewFormSheetState extends State<_ReviewFormSheet> {
+  static const int _maxPhotos = 3;
+
   final _formKey = GlobalKey<FormState>();
   late double _rating = widget.initialRating;
   late final TextEditingController _commentController = TextEditingController(
     text: widget.initialComment,
   );
-  final List<File> _photos = [];
+  late final List<String> _keptPhotoUrls = [...widget.initialPhotoUrls];
+  final List<File> _newPhotos = [];
   final ImagePicker _picker = ImagePicker();
 
+  int get _totalPhotoCount => _keptPhotoUrls.length + _newPhotos.length;
+
   Future<void> _pickPhoto() async {
-    if (_photos.length >= 3) return;
+    if (_totalPhotoCount >= _maxPhotos) return;
     final picked = await _picker.pickImage(
       source: ImageSource.gallery,
       imageQuality: 80,
     );
-    if (picked != null) setState(() => _photos.add(File(picked.path)));
+    if (picked != null) setState(() => _newPhotos.add(File(picked.path)));
   }
 
   @override
@@ -159,7 +176,44 @@ class _ReviewFormSheetState extends State<_ReviewFormSheet> {
                   const SizedBox(height: AppSpacing.md),
                   Row(
                     children: [
-                      ..._photos.map(
+                      ..._keptPhotoUrls.map(
+                        (url) => Padding(
+                          padding: const EdgeInsets.only(right: AppSpacing.sm),
+                          child: Stack(
+                            children: [
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(
+                                  AppRadius.md,
+                                ),
+                                child: CachedNetworkImage(
+                                  imageUrl: url,
+                                  width: 64,
+                                  height: 64,
+                                  fit: BoxFit.cover,
+                                ),
+                              ),
+                              Positioned(
+                                top: -6,
+                                right: -6,
+                                child: GestureDetector(
+                                  onTap: () =>
+                                      setState(() => _keptPhotoUrls.remove(url)),
+                                  child: const CircleAvatar(
+                                    radius: 10,
+                                    backgroundColor: AppColors.error,
+                                    child: Icon(
+                                      Symbols.close_rounded,
+                                      size: 12,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      ..._newPhotos.map(
                         (file) => Padding(
                           padding: const EdgeInsets.only(right: AppSpacing.sm),
                           child: Stack(
@@ -180,7 +234,7 @@ class _ReviewFormSheetState extends State<_ReviewFormSheet> {
                                 right: -6,
                                 child: GestureDetector(
                                   onTap: () =>
-                                      setState(() => _photos.remove(file)),
+                                      setState(() => _newPhotos.remove(file)),
                                   child: const CircleAvatar(
                                     radius: 10,
                                     backgroundColor: AppColors.error,
@@ -196,7 +250,7 @@ class _ReviewFormSheetState extends State<_ReviewFormSheet> {
                           ),
                         ),
                       ),
-                      if (_photos.length < 3)
+                      if (_totalPhotoCount < _maxPhotos)
                         InkWell(
                           onTap: _pickPhoto,
                           borderRadius: BorderRadius.circular(AppRadius.md),
@@ -225,7 +279,8 @@ class _ReviewFormSheetState extends State<_ReviewFormSheet> {
                         ReviewFormResult(
                           rating: _rating,
                           comment: _commentController.text.trim(),
-                          newPhotos: _photos,
+                          keptPhotoUrls: _keptPhotoUrls,
+                          newPhotos: _newPhotos,
                         ),
                       );
                     },

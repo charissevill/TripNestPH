@@ -123,16 +123,22 @@ class FestivalRepository {
     }
   }
 
-  Future<void> updateAggregateRating(
-    String id, {
-    required double rating,
-    required int reviewCount,
-  }) async {
+  /// Overwrites just the average — [ReviewRepository] owns `reviewCount`
+  /// separately via [adjustReviewCount], which is atomic and must never be
+  /// clobbered by a plain overwrite based on a possibly-stale read.
+  Future<void> updateAggregateRating(String id, {required double rating}) async {
     try {
-      await _collection.doc(id).update({
-        'rating': rating,
-        'reviewCount': reviewCount,
-      });
+      await _collection.doc(id).update({'rating': rating});
+    } catch (e) {
+      throw AppException.from(e);
+    }
+  }
+
+  /// Atomically bumps `reviewCount` by [delta] (+1/-1) server-side — see
+  /// `DestinationRepository.adjustReviewCount` for the full reasoning.
+  Future<void> adjustReviewCount(String id, int delta) async {
+    try {
+      await _collection.doc(id).update({'reviewCount': FieldValue.increment(delta)});
     } catch (e) {
       throw AppException.from(e);
     }

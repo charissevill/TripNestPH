@@ -7,10 +7,10 @@ import 'package:tripnest_ph/data/repositories/restaurant_repository.dart';
 import 'package:tripnest_ph/data/repositories/review_repository.dart';
 import 'package:tripnest_ph/domain/models/review.dart';
 
-Review _review({required String id, required double rating}) {
+Review _review({required String id, required double rating, String userId = 'user-1'}) {
   return Review(
     id: id,
-    userId: 'user-1',
+    userId: userId,
     targetId: 'dest-1',
     targetType: ReviewTargetType.destination,
     authorName: 'Traveler',
@@ -45,12 +45,24 @@ void main() {
   });
 
   test('addReview() recalculates the target\'s aggregate rating and review count', () async {
-    await reviewRepository.addReview(review: _review(id: '', rating: 4));
-    await reviewRepository.addReview(review: _review(id: '', rating: 2));
+    await reviewRepository.addReview(review: _review(id: '', rating: 4, userId: 'user-1'));
+    await reviewRepository.addReview(review: _review(id: '', rating: 2, userId: 'user-2'));
 
     final doc = await firestore.collection('tourist_spots').doc('dest-1').get();
     expect(doc.data()?['reviewCount'], 2);
     expect(doc.data()?['rating'], 3.0);
+  });
+
+  test('addReview() from the same user for the same target overwrites instead of duplicating', () async {
+    await reviewRepository.addReview(review: _review(id: '', rating: 4));
+    await reviewRepository.addReview(review: _review(id: '', rating: 2));
+
+    final doc = await firestore.collection('tourist_spots').doc('dest-1').get();
+    expect(doc.data()?['reviewCount'], 1);
+    expect(doc.data()?['rating'], 2.0);
+    final reviews = await reviewRepository.getByUser('user-1');
+    expect(reviews, hasLength(1));
+    expect(reviews.single.rating, 2);
   });
 
   test('deleteReview() removes it and recalculates the aggregate down to zero', () async {

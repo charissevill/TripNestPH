@@ -19,10 +19,17 @@ class ReviewReportRepository {
   /// blocks it outright instead of letting one user file unlimited reports
   /// against the same review.
   Future<void> report({required String reviewId, required String userId, required String reason}) async {
+    final ref = _collection.doc('${reviewId}_$userId');
     try {
-      await _collection
-          .doc('${reviewId}_$userId')
-          .set(ReviewReport(id: '', reviewId: reviewId, userId: userId, reason: reason, createdAt: DateTime.now()).toMap());
+      // Checked explicitly rather than letting the second write hit
+      // firestore.rules' `allow update: if false` and surface as a generic
+      // "you don't have permission to do that" — which reads like a bug,
+      // not confirmation the report already went through.
+      final existing = await ref.get();
+      if (existing.exists) {
+        throw const AppException('You\'ve already reported this review.');
+      }
+      await ref.set(ReviewReport(id: '', reviewId: reviewId, userId: userId, reason: reason, createdAt: DateTime.now()).toMap());
     } catch (e) {
       throw AppException.from(e);
     }

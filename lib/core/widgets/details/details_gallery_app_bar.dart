@@ -80,14 +80,30 @@ class _DetailsGalleryAppBarState extends State<DetailsGalleryAppBar> with AutoAd
         background: Stack(
           fit: StackFit.expand,
           children: [
-            PageView.builder(
-              controller: _pageController,
-              itemCount: widget.imageUrls.length,
-              itemBuilder: (context, index) {
-                final image = CachedNetworkImage(imageUrl: widget.imageUrls[index], fit: BoxFit.cover);
-                return index == 0 && widget.heroTag != null ? Hero(tag: widget.heroTag!, child: image) : image;
-              },
-            ),
+            // An admin-added listing with no photos yet used to render a
+            // blank hero header here — province_details_screen.dart already
+            // has a tinted fallback for exactly this case; this mirrors the
+            // simple (non-live-photo) half of it, since the other three
+            // Details screens share this one widget.
+            if (widget.imageUrls.isEmpty)
+              Container(
+                color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.15),
+                alignment: Alignment.center,
+                child: Icon(
+                  Symbols.image_rounded,
+                  size: 48,
+                  color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.4),
+                ),
+              )
+            else
+              PageView.builder(
+                controller: _pageController,
+                itemCount: widget.imageUrls.length,
+                itemBuilder: (context, index) {
+                  final image = CachedNetworkImage(imageUrl: widget.imageUrls[index], fit: BoxFit.cover);
+                  return index == 0 && widget.heroTag != null ? Hero(tag: widget.heroTag!, child: image) : image;
+                },
+              ),
             Positioned.fill(
               child: IgnorePointer(
                 child: DecoratedBox(

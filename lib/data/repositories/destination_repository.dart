@@ -154,16 +154,27 @@ class DestinationRepository {
     }
   }
 
-  Future<void> updateAggregateRating(
-    String id, {
-    required double rating,
-    required int reviewCount,
-  }) async {
+  /// Overwrites just the average — [ReviewRepository] owns `reviewCount`
+  /// separately via [adjustReviewCount], which is atomic and must never be
+  /// clobbered by a plain overwrite based on a possibly-stale read.
+  Future<void> updateAggregateRating(String id, {required double rating}) async {
     try {
-      await _collection.doc(id).update({
-        'rating': rating,
-        'reviewCount': reviewCount,
-      });
+      await _collection.doc(id).update({'rating': rating});
+    } catch (e) {
+      throw AppException.from(e);
+    }
+  }
+
+  /// Atomically bumps `reviewCount` by [delta] (+1/-1) server-side —
+  /// race-free no matter how many reviews are being added/removed/hidden
+  /// for this listing at once, unlike a read-recompute-write cycle where
+  /// two concurrent calls can silently clobber each other and leave the
+  /// count permanently wrong. Works correctly against existing documents
+  /// with no migration needed, since it increments whatever `reviewCount`
+  /// is already there.
+  Future<void> adjustReviewCount(String id, int delta) async {
+    try {
+      await _collection.doc(id).update({'reviewCount': FieldValue.increment(delta)});
     } catch (e) {
       throw AppException.from(e);
     }

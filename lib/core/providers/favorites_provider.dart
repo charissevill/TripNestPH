@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../data/repositories/favorites_repository.dart';
 import '../../domain/models/place.dart';
+import '../utils/app_exception.dart';
 
 /// Firestore-backed favorites state, exposing the exact same API the Phase 1
 /// UI already calls (`isDestinationSaved`, `toggleDestination`, ...) so no
@@ -19,6 +20,12 @@ class FavoritesProvider extends ChangeNotifier {
   Set<String> _savedDestinationIds = {};
   Set<String> _savedRestaurantIds = {};
   Set<String> _savedFestivalIds = {};
+
+  // Chains writes for the same (type, id) so a rapid double-tap (save, then
+  // unsave before the first write lands) applies to Firestore in the order
+  // the taps actually happened, instead of two independent, unordered async
+  // calls racing and possibly landing in the wrong order.
+  final Map<String, Future<void>> _pendingByKey = {};
 
   /// A live Places result is never persisted to Firestore anywhere else, so
   /// unlike the three sets above (each backed by its own collection to
@@ -86,10 +93,24 @@ class FavoritesProvider extends ChangeNotifier {
     }
     notifyListeners();
 
-    final future = wasSaved ? _repository.remove(userId, type, id) : _repository.add(userId, type, id);
-    future.catchError((_) {
-      // Offline persistence queues the write for later; nothing to revert.
+    final key = '${type.name}:$id';
+    final previous = _pendingByKey[key] ?? Future.value();
+    final chained = previous.then((_) {
+      return (wasSaved ? _repository.remove(userId, type, id) : _repository.add(userId, type, id)).catchError((e) {
+        // A genuine offline error queues via Firestore's own persistence
+        // and will apply once connectivity returns — nothing to revert. Any
+        // other failure (stale auth token, a rules regression) means the
+        // write never happened and never will on its own, so the optimistic
+        // flip above must be undone instead of silently lying to the user
+        // that it saved.
+        if (isOfflineException(e)) return;
+        if (currentSet.contains(id) == !wasSaved) {
+          wasSaved ? currentSet.add(id) : currentSet.remove(id);
+          notifyListeners();
+        }
+      });
     });
+    _pendingByKey[key] = chained;
   }
 
   /// Same optimistic-update shape as [_toggle], but list-based (there's no

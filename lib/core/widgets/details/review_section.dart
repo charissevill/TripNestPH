@@ -44,6 +44,7 @@ class _ReviewSectionState extends State<ReviewSection> {
       context,
       initialRating: existing?.rating ?? 5,
       initialComment: existing?.comment ?? '',
+      initialPhotoUrls: existing?.photoUrls ?? const [],
       isEditing: existing != null,
     );
     if (result == null || !context.mounted) return;
@@ -63,6 +64,8 @@ class _ReviewSectionState extends State<ReviewSection> {
             createdAt: existing.createdAt,
             photoUrls: existing.photoUrls,
           ),
+          keptPhotoUrls: result.keptPhotoUrls,
+          newPhotos: result.newPhotos,
         );
       } else {
         final user = auth.currentUser;
@@ -135,49 +138,62 @@ class _ReviewSectionState extends State<ReviewSection> {
     final theme = Theme.of(context);
     final currentUid = context.watch<AuthProvider>().firebaseUser?.uid;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
+    return StreamBuilder<List<Review>>(
+      stream: _repository.streamForTarget(widget.targetId, widget.targetType),
+      builder: (context, snapshot) {
+        final reviews = snapshot.data ?? const [];
+        // Live, from the same stream the list below renders — not the
+        // parent screen's one-time initial load, which used to sit frozen
+        // above a list that had already moved on (e.g. right after
+        // submitting a review, the count here used to lag until the whole
+        // screen was pulled to refresh).
+        final count = snapshot.connectionState == ConnectionState.waiting ? widget.reviewCount : reviews.length;
+        Review? ownReview;
+        for (final r in reviews) {
+          if (r.userId == currentUid) {
+            ownReview = r;
+            break;
+          }
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Expanded(child: Text('Reviews (${widget.reviewCount})', style: theme.textTheme.titleLarge)),
-            TextButton.icon(
-              onPressed: () => _writeReview(context),
-              icon: const Icon(Symbols.edit_rounded, size: 18),
-              label: const Text('Write a Review'),
+            Row(
+              children: [
+                Expanded(child: Text('Reviews ($count)', style: theme.textTheme.titleLarge)),
+                TextButton.icon(
+                  onPressed: () => _writeReview(context, existing: ownReview),
+                  icon: const Icon(Symbols.edit_rounded, size: 18),
+                  label: Text(ownReview == null ? 'Write a Review' : 'Edit Your Review'),
+                ),
+              ],
             ),
-          ],
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        StreamBuilder<List<Review>>(
-          stream: _repository.streamForTarget(widget.targetId, widget.targetType),
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Padding(
+            const SizedBox(height: AppSpacing.sm),
+            if (snapshot.connectionState == ConnectionState.waiting)
+              const Padding(
                 padding: EdgeInsets.symmetric(vertical: AppSpacing.lg),
                 child: Center(child: CircularProgressIndicator(strokeWidth: 2.4)),
-              );
-            }
-            final reviews = snapshot.data ?? const [];
-            if (reviews.isEmpty) {
-              return Padding(
+              )
+            else if (reviews.isEmpty)
+              Padding(
                 padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
                 child: Text(
                   'No reviews yet — be the first to share your experience.',
                   style: theme.textTheme.bodyMedium,
                 ),
-              );
-            }
-            return ReviewList(
-              reviews: reviews,
-              currentUserId: currentUid,
-              onEdit: (r) => _writeReview(context, existing: r),
-              onDelete: (r) => _deleteReview(context, r),
-              onReport: (r) => _reportReview(context, r),
-            );
-          },
-        ),
-      ],
+              )
+            else
+              ReviewList(
+                reviews: reviews,
+                currentUserId: currentUid,
+                onEdit: (r) => _writeReview(context, existing: r),
+                onDelete: (r) => _deleteReview(context, r),
+                onReport: (r) => _reportReview(context, r),
+              ),
+          ],
+        );
+      },
     );
   }
 }

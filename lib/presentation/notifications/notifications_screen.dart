@@ -101,13 +101,14 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                       const SizedBox(height: AppSpacing.sm),
                   itemBuilder: (context, i) {
                     final notification = notifications[i];
+                    final isRead = notification.isReadBy(uid);
                     return InkWell(
-                      onTap: () => repository.markAsRead(notification.id),
+                      onTap: () => repository.markAsRead(notification, uid),
                       borderRadius: BorderRadius.circular(AppRadius.lg),
                       child: Container(
                         padding: const EdgeInsets.all(AppSpacing.md),
                         decoration: BoxDecoration(
-                          color: notification.isRead
+                          color: isRead
                               ? theme.colorScheme.surface
                               : theme.colorScheme.primary.withValues(
                                   alpha: 0.06,
@@ -157,7 +158,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                                 ],
                               ),
                             ),
-                            if (!notification.isRead)
+                            if (!isRead)
                               Container(
                                 width: 8,
                                 height: 8,

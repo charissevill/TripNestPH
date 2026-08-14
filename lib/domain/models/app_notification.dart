@@ -54,6 +54,7 @@ class AppNotification {
     required this.category,
     required this.createdAt,
     this.isRead = false,
+    this.readBy = const [],
     this.relatedId,
     this.imageUrl = '',
   });
@@ -66,7 +67,20 @@ class AppNotification {
   final String body;
   final NotificationCategory category;
   final DateTime createdAt;
+
+  /// Read state for a *personal* notification (`userId` non-empty). Ignored
+  /// for a broadcast, which has no single owner — see [readBy].
   final bool isRead;
+
+  /// Read state for a *broadcast* notification (`userId == ''`): the uids of
+  /// every traveler who's opened it. One shared doc has no single "read"
+  /// flag to flip, since that would mark it read for every recipient at
+  /// once — see [isReadBy].
+  final List<String> readBy;
+
+  /// The read state to actually show a given viewer — [isRead] for a
+  /// personal notification, whether they're in [readBy] for a broadcast.
+  bool isReadBy(String? uid) => userId.isEmpty ? readBy.contains(uid) : isRead;
 
   /// Id of the festival/destination this notification links to, if any.
   final String? relatedId;
@@ -82,6 +96,7 @@ class AppNotification {
       category: _categoryFromString(map['category'] as String? ?? 'general'),
       createdAt: timestamp is Timestamp ? timestamp.toDate() : DateTime.now(),
       isRead: map['isRead'] as bool? ?? false,
+      readBy: (map['readBy'] as List<dynamic>?)?.cast<String>() ?? const [],
       relatedId: map['relatedId'] as String?,
       imageUrl: map['imageUrl'] as String? ?? '',
     );

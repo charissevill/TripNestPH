@@ -81,6 +81,29 @@ class UserRepository {
     }
   }
 
+  /// Server-side prefix match on email — the Admin Portal's search box
+  /// otherwise only ever filtered whatever page had already been scrolled
+  /// into `_users` locally, so searching for a traveler beyond the first
+  /// `pageSize` accounts silently returned "No matches" even though the
+  /// account genuinely exists. Case-sensitive (Firestore range queries
+  /// can't do case-insensitive matching without a separate lowercased
+  /// field this collection doesn't have), so the caller should lowercase
+  /// [prefix] to match how email is normally typed/stored.
+  Future<List<AppUser>> searchByEmailPrefix(String prefix, {int limit = 20}) async {
+    if (prefix.isEmpty) return const [];
+    try {
+      final snapshot = await _users
+          .orderBy('email')
+          .startAt([prefix])
+          .endAt(['$prefix'])
+          .limit(limit)
+          .get();
+      return snapshot.docs.map((d) => AppUser.fromMap(d.id, d.data())).toList();
+    } catch (e) {
+      throw AppException.from(e);
+    }
+  }
+
   /// Admin Portal suspend/activate — matches `firestore.rules`'s
   /// admin-write permission on `users` exactly (status only, never any
   /// other field alongside it).
@@ -148,13 +171,25 @@ class UserRepository {
     }
   }
 
+  /// Doc count above which older entries get pruned — well above the 10
+  /// ever actually displayed ([recentlyViewedDestinations]'s `limit`), just
+  /// enough slack that pruning doesn't run on every single view.
+  static const int _maxRecentlyViewed = 30;
+
   Future<void> recordRecentlyViewed(String uid, String destinationId) async {
     try {
-      await _users
-          .doc(uid)
-          .collection(FirestorePaths.recentlyViewed)
-          .doc(destinationId)
-          .set({'viewedAt': FieldValue.serverTimestamp()});
+      final collection = _users.doc(uid).collection(FirestorePaths.recentlyViewed);
+      await collection.doc(destinationId).set({'viewedAt': FieldValue.serverTimestamp()});
+      // Otherwise this subcollection grows forever — nothing ever pruned
+      // it, since reads already cap at 10 and never surfaced the problem.
+      final snapshot = await collection.orderBy('viewedAt', descending: true).get();
+      if (snapshot.docs.length > _maxRecentlyViewed) {
+        final batch = _db.batch();
+        for (final doc in snapshot.docs.skip(_maxRecentlyViewed)) {
+          batch.delete(doc.reference);
+        }
+        await batch.commit();
+      }
     } catch (e) {
       // Recently-viewed tracking is best-effort; never block navigation on it.
     }

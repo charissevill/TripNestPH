@@ -104,22 +104,30 @@ class _MyPhotosScreenState extends State<MyPhotosScreen> {
         ownerId: uid,
         file: file,
       );
-      await _photoRepository.create(
-        TripPhoto(
-          id: '',
-          userId: uid,
-          photoUrl: photoUrl,
-          createdAt: DateTime.now(),
-          takenAt: exif.takenAt,
-          latitude: exif.latitude,
-          longitude: exif.longitude,
-          placeName: match?.name,
-          matchTier: match?.tier,
-          destinationId: match?.destinationId,
-          restaurantId: match?.restaurantId,
-          placeId: match?.placeId,
-        ),
-      );
+      try {
+        await _photoRepository.create(
+          TripPhoto(
+            id: '',
+            userId: uid,
+            photoUrl: photoUrl,
+            createdAt: DateTime.now(),
+            takenAt: exif.takenAt,
+            latitude: exif.latitude,
+            longitude: exif.longitude,
+            placeName: match?.name,
+            matchTier: match?.tier,
+            destinationId: match?.destinationId,
+            restaurantId: match?.restaurantId,
+            placeId: match?.placeId,
+          ),
+        );
+      } catch (e) {
+        // The upload above already succeeded — without this, a failure
+        // right here (dropped connection, rules mismatch) orphans that file
+        // in Storage forever with no Firestore doc ever pointing at it.
+        await _storageService.deleteByUrl(photoUrl);
+        rethrow;
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(

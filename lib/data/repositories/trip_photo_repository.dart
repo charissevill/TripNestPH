@@ -43,4 +43,34 @@ class TripPhotoRepository {
       throw AppException.from(e);
     }
   }
+
+  /// Every photo doc [userId] owns — the caller is responsible for also
+  /// deleting each [TripPhoto.photoUrl] from Storage (see
+  /// `AuthProvider.deleteAccount`), since this repository has no Storage
+  /// access of its own.
+  Future<List<TripPhoto>> getAllForUser(String userId) async {
+    try {
+      final snapshot = await _collection.where('userId', isEqualTo: userId).get();
+      return snapshot.docs.map((d) => TripPhoto.fromMap(d.id, d.data())).toList();
+    } catch (e) {
+      throw AppException.from(e);
+    }
+  }
+
+  /// Deletes every photo doc [userId] owns — part of account deletion. Does
+  /// NOT touch Storage; callers that also need the underlying files removed
+  /// should use [getAllForUser] first and delete each [TripPhoto.photoUrl]
+  /// via `StorageService.deleteByUrl`.
+  Future<void> deleteAllForUser(String userId) async {
+    try {
+      final snapshot = await _collection.where('userId', isEqualTo: userId).get();
+      final batch = _db.batch();
+      for (final doc in snapshot.docs) {
+        batch.delete(doc.reference);
+      }
+      await batch.commit();
+    } catch (e) {
+      throw AppException.from(e);
+    }
+  }
 }

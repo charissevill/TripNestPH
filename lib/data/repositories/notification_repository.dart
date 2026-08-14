@@ -34,9 +34,19 @@ class NotificationRepository {
     });
   }
 
-  Future<void> markAsRead(String id) async {
+  /// Marks [notification] read for [uid]. A broadcast (empty `userId`) has
+  /// no single owner, so this appends [uid] to a shared `readBy` array
+  /// instead of flipping `isRead` — otherwise the first traveler to open a
+  /// festival announcement would mark it read for every other traveler too.
+  Future<void> markAsRead(AppNotification notification, String uid) async {
     try {
-      await _collection.doc(id).update({'isRead': true});
+      if (notification.userId.isEmpty) {
+        await _collection.doc(notification.id).update({
+          'readBy': FieldValue.arrayUnion([uid]),
+        });
+      } else {
+        await _collection.doc(notification.id).update({'isRead': true});
+      }
     } catch (e) {
       throw AppException.from(e);
     }
@@ -65,6 +75,22 @@ class NotificationRepository {
           createdAt: DateTime.now(),
         ).toMap(),
       );
+    } catch (e) {
+      throw AppException.from(e);
+    }
+  }
+
+  /// Deletes every *personal* notification [userId] owns — part of account
+  /// deletion. Broadcasts are never touched here: they belong to no single
+  /// user and stay visible to everyone else.
+  Future<void> deleteAllForUser(String userId) async {
+    try {
+      final snapshot = await _collection.where('userId', isEqualTo: userId).get();
+      final batch = _db.batch();
+      for (final doc in snapshot.docs) {
+        batch.delete(doc.reference);
+      }
+      await batch.commit();
     } catch (e) {
       throw AppException.from(e);
     }

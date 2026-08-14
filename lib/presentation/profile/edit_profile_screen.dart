@@ -80,6 +80,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     final uid = auth.firebaseUser?.uid;
     if (uid == null) return;
 
+    // Captured before the upload/update below touch anything — the old
+    // Storage file was otherwise never cleaned up, so a traveler who
+    // changes their avatar repeatedly accumulates one orphaned file per
+    // change, forever, with real Storage cost and nothing ever pointing at
+    // them again. (Harmless no-op if this was actually a Google sign-in
+    // photo URL rather than one of ours — deleteByUrl silently ignores
+    // anything it can't resolve to a real Storage object.)
+    final oldPhotoUrl = auth.currentUser?.photoUrl;
     setState(() => _uploadingPhoto = true);
     try {
       final url = await _storageService.uploadFile(
@@ -88,6 +96,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         file: File(picked.path),
       );
       await auth.updatePhotoUrl(url);
+      if (oldPhotoUrl != null && oldPhotoUrl.isNotEmpty) {
+        await _storageService.deleteByUrl(oldPhotoUrl);
+      }
     } catch (e) {
       if (mounted) setState(() => _error = AppException.from(e).message);
     } finally {
@@ -215,6 +226,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               TextFormField(
                 controller: _nameController,
                 validator: Validators.name,
+                maxLength: 60,
                 decoration: const InputDecoration(
                   labelText: 'Full Name',
                   floatingLabelBehavior: FloatingLabelBehavior.auto,

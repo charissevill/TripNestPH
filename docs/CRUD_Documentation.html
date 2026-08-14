@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>CRUD Functionality Implementation — Week 4</title>
+<style>
+  @page { size: A4; margin: 16mm 16mm; }
+  * { box-sizing: border-box; }
+  body {
+    font-family: 'Georgia', 'Times New Roman', serif;
+    color: #1a1a1a;
+    font-size: 10.8pt;
+    line-height: 1.42;
+    margin: 0;
+  }
+  h1, h2, h3 { font-family: 'Arial', 'Helvetica', sans-serif; color: #0d1b2a; }
+  .cover {
+    height: 253mm;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+  }
+  .cover .badge {
+    width: 84px; height: 84px; border-radius: 50%;
+    background: linear-gradient(135deg,#2D9CDB,#1B7FB8);
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 34px; font-weight: bold; font-family: Arial, sans-serif;
+    margin-bottom: 28px;
+  }
+  .cover h1 {
+    font-size: 26pt; margin: 0 0 4px 0; letter-spacing: 0.5px;
+  }
+  .cover h2 {
+    font-size: 14pt; font-weight: normal; color: #4a5568; margin: 0 0 40px 0;
+  }
+  .cover-table {
+    border-collapse: collapse;
+    font-family: Arial, sans-serif;
+    font-size: 11.5pt;
+  }
+  .cover-table td { padding: 7px 14px; text-align: left; }
+  .cover-table td.label { color: #556; font-weight: bold; white-space: nowrap; }
+  .cover-table td.value { color: #111; border-bottom: 1px solid #cbd5e0; min-width: 220px; }
+  .page-break { page-break-before: always; }
+  h2.section-title {
+    font-size: 13.5pt;
+    border-bottom: 2px solid #2D9CDB;
+    padding-bottom: 3px;
+    margin-top: 16px;
+    margin-bottom: 7px;
+  }
+  h3.op-title {
+    font-size: 11pt;
+    color: #1B7FB8;
+    margin: 0 0 3px 0;
+  }
+  p { margin: 3px 0 6px 0; text-align: justify; }
+  .op-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px 16px;
+  }
+  .op-cell { page-break-inside: avoid; }
+  .op-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .op-row .op-text { flex: 1 1 auto; margin: 0; font-size: 9.7pt; }
+  .op-row .figure { flex: 0 0 auto; margin: 0; }
+  code, .code {
+    font-family: 'Consolas', 'Courier New', monospace;
+    font-size: 9.5pt;
+  }
+  .figure {
+    margin: 10px 0 4px 0;
+    text-align: center;
+    page-break-inside: avoid;
+  }
+  .figure img {
+    max-width: 108px;
+    max-height: 150px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+  }
+  .figure .caption {
+    font-family: Arial, sans-serif;
+    font-size: 8pt;
+    color: #555;
+    font-style: italic;
+    margin-top: 4px;
+  }
+  .codeblock {
+    background: #0d1b2a;
+    color: #dbe4ee;
+    padding: 10px 12px;
+    border-radius: 6px;
+    font-family: 'Consolas','Courier New',monospace;
+    font-size: 8pt;
+    line-height: 1.42;
+    white-space: pre-wrap;
+    margin: 6px 0 4px 0;
+  }
+  .codeblock .kw { color: #7dd3fc; }
+  .codeblock .cm { color: #6b8299; font-style: italic; }
+  table.summary {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: Arial, sans-serif;
+    font-size: 10.5pt;
+    margin: 8px 0;
+  }
+  table.summary th, table.summary td {
+    border: 1px solid #cbd5e0;
+    padding: 7px 10px;
+    text-align: left;
+  }
+  table.summary th { background: #eef4fa; }
+  blockquote {
+    margin: 6px 0; padding: 8px 12px;
+    border-left: 3px solid #2D9CDB;
+    background: #f7fafc;
+    font-size: 11pt;
+  }
+</style>
+</head>
+<body>
+
+<!-- ===================== PAGE 1 — COVER ===================== -->
+<div class="cover">
+  <div class="badge">TN</div>
+  <h1>CRUD FUNCTIONALITY IMPLEMENTATION</h1>
+  <h2>Week 4 Activity</h2>
+  <table class="cover-table">
+    <tr><td class="label">Project Name:</td><td class="value">TripNest PH</td></tr>
+    <tr><td class="label">Main Data Entity:</td><td class="value">Saved Trip Itineraries</td></tr>
+    <tr><td class="label">Submitted by:</td><td class="value">Villarama, Charisse</td></tr>
+    <tr><td class="label">Course/Section:</td><td class="value">ITE233</td></tr>
+    <tr><td class="label">Date:</td><td class="value">August 2026</td></tr>
+  </table>
+</div>
+
+<!-- ===================== PAGE 2+ — CRUD IMPLEMENTATION ===================== -->
+<div class="page-break">
+<h2 class="section-title">1. Introduction</h2>
+<p>
+TripNest PH is a Flutter and Firebase travel-planning app for the Philippines.
+Its AI Trip Planner generates a full day-by-day itinerary — budget breakdown,
+weather outlook, and recommended stays — for a destination the traveler
+chooses. This activity implements complete CRUD (Create, Read, Update,
+Delete) functionality on the main data entity managed from that flow:
+<strong>Saved Trip Itineraries</strong>. Travelers can save a generated
+itinerary, view every trip they've saved, update a trip's travel start date,
+and remove a trip they no longer need.
+</p>
+
+<h2 class="section-title">2. Database Used</h2>
+<p><strong>Database:</strong> Firebase Cloud Firestore</p>
+<p>
+Firebase Firestore stores each saved itinerary as a document in the
+<code>saved_itineraries</code> collection. The app communicates with
+Firestore through a single repository class
+(<code>ItineraryRepository</code>) to create, read, update, and delete these
+records, and listens to the collection live so the "My Trips" list updates
+immediately after any change — no manual refresh needed.
+</p>
+
+<h2 class="section-title">3. CRUD Operations</h2>
+
+<div class="op-grid">
+  <div class="op-cell">
+    <h3 class="op-title">Create</h3>
+    <div class="op-row">
+      <p class="op-text">
+      Saving a freshly AI-generated itinerary by tapping a bookmark icon,
+      optionally tagging it with a real travel start date. Writes the whole
+      itinerary as a new Firestore document.
+      </p>
+      <div class="figure">
+        <img src="crud_create_result.png">
+        <div class="caption">Fig. 1. Create — trip saved.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="op-cell">
+    <h3 class="op-title">Read</h3>
+    <div class="op-row">
+      <p class="op-text">
+      Retrieves every trip the signed-in traveler has saved from Firestore
+      and displays it under "My Trips," live, with no manual refresh
+      needed.
+      </p>
+      <div class="figure">
+        <img src="crud_read_list.png">
+        <div class="caption">Fig. 2. Read — trip listed.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="op-cell">
+    <h3 class="op-title">Update</h3>
+    <div class="op-row">
+      <p class="op-text">
+      Lets the trip's owner change its travel start date through a date
+      picker and save the change back to Firestore. Weather Outlook
+      re-fetches for the new date.
+      </p>
+      <div class="figure">
+        <img src="crud_update_result.png">
+        <div class="caption">Fig. 3. Update — date changed.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="op-cell">
+    <h3 class="op-title">Delete</h3>
+    <div class="op-row">
+      <p class="op-text">
+      Lets the owner remove a saved trip. A confirmation dialog naming the
+      trip is shown first, so it can't be deleted by accident.
+      </p>
+      <div class="figure">
+        <img src="crud_delete_confirm.png">
+        <div class="caption">Fig. 4. Delete — confirm.</div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ===================== PAGE 3 — VALIDATION & SUMMARY ===================== -->
+<div class="page-break">
+<h2 class="section-title">4. Data Validation</h2>
+<p>
+Validation is enforced at two levels. On the client, a save/update/delete
+action is only allowed while the traveler is signed in — an unauthenticated
+attempt shows the message "Sign in to save this itinerary." instead of
+writing anything. On the server, Firebase Firestore Security Rules
+independently re-check every write against the same ownership rule, so the
+restriction cannot be bypassed even by a modified client — a saved
+itinerary can only be created, updated, or deleted by the traveler who owns
+it.
+</p>
+<div class="codeblock">match /saved_itineraries/{itineraryId} {
+  <span class="kw">allow</span> read:   <span class="kw">if</span> isSignedIn() &amp;&amp; (resource.data.userId == request.auth.uid || isCollaborator() || hasAdminRole(['admin']));
+  <span class="kw">allow</span> create: <span class="kw">if</span> isSignedIn() &amp;&amp; request.resource.data.userId == request.auth.uid;
+  <span class="kw">allow</span> delete: <span class="kw">if</span> isSignedIn() &amp;&amp; resource.data.userId == request.auth.uid;
+  <span class="kw">allow</span> update: <span class="kw">if</span> isSignedIn() &amp;&amp; (
+    <span class="cm">// Owner: full control.</span>
+    resource.data.userId == request.auth.uid
+    <span class="cm">// ...or a collaborator joining/leaving a shared trip (see firestore.rules)</span>
+    || ...
+  );
+}</div>
+<div class="caption" style="text-align:center;margin-top:2px;">Figure 5. Firestore Security Rules — server-side ownership validation for <code>saved_itineraries</code>.</div>
+
+<h2 class="section-title">5. CRUD Summary</h2>
+<table class="summary">
+  <tr><th>Operation</th><th>Function</th></tr>
+  <tr><td><strong>Create</strong></td><td>Saves a newly generated itinerary as a new document in Firebase Firestore</td></tr>
+  <tr><td><strong>Read</strong></td><td>Retrieves and displays every trip the traveler has saved, live</td></tr>
+  <tr><td><strong>Update</strong></td><td>Modifies an existing trip's travel start date</td></tr>
+  <tr><td><strong>Delete</strong></td><td>Removes an existing saved trip, after confirmation</td></tr>
+  <tr><td><strong>Validation</strong></td><td>Client-side sign-in check plus server-side Firestore Security Rules restrict every write to the trip's owner</td></tr>
+</table>
+
+<h2 class="section-title">6. Conclusion</h2>
+<blockquote>
+The project successfully implements complete CRUD functionality on Saved
+Trip Itineraries using Firebase Firestore. Travelers can create, view,
+update, and delete their saved trips, while client- and server-side
+validation ensures only the trip's owner can modify or remove it. The
+implemented features provide a functional and user-friendly way of managing
+a traveler's saved trips within TripNest PH.
+</blockquote>
+</div>
+
+</body>
+</html>

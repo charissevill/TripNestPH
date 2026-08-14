@@ -199,7 +199,12 @@ class AiChatProvider extends ChangeNotifier {
     unawaited(_persistSessions());
 
     final version = ++_requestVersion;
-    final history = _currentSession!.messages;
+    // Error bubbles ("Something went wrong. Please try again.") are UI
+    // feedback, not a real assistant reply — sending them back as context
+    // used to make the model treat its own past failure message as if it
+    // had actually said that, for every turn until it aged out of the
+    // history window.
+    final history = _currentSession!.messages.where((m) => !m.isError).toList();
     final recentHistory = history.length > _maxHistoryMessages
         ? history.sublist(history.length - _maxHistoryMessages)
         : history;

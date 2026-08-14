@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:cached_network_image/cached_network_image.dart';
@@ -75,7 +76,6 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
   final ExpenseRepository _expenseRepository = ExpenseRepository();
   final ItineraryOfflineService _offlineService = ItineraryOfflineService();
   final LocalPreferencesService _preferencesService = LocalPreferencesService();
-  final WeatherService _weatherService = WeatherService();
   final PlacesService _places = PlacesService();
   bool _busy = false;
   bool _exportingPdf = false;
@@ -119,18 +119,25 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
     }
   }
 
-  @override
-  void dispose() {
-    _weatherService.dispose();
-    super.dispose();
-  }
-
   Future<void> _loadOfflineStatus() async {
     final ids = await _preferencesService.getOfflineItineraryIds();
-    if (mounted)
-      setState(
-        () => _isAvailableOffline = ids.contains(widget.savedItineraryId),
+    final isAvailable = ids.contains(widget.savedItineraryId);
+    if (mounted) setState(() => _isAvailableOffline = isAvailable);
+    // The downloaded snapshot was otherwise a one-time capture with no way
+    // to know it had gone stale (a collaborator's edit, a changed start
+    // date) — opening the trip screen at all means there's connectivity
+    // right now, so quietly re-warming it here keeps an already-downloaded
+    // trip's offline copy no more than "one online visit" out of date,
+    // without needing a separate staleness check. Silent and best-effort:
+    // no loading state, no error surfaced — the traveler already has a
+    // working (if slightly stale) offline copy either way.
+    if (isAvailable && mounted) {
+      unawaited(
+        _offlineService
+            .makeAvailableOffline(context: context, itineraryId: widget.savedItineraryId!, itinerary: widget.itinerary)
+            .catchError((_) {}),
       );
+    }
   }
 
   Future<void> _saveOffline() async {
@@ -161,6 +168,13 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
     try {
       final trip = await _repository.getById(widget.savedItineraryId!);
       if (mounted) setState(() => _savedItinerary = trip);
+      // Otherwise the Weather Outlook silently kept showing the forecast
+      // fetched back on the day this trip was first generated, forever —
+      // _refreshWeatherForDate was only ever wired to the date *picker*
+      // (_editStartDate), never to loading a trip that already has a date.
+      if (trip?.startDate != null) {
+        await _refreshWeatherForDate(trip!.startDate!);
+      }
     } catch (_) {
       // Best-effort: falls back to owner-only view (packing/collaborators
       // sections simply won't render) rather than blocking the itinerary.
@@ -345,6 +359,14 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
           context,
         ).showSnackBar(SnackBar(content: Text(AppException.from(e).message)));
     }
+    // Any reminder set earlier was relative to the OLD date and has no
+    // reliable way to be re-derived for the new one (it's a freely-picked
+    // date/time, not always "N days before the trip") — cancelling rather
+    // than leaving it to silently fire on a date that's no longer this
+    // trip's start is the safer failure mode. NotificationService.
+    // cancelReminder is a no-op if nothing was ever scheduled for that id.
+    await NotificationService.instance.cancelReminder(_reminderId(isTravelDay: true));
+    await NotificationService.instance.cancelReminder(_reminderId(isTravelDay: false));
     await _refreshWeatherForDate(picked);
   }
 
@@ -373,11 +395,22 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
       return;
     }
 
-    final forecast = await _weatherService.getForecast(
-      latitude: latitude,
-      longitude: longitude,
-      days: forecastWindow,
-    );
+    // A fresh client per request, never a field held for the widget's whole
+    // lifetime — the same fix CurrentWeatherCard already needed: reusing
+    // one long-lived http.Client across requests can get stuck after a
+    // network blip, silently returning empty/stale forecasts on every
+    // subsequent date change until the screen is closed and reopened.
+    final weatherService = WeatherService();
+    List<WeatherForecast> forecast;
+    try {
+      forecast = await weatherService.getForecast(
+        latitude: latitude,
+        longitude: longitude,
+        days: forecastWindow,
+      );
+    } finally {
+      weatherService.dispose();
+    }
     final forTrip = forecast.length > daysUntilTrip
         ? forecast.sublist(daysUntilTrip)
         : const <WeatherForecast>[];
@@ -461,9 +494,23 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
 
       if (!mounted) return;
       if (itinerary != null) {
+        final savedId = widget.savedItineraryId;
+        if (savedId != null) {
+          // Already saved — overwrite the same trip in place instead of
+          // leaving it stale/orphaned while this pushes a second, separate
+          // unsaved copy (see updateItinerary's doc comment).
+          try {
+            await _repository.updateItinerary(savedId, title: itinerary.destinationName, itinerary: itinerary);
+          } catch (e) {
+            if (!mounted) return;
+            _showRegenerateError(AppException.from(e).message);
+            return;
+          }
+        }
+        if (!mounted) return;
         context.pushReplacement(
           RoutePaths.generatedItinerary,
-          extra: {'itinerary': itinerary},
+          extra: {'itinerary': itinerary, if (savedId != null) 'savedId': savedId},
         );
       } else {
         _showRegenerateError(
@@ -529,6 +576,17 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
     }
   }
 
+  /// Keyed by the trip's own saved id, not just its destination name — two
+  /// separate saved trips to the same place (different dates) used to
+  /// collide on the same notification id, so scheduling a reminder on the
+  /// second trip silently cancelled the first trip's reminder (see
+  /// `NotificationService.scheduleReminder`'s "same id replaces it"
+  /// contract). Packing vs. travel-day still get different id offsets so
+  /// scheduling one never overwrites the other for the *same* trip.
+  int _reminderId({required bool isTravelDay}) {
+    return widget.savedItineraryId.hashCode + (isTravelDay ? 0 : 1);
+  }
+
   Future<void> _setReminder() async {
     final choice = await showModalBottomSheet<String>(
       context: context,
@@ -558,10 +616,7 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
     if (dateTime == null || !mounted) return;
 
     final isTravelDay = choice == 'travel';
-    // Packing and travel-day reminders for the same trip get different id
-    // offsets so scheduling one never overwrites the other.
-    final id =
-        widget.itinerary.destinationName.hashCode + (isTravelDay ? 0 : 1);
+    final id = _reminderId(isTravelDay: isTravelDay);
     await NotificationService.instance.scheduleReminder(
       id: id,
       title: isTravelDay ? 'Travel Day Reminder' : 'Packing Reminder',
@@ -766,12 +821,13 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
   Future<void> _togglePackingItem(PackingItem item) async {
     final trip = _savedItinerary;
     if (trip == null) return;
+    final newChecked = !item.checked;
     final updated = trip.packingItems
-        .map((p) => p.id == item.id ? p.copyWith(checked: !p.checked) : p)
+        .map((p) => p.id == item.id ? p.copyWith(checked: newChecked) : p)
         .toList();
     setState(() => _savedItinerary = trip.copyWith(packingItems: updated));
     try {
-      await _repository.updatePackingItems(trip.id, updated);
+      await _repository.togglePackingItem(trip.id, item.id, newChecked);
     } catch (e) {
       if (mounted)
         ScaffoldMessenger.of(
@@ -818,7 +874,7 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
     final updated = [...trip.packingItems, newItem];
     setState(() => _savedItinerary = trip.copyWith(packingItems: updated));
     try {
-      await _repository.updatePackingItems(trip.id, updated);
+      await _repository.addPackingItem(trip.id, newItem);
     } catch (e) {
       if (mounted)
         ScaffoldMessenger.of(
@@ -841,7 +897,7 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
     final updated = trip.packingItems.where((p) => p.id != item.id).toList();
     setState(() => _savedItinerary = trip.copyWith(packingItems: updated));
     try {
-      await _repository.updatePackingItems(trip.id, updated);
+      await _repository.removePackingItem(trip.id, item.id);
     } catch (e) {
       if (mounted)
         ScaffoldMessenger.of(
@@ -1129,6 +1185,7 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
                                     allMemberIds: memberIds,
                                     memberNames: memberNames,
                                     currentUid: _uid,
+                                    isOwner: _isOwner,
                                     onDelete: _deleteExpense,
                                   ),
                                   if (expenses.isNotEmpty)
@@ -1644,6 +1701,7 @@ class _BudgetTrackerCard extends StatelessWidget {
     required this.allMemberIds,
     required this.memberNames,
     required this.currentUid,
+    required this.isOwner,
     required this.onDelete,
   });
 
@@ -1652,6 +1710,12 @@ class _BudgetTrackerCard extends StatelessWidget {
   final List<String> allMemberIds;
   final Map<String, String> memberNames;
   final String? currentUid;
+
+  /// The trip owner can remove any expense; a collaborator can only remove
+  /// their own — matches the server-side rule (firestore.rules' `expenses`
+  /// match block), so the button offered here never fails a tap with a
+  /// permission error the traveler had no way to predict.
+  final bool isOwner;
   final ValueChanged<Expense> onDelete;
 
   String _nameFor(String uid) =>
@@ -1768,14 +1832,17 @@ class _BudgetTrackerCard extends StatelessWidget {
                       '₱${expense.amount.toStringAsFixed(0)}',
                       style: theme.textTheme.labelMedium,
                     ),
-                    IconButton(
-                      icon: Icon(
-                        Symbols.close_rounded,
-                        size: 18,
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                      onPressed: () => onDelete(expense),
-                    ),
+                    if (isOwner || expense.loggedBy == currentUid)
+                      IconButton(
+                        icon: Icon(
+                          Symbols.close_rounded,
+                          size: 18,
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                        onPressed: () => onDelete(expense),
+                      )
+                    else
+                      const SizedBox(width: 48),
                   ],
                 ),
               ),

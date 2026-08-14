@@ -34,15 +34,43 @@ class AiRepository {
     PlacesService? placesService,
   }) : _openAi = openAiService ?? OpenAiService(),
        _cache = cacheService ?? AiCacheService(),
-       _weather = weatherService ?? WeatherService(),
+       _weatherOverride = weatherService,
        _places = placesService ?? PlacesService(),
        _restaurantRepositoryOverride = restaurantRepository,
        _provinceRepositoryOverride = provinceRepository;
 
   final OpenAiService _openAi;
   final AiCacheService _cache;
-  final WeatherService _weather;
+
+  // Null in production — a fresh WeatherService is created per request
+  // instead (see _fetchForecast) rather than one held for this repository's
+  // whole lifetime, which is effectively the app's whole lifetime (both
+  // AiChatProvider and AiPlannerProvider construct their AiRepository once
+  // at startup). The same stale-client bug CurrentWeatherCard was fixed for:
+  // a long-lived http.Client can get stuck after a network blip and keep
+  // returning empty/stale forecasts for every generation after that. Tests
+  // inject a fake here and get that exact instance every time, same as
+  // before.
+  final WeatherService? _weatherOverride;
   final PlacesService _places;
+
+  /// A real forecast fetch, using a fresh client per call in production (or
+  /// the injected test double, every time) — see [_weatherOverride].
+  Future<List<WeatherForecast>> _fetchForecast({
+    required double latitude,
+    required double longitude,
+    required int days,
+  }) async {
+    if (_weatherOverride != null) {
+      return _weatherOverride.getForecast(latitude: latitude, longitude: longitude, days: days);
+    }
+    final weatherService = WeatherService();
+    try {
+      return await weatherService.getForecast(latitude: latitude, longitude: longitude, days: days);
+    } finally {
+      weatherService.dispose();
+    }
+  }
 
   // Lazy, same reasoning as AuthProvider's rarely-used repositories: this
   // provider is constructed unconditionally at app startup (so the AI
@@ -136,7 +164,7 @@ class AiRepository {
     final weatherFuture =
         destinationCoordinates.latitude != null &&
             destinationCoordinates.longitude != null
-        ? _weather.getForecast(
+        ? _fetchForecast(
             latitude: destinationCoordinates.latitude!,
             longitude: destinationCoordinates.longitude!,
             days: request.days,
@@ -161,6 +189,7 @@ class AiRepository {
     // resubmission of the same untouched Planner form, which should reuse
     // what was already generated instead of spending another API call.
     var raw = forceRefresh ? null : await _cache.get('itinerary', signature);
+    final isFreshResponse = raw == null;
     if (raw == null) {
       raw = await _openAi.complete(
         messages: [
@@ -189,11 +218,17 @@ class AiRepository {
         maxTokens: 2400,
         jsonMode: true,
       );
-      await _cache.set('itinerary', signature, raw);
+      // Not cached yet — only once _parseItinerary below confirms it's
+      // actually usable. Caching it here unconditionally meant a truncated/
+      // malformed response (hits the token cap mid-object, a flaky
+      // provider response) got cached as-is, and every retry with the same
+      // unchanged form kept hitting the cache and getting back that exact
+      // same broken text for up to the cache's full TTL — with no way to
+      // actually get a fresh attempt short of changing the form.
     }
     final weather = await weatherFuture;
 
-    return _parseItinerary(
+    final itinerary = await _parseItinerary(
       raw,
       request: request,
       coverImageUrl: coverImageUrl,
@@ -204,6 +239,12 @@ class AiRepository {
       destinationLatitude: destinationCoordinates.latitude,
       destinationLongitude: destinationCoordinates.longitude,
     );
+    // Only reached once parsing above actually succeeded — see the comment
+    // where the old unconditional cache write used to sit.
+    if (isFreshResponse) {
+      await _cache.set('itinerary', signature, raw);
+    }
+    return itinerary;
   }
 
   /// [AiItineraryRequest.latitude]/`longitude` are only ever set for a
@@ -570,7 +611,10 @@ class AiRepository {
     return text.trim();
   }
 
-  void dispose() {
-    _weather.dispose();
-  }
+  // Nothing to dispose anymore — see _weatherOverride's doc comment; a
+  // fresh WeatherService is created and disposed per-request instead of
+  // held here for the repository's lifetime. Kept as a no-op rather than
+  // removed outright since both AiChatProvider and AiPlannerProvider call
+  // this unconditionally.
+  void dispose() {}
 }

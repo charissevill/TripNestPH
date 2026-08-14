@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:tripnest_ph/data/repositories/itinerary_repository.dart';
 import 'package:tripnest_ph/data/mock/mock_itinerary.dart';
+import 'package:tripnest_ph/domain/models/packing_item.dart';
 import 'package:tripnest_ph/domain/models/saved_itinerary.dart';
 
 void main() {
@@ -78,15 +79,50 @@ void main() {
     expect(trip!.memberNames, {'owner-1': 'Juan'});
   });
 
-  test('updatePackingItems() persists a checked-off item', () async {
+  test('togglePackingItem() persists a checked-off item without touching the others', () async {
     final id = await repository.save(userId: 'owner-1', title: 'Palawan Trip', itinerary: mockItinerary);
     final trip = await repository.getById(id);
-    final updated = trip!.packingItems.map((p) => p.id == trip.packingItems.first.id ? p.copyWith(checked: true) : p).toList();
+    final targetId = trip!.packingItems.first.id;
 
-    await repository.updatePackingItems(id, updated);
+    await repository.togglePackingItem(id, targetId, true);
 
     final reloaded = await repository.getById(id);
-    expect(reloaded!.packingItems.first.checked, isTrue);
+    expect(reloaded!.packingItems.firstWhere((p) => p.id == targetId).checked, isTrue);
+    expect(reloaded.packingItems.length, trip.packingItems.length);
+  });
+
+  test('togglePackingItem() on one item never clobbers a concurrent toggle on a different item', () async {
+    final id = await repository.save(userId: 'owner-1', title: 'Palawan Trip', itinerary: mockItinerary);
+    final trip = await repository.getById(id);
+    final firstId = trip!.packingItems[0].id;
+    final secondId = trip.packingItems[1].id;
+
+    // Both "collaborators" read the same starting snapshot, then each
+    // targets a different item — the exact scenario that used to lose an
+    // update when both wrote back the whole array.
+    await repository.togglePackingItem(id, firstId, true);
+    await repository.togglePackingItem(id, secondId, true);
+
+    final reloaded = await repository.getById(id);
+    expect(reloaded!.packingItems.firstWhere((p) => p.id == firstId).checked, isTrue);
+    expect(reloaded.packingItems.firstWhere((p) => p.id == secondId).checked, isTrue);
+  });
+
+  test('addPackingItem() then removePackingItem() round-trips cleanly', () async {
+    final id = await repository.save(userId: 'owner-1', title: 'Palawan Trip', itinerary: mockItinerary);
+    final trip = await repository.getById(id);
+    final before = trip!.packingItems.length;
+    const newItem = PackingItem(id: 'extra-1', label: 'Snorkel gear', checked: false);
+
+    await repository.addPackingItem(id, newItem);
+    final afterAdd = await repository.getById(id);
+    expect(afterAdd!.packingItems.length, before + 1);
+    expect(afterAdd.packingItems.any((p) => p.id == 'extra-1'), isTrue);
+
+    await repository.removePackingItem(id, 'extra-1');
+    final afterRemove = await repository.getById(id);
+    expect(afterRemove!.packingItems.length, before);
+    expect(afterRemove.packingItems.any((p) => p.id == 'extra-1'), isFalse);
   });
 
   test('streamForUser() includes trips the user owns AND trips they joined as a collaborator', () async {

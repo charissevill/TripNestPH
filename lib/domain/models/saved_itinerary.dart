@@ -82,12 +82,25 @@ class SavedItinerary {
       savedAt: timestamp is Timestamp ? timestamp.toDate() : DateTime.now(),
       collaboratorIds: List<String>.from(map['collaboratorIds'] as List? ?? const []),
       memberNames: Map<String, String>.from(map['memberNames'] as Map? ?? const {}),
-      packingItems: (map['packingItems'] as List?)
-              ?.map((p) => PackingItem.fromMap(Map<String, dynamic>.from(p as Map)))
-              .toList() ??
-          PackingItem.defaults(),
+      packingItems: _packingItemsFromRaw(map['packingItems']),
       startDate: startTimestamp is Timestamp ? startTimestamp.toDate() : null,
     );
+  }
+
+  /// Reads either storage shape: a `{itemId: {...}}` map (current — see
+  /// `ItineraryRepository.togglePackingItem`/`addPackingItem`/
+  /// `removePackingItem`, which target one item by key so two collaborators
+  /// editing different items concurrently can't clobber each other) or the
+  /// older `[{...}, {...}]` list (any trip saved before that change) —
+  /// never rewritten on read, just understood either way.
+  static List<PackingItem> _packingItemsFromRaw(Object? raw) {
+    if (raw is Map) {
+      return raw.values.map((p) => PackingItem.fromMap(Map<String, dynamic>.from(p as Map))).toList();
+    }
+    if (raw is List) {
+      return raw.map((p) => PackingItem.fromMap(Map<String, dynamic>.from(p as Map))).toList();
+    }
+    return PackingItem.defaults();
   }
 
   Map<String, dynamic> toMap() {
@@ -98,7 +111,8 @@ class SavedItinerary {
       'savedAt': FieldValue.serverTimestamp(),
       'collaboratorIds': collaboratorIds,
       'memberNames': memberNames,
-      'packingItems': packingItems.map((p) => p.toMap()).toList(),
+      // A map keyed by item id, not a list — see _packingItemsFromRaw.
+      'packingItems': {for (final p in packingItems) p.id: p.toMap()},
       'startDate': startDate != null ? Timestamp.fromDate(startDate!) : null,
     };
   }

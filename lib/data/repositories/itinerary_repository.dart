@@ -120,6 +120,24 @@ class ItineraryRepository {
     }
   }
 
+  /// Overwrites a saved trip's generated content in place — used when the
+  /// owner taps "Regenerate" on a trip that's already saved. Without this,
+  /// regenerating had nowhere to write the fresh itinerary back to, so it
+  /// silently orphaned the original saved doc (still holding the stale
+  /// content) and, if saved again, created a duplicate with none of the
+  /// original's collaborators/expenses/packing list. Owner-only, enforced
+  /// by rules the same as every other field on this doc.
+  Future<void> updateItinerary(String itineraryId, {required String title, required Itinerary itinerary}) async {
+    try {
+      await _collection.doc(itineraryId).update({
+        'title': title,
+        'itinerary': itinerary.toMap(),
+      });
+    } catch (e) {
+      throw AppException.from(e);
+    }
+  }
+
   /// Sets or clears (pass `null`) the trip's actual travel start date —
   /// separate from when it was bookmarked. Owner-only, enforced by rules.
   Future<void> updateStartDate(String itineraryId, DateTime? startDate) async {
@@ -198,14 +216,37 @@ class ItineraryRepository {
     }
   }
 
-  Future<void> updatePackingItems(
-    String itineraryId,
-    List<PackingItem> items,
-  ) async {
+  /// Checks/unchecks one item in place — a targeted `packingItems.{id}.
+  /// checked` field write, not a whole-array replace. Two collaborators
+  /// editing different items at nearly the same moment (the packing list
+  /// isn't a live stream — see GeneratedItineraryScreen) used to each
+  /// overwrite the other's copy of the *entire* list with their own,
+  /// silently reverting whichever change hadn't been re-fetched yet; a
+  /// per-item write can't lose a concurrent edit to a *different* item,
+  /// since each targets its own field path.
+  Future<void> togglePackingItem(String itineraryId, String itemId, bool checked) async {
     try {
-      await _collection.doc(itineraryId).update({
-        'packingItems': items.map((p) => p.toMap()).toList(),
-      });
+      await _collection.doc(itineraryId).update({'packingItems.$itemId.checked': checked});
+    } catch (e) {
+      throw AppException.from(e);
+    }
+  }
+
+  /// Adds (or overwrites, if the id already exists) one item — same
+  /// targeted-write reasoning as [togglePackingItem].
+  Future<void> addPackingItem(String itineraryId, PackingItem item) async {
+    try {
+      await _collection.doc(itineraryId).update({'packingItems.${item.id}': item.toMap()});
+    } catch (e) {
+      throw AppException.from(e);
+    }
+  }
+
+  /// Removes one item — same targeted-write reasoning as
+  /// [togglePackingItem].
+  Future<void> removePackingItem(String itineraryId, String itemId) async {
+    try {
+      await _collection.doc(itineraryId).update({'packingItems.$itemId': FieldValue.delete()});
     } catch (e) {
       throw AppException.from(e);
     }

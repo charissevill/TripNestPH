@@ -15,6 +15,15 @@ service cloud.firestore {
       return request.resource.data.diff(resource.data).affectedKeys().hasOnly(fields);
     }
 
+    // A broadcast notification (see notifications match block) has no single
+    // owner, so "marking it read" adds the reader's own uid to a shared
+    // `readBy` array instead of flipping a single `isRead` boolean — this
+    // guards that a reader can only ever add themselves, never remove or
+    // forge another traveler's entry.
+    function oldNotificationReadBy() {
+      return 'readBy' in resource.data ? resource.data.readBy : [];
+    }
+
     // ---- Data validation helpers ------------------------------------------
     // Defense-in-depth: the app's own form validation already keeps ratings
     // in range and comments a sane length, but these rules stop a malicious
@@ -39,17 +48,38 @@ service cloud.firestore {
             && exists(/databases/$(database)/documents/users/$(request.auth.uid)/visited/$(request.resource.data.targetType + '_' + request.resource.data.targetId)));
     }
 
-    // A traveler's client-side aggregate-recalculation write (see
-    // ReviewRepository._recalculateAggregate) is trusted to have computed
-    // the right numbers, but the rule itself still has to stop a client
-    // from writing garbage straight to a public listing's rating —
-    // wrong type, a negative count, or a rating outside the 0–5 review
-    // scale would otherwise pass silently.
-    function isValidAggregateUpdate() {
+    // A traveler's client-side rating-average recompute (see
+    // ReviewRepository._recalculateRating) is trusted to have computed the
+    // right number, but the rule itself still has to stop a client from
+    // writing garbage straight to a public listing's rating — wrong type or
+    // a value outside the 0–5 review scale would otherwise pass silently.
+    function isValidRatingUpdate() {
       return request.resource.data.rating is number
-        && request.resource.data.rating >= 0 && request.resource.data.rating <= 5
-        && request.resource.data.reviewCount is int
-        && request.resource.data.reviewCount >= 0;
+        && request.resource.data.rating >= 0 && request.resource.data.rating <= 5;
+    }
+
+    // ReviewRepository.adjustReviewCount writes reviewCount as an atomic
+    // +1/-1 (see its doc comment for why: it must never be a plain
+    // recompute-and-overwrite, which is exactly the race that used to let
+    // two concurrent review writes silently clobber each other's count).
+    // Same "trust the shape, not the client's arithmetic" reasoning as
+    // isValidSearchTrendIncrement below — a client can only ever nudge the
+    // real current count by exactly one in either direction, never set it
+    // to an arbitrary number.
+    function isValidReviewCountAdjustment() {
+      return request.resource.data.reviewCount is int
+        && request.resource.data.reviewCount >= 0
+        && (request.resource.data.reviewCount == resource.data.reviewCount + 1
+            || request.resource.data.reviewCount == resource.data.reviewCount - 1);
+    }
+
+    // A traveler-triggered aggregate write is always exactly one of these
+    // two shapes (see ReviewRepository) — never both fields in the same
+    // write, so `reviewCount` (atomic) can never be clobbered by a
+    // possibly-stale `rating` recompute landing in the same update.
+    function isValidAggregateUpdate() {
+      return (onlyChangedFields(['rating']) && isValidRatingUpdate())
+        || (onlyChangedFields(['reviewCount']) && isValidReviewCountAdjustment());
     }
 
     // A brand-new search_trends/{term} doc must start at count == 1 (the
@@ -146,8 +176,13 @@ service cloud.firestore {
       // (self-service profile) — status and role changes are a separate,
       // admin-only door (see setStatus/promotions), never bundled with a
       // self-edit.
+      // The "never target yourself" check lives here too, not just in the
+      // Admin Portal UI (which already hides the menu for your own row) —
+      // otherwise a sole remaining admin could still suspend/demote their
+      // own account via a bypassed UI or a raw SDK call, with no recovery
+      // path short of an out-of-band seed script.
       allow update: if (isOwner(uid) && onlyChangedFields(['name', 'photoUrl', 'businessName']))
-                    || (hasAdminRole(['admin']) && onlyChangedFields(['status', 'role']));
+                    || (hasAdminRole(['admin']) && onlyChangedFields(['status', 'role']) && !isOwner(uid));
       allow delete: if hasAdminRole(['admin']);
     }
 
@@ -167,14 +202,39 @@ service cloud.firestore {
     // Every traveler can read/write only their own profile document and
     // their own recently-viewed history. Admin Portal accounts can also
     // read (never write) for the Users module and dashboard stats.
+    // A brand-new profile must match the signed-in identity that's creating
+    // it — not just "email is some string" — so a raw SDK call bypassing
+    // the app UI can't spoof another traveler's email or write oversized
+    // junk fields into a doc other code will trust later (e.g. the review
+    // author name shown to every other traveler).
+    function isValidNewUserProfile() {
+      return request.resource.data.email is string && request.resource.data.email.size() <= 254
+        && (request.resource.data.email == '' || request.resource.data.email == request.auth.token.email)
+        && request.resource.data.name is string && request.resource.data.name.size() <= 100
+        && request.resource.data.photoUrl is string && request.resource.data.photoUrl.size() <= 2048
+        && request.resource.data.status == 'active';
+    }
+
+    // Only checks the fields actually being touched — an update that
+    // doesn't change name/photoUrl at all (e.g. just travelPreferences)
+    // shouldn't have to satisfy bounds on fields it isn't writing. Same
+    // length caps as isValidNewUserProfile, so a raw SDK write can't do via
+    // "edit profile" what create already blocks.
+    function isValidUserUpdate() {
+      return (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['name'])
+              || (request.resource.data.name is string && request.resource.data.name.size() <= 100))
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['photoUrl'])
+              || (request.resource.data.photoUrl is string && request.resource.data.photoUrl.size() <= 2048));
+    }
+
     match /users/{userId} {
       allow read: if isOwner(userId) || isActiveAdmin();
-      allow create: if isOwner(userId) && request.resource.data.email is string;
+      allow create: if isOwner(userId) && isValidNewUserProfile();
       // Travelers can update their own profile but never their own
       // `status` — that's the Admin Portal's suspend/activate switch, and
       // an admin (write access here is intentionally limited to just that
       // one field) is the only one who can flip it.
-      allow update: if (isOwner(userId) && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['status']))
+      allow update: if (isOwner(userId) && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['status']) && isValidUserUpdate())
                     || (hasAdminRole(['admin']) && onlyChangedFields(['status']));
       // Self-delete is the traveler's own account-deletion flow (Settings ->
       // Delete Account); an admin can also remove an account directly.
@@ -216,7 +276,7 @@ service cloud.firestore {
       // own province — canManageProvince alone would still let them
       // reassign someone else's spot into their own province by editing
       // provinceId, so the unchanged-provinceId check closes that off too.
-      allow update: if (isSignedIn() && onlyChangedFields(['rating', 'reviewCount']) && isValidAggregateUpdate())
+      allow update: if (isSignedIn() && isValidAggregateUpdate())
                     || hasAdminRole(['admin'])
                     || (hasAdminRole(['lgu']) && adminData().provinceId == resource.data.provinceId
                         && request.resource.data.provinceId == resource.data.provinceId);
@@ -238,7 +298,7 @@ service cloud.firestore {
       allow get: if isSignedIn();
       allow list: if isSignedIn() && (resource.data.status == 'published' || hasAdminRole(['admin']));
       allow create, delete: if hasAdminRole(['admin']);
-      allow update: if (isSignedIn() && onlyChangedFields(['rating', 'reviewCount']) && isValidAggregateUpdate())
+      allow update: if (isSignedIn() && isValidAggregateUpdate())
                     || hasAdminRole(['admin'])
                     || (hasAdminRole(['businessOwner']) && resource.data.ownerId == request.auth.uid
                         && request.resource.data.ownerId == request.auth.uid
@@ -252,7 +312,7 @@ service cloud.firestore {
       allow get: if isSignedIn();
       allow list: if isSignedIn() && (resource.data.status == 'published' || hasAdminRole(['admin', 'lgu']));
       allow create: if canManageProvince(request.resource.data.provinceId);
-      allow update: if (isSignedIn() && onlyChangedFields(['rating', 'reviewCount']) && isValidAggregateUpdate())
+      allow update: if (isSignedIn() && isValidAggregateUpdate())
                     || hasAdminRole(['admin'])
                     || (hasAdminRole(['lgu']) && adminData().provinceId == resource.data.provinceId
                         && request.resource.data.provinceId == resource.data.provinceId);
@@ -293,7 +353,11 @@ service cloud.firestore {
     // Places" dashboard metric — never write.
     match /favorites/{favoriteId} {
       allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isActiveAdmin());
-      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+      // The admin branch backs deleting a listing's now-dangling favorites
+      // when an admin removes it (see AdminBusinessListScreen) — otherwise
+      // those favorite docs point at an id that no longer resolves to
+      // anything, permanently.
+      allow delete: if isSignedIn() && (resource.data.userId == request.auth.uid || isActiveAdmin());
       allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
     }
 
@@ -333,7 +397,16 @@ service cloud.firestore {
     }
 
     match /saved_itineraries/{itineraryId} {
-      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isCollaborator() || hasAdminRole(['admin']));
+      // Split from a single `read` on purpose: joining a shared trip means
+      // looking it up by its share code (the doc id) BEFORE the joiner is
+      // an owner/collaborator, so a single-document `get` is allowed for
+      // any signed-in traveler — the 20-character random id is itself the
+      // invitation, the same "anyone with the link" model the `update`
+      // rule below already uses for the join write itself. `list` (a
+      // collection query — "My Trips") stays restricted, so this can never
+      // be used to enumerate/browse every trip in the app.
+      allow get: if isSignedIn();
+      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isCollaborator() || hasAdminRole(['admin']));
       allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
       allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
       allow update: if isSignedIn() && (
@@ -363,13 +436,39 @@ service cloud.firestore {
       );
 
       match /expenses/{expenseId} {
-        allow read, write: if isSignedIn() && (
-          get(/databases/$(database)/documents/saved_itineraries/$(itineraryId)).data.userId == request.auth.uid
-          || (
-            ('collaboratorIds' in get(/databases/$(database)/documents/saved_itineraries/$(itineraryId)).data)
-            && request.auth.uid in get(/databases/$(database)/documents/saved_itineraries/$(itineraryId)).data.collaboratorIds
-          )
-        );
+        function isTripOwner() {
+          return get(/databases/$(database)/documents/saved_itineraries/$(itineraryId)).data.userId == request.auth.uid;
+        }
+
+        function isTripCollaborator() {
+          return ('collaboratorIds' in get(/databases/$(database)/documents/saved_itineraries/$(itineraryId)).data)
+            && request.auth.uid in get(/databases/$(database)/documents/saved_itineraries/$(itineraryId)).data.collaboratorIds;
+        }
+
+        // Trusts the app's own split-math (ExpenseSplit) the same way
+        // reviews/aggregates trust their own client-side recompute — this
+        // is just the shape/sanity backstop against a raw write straight to
+        // Firestore, not full business-logic validation.
+        function isValidExpense() {
+          return request.resource.data.loggedBy == request.auth.uid
+            && request.resource.data.amount is number
+            && request.resource.data.amount > 0 && request.resource.data.amount <= 1000000
+            && request.resource.data.category is string && request.resource.data.category.size() > 0
+            && request.resource.data.note is string && request.resource.data.note.size() <= 500;
+        }
+
+        allow read: if isSignedIn() && (isTripOwner() || isTripCollaborator());
+        allow create: if isSignedIn() && (isTripOwner() || isTripCollaborator()) && isValidExpense();
+        // Any collaborator could edit or delete ANY expense before —
+        // including ones someone else logged — with nothing server-side
+        // checking who actually logged it. Now only the trip owner (full
+        // control, same as everywhere else on this doc) or whoever logged
+        // that specific expense can touch it, and an edit can't reassign
+        // `loggedBy` to dodge that check.
+        allow update: if isSignedIn() && (isTripOwner() || resource.data.loggedBy == request.auth.uid)
+                      && request.resource.data.loggedBy == resource.data.loggedBy
+                      && isValidExpense();
+        allow delete: if isSignedIn() && (isTripOwner() || resource.data.loggedBy == request.auth.uid);
       }
     }
 
@@ -447,9 +546,13 @@ service cloud.firestore {
     match /notifications/{notificationId} {
       allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || resource.data.userId == '');
       // A personal notification's isRead can only be flipped by the
-      // traveler it belongs to; a broadcast (userId == '') has no single
-      // owner, so any signed-in traveler marking it read is expected.
-      allow update: if (isSignedIn() && onlyChangedFields(['isRead']) && (resource.data.userId == request.auth.uid || resource.data.userId == ''))
+      // traveler it belongs to. A broadcast (userId == '') has no single
+      // owner — read state there is per-reader, so a signed-in traveler may
+      // only append their own uid to `readBy`, never touch anyone else's.
+      allow update: if (isSignedIn() && resource.data.userId == request.auth.uid && onlyChangedFields(['isRead']))
+                    || (isSignedIn() && resource.data.userId == '' && onlyChangedFields(['readBy'])
+                        && request.resource.data.readBy.hasOnly(oldNotificationReadBy().concat([request.auth.uid]))
+                        && oldNotificationReadBy().hasOnly(request.resource.data.readBy))
                     || hasAdminRole(['admin', 'lgu']);
       // Broadcasts (empty userId) stay admin+lgu, matching the "Send
       // Announcement" tile both roles see. A personal notification (e.g.
@@ -457,7 +560,9 @@ service cloud.firestore {
       // admin-only, since only admin ever changes a business's status.
       allow create: if (hasAdminRole(['admin', 'lgu']) && request.resource.data.userId == '')
                     || (hasAdminRole(['admin']) && request.resource.data.userId is string && request.resource.data.userId != '');
-      allow delete: if hasAdminRole(['admin', 'lgu']);
+      // A traveler may delete their own personal notifications (account
+      // deletion cleanup); broadcasts stay admin/lgu-only, same as create.
+      allow delete: if (isSignedIn() && resource.data.userId == request.auth.uid) || hasAdminRole(['admin', 'lgu']);
     }
 
     // ---- rate_limits/{id} --------------------------------------------------

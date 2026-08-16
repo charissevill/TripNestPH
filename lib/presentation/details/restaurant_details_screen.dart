@@ -24,6 +24,8 @@ import '../../core/widgets/details/info_stat_card.dart';
 import '../../core/widgets/details/map_preview.dart';
 import '../../core/widgets/details/review_section.dart';
 import '../../core/widgets/dialogs/emergency_access_sheet.dart';
+import '../../core/widgets/dialogs/report_content_dialog.dart';
+import '../../domain/models/content_report.dart';
 import '../../core/widgets/indicators/rating_widget.dart';
 import '../../core/widgets/layout/max_width_container.dart';
 import '../../core/widgets/layout/section_header.dart';
@@ -266,6 +268,16 @@ class _RestaurantDetailsBody extends StatelessWidget {
                 Text(
                   restaurant.description,
                   style: theme.textTheme.bodyMedium?.copyWith(height: 1.6),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton.icon(
+                    style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: const Size(0, 32)),
+                    onPressed: () => reportContent(context, targetId: restaurant.id, targetType: ContentTargetType.restaurant),
+                    icon: const Icon(Symbols.flag_rounded, size: 15),
+                    label: const Text('Report incorrect info'),
+                  ),
                 ),
                 if (restaurant.accessibilityTags.isNotEmpty) ...[
                   const SizedBox(height: AppSpacing.lg),

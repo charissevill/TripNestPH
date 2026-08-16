@@ -20,6 +20,7 @@ class FirestorePaths {
   static const String adminInvites = 'admin_invites';
   static const String businesses = 'businesses';
   static const String reviewReports = 'review_reports';
+  static const String contentReports = 'content_reports';
   static const String tripPhotos = 'trip_photos';
   static const String searchTrends = 'search_trends';
   static const String analyticsSnapshots = 'analytics_snapshots';

@@ -25,6 +25,8 @@ import '../../core/widgets/carousels/nearby_places_section.dart';
 import '../../core/widgets/details/current_weather_card.dart';
 import '../../core/widgets/details/details_gallery_app_bar.dart';
 import '../../core/widgets/dialogs/emergency_access_sheet.dart';
+import '../../core/widgets/dialogs/report_content_dialog.dart';
+import '../../domain/models/content_report.dart';
 import '../../core/widgets/details/info_stat_card.dart';
 import '../../core/widgets/details/map_preview.dart';
 import '../../core/widgets/details/review_section.dart';
@@ -291,7 +293,17 @@ class _TouristDetailsBody extends StatelessWidget {
                   destination.longDescription,
                   style: theme.textTheme.bodyMedium?.copyWith(height: 1.6),
                 ),
-                const SizedBox(height: AppSpacing.xxl),
+                const SizedBox(height: AppSpacing.sm),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton.icon(
+                    style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: const Size(0, 32)),
+                    onPressed: () => reportContent(context, targetId: destination.id, targetType: ContentTargetType.destination),
+                    icon: const Icon(Symbols.flag_rounded, size: 15),
+                    label: const Text('Report incorrect info'),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.xl),
                 Text('Location', style: theme.textTheme.titleLarge),
                 const SizedBox(height: AppSpacing.sm),
                 MapPreview(

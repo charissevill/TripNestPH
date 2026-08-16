@@ -580,6 +580,22 @@ service cloud.firestore {
       allow delete: if hasAdminRole(['admin']);
     }
 
+    // ---- content_reports/{id} — traveler flags on a listing itself (wrong
+    // info, permanently closed, inappropriate photo), as opposed to
+    // review_reports above which flags a specific review. Same
+    // immutable-once-filed, admin-clears-by-deleting shape.
+    match /content_reports/{reportId} {
+      allow read: if hasAdminRole(['admin']) || (isSignedIn() && resource.data.userId == request.auth.uid);
+      allow create: if isSignedIn()
+                    && request.resource.data.userId == request.auth.uid
+                    && request.resource.data.targetId is string && request.resource.data.targetId.size() > 0
+                    && request.resource.data.targetType in ['destination', 'restaurant', 'festival']
+                    && request.resource.data.reason is string && request.resource.data.reason.size() > 0
+                    && request.resource.data.reason.size() <= 500;
+      allow update: if false;
+      allow delete: if hasAdminRole(['admin']);
+    }
+
     // ---- notifications/{id} ----------------------------------------------
     // A doc with an empty userId is a broadcast sent to every traveler.
     // Marking a broadcast notification "read" is a simplification for this

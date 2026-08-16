@@ -435,6 +435,64 @@ void main() {
     expect(userContent, contains('let food lead the plan'));
   });
 
+  test('generateItinerary() carries the Food category\'s priced line items through to the itinerary', () async {
+    final firestore = FakeFirebaseFirestore();
+    final caller = _fakeAiComplete({
+      'days': [
+        {'dayNumber': 1, 'dateLabel': 'Day 1', 'activities': <Map<String, dynamic>>[]},
+      ],
+      'budgetBreakdown': [
+        {
+          'label': 'Food',
+          'amount': 1000,
+          'iconKey': 'restaurant',
+          'colorKey': 'secondary',
+          'items': [
+            {'name': 'Chicken Inasal meal', 'price': 150},
+            {'name': 'Halo-halo', 'price': 90},
+          ],
+        },
+        {'label': 'Transportation', 'amount': 500, 'iconKey': 'directions_boat', 'colorKey': 'primary'},
+      ],
+      'travelTips': <String>[],
+      'totalBudget': 1500,
+      'recommendedRestaurantNames': <String>[],
+      'nearbyAttractionNames': <String>[],
+    });
+
+    final repository = AiRepository(
+      openAiService: OpenAiService(caller: caller),
+      restaurantRepository: RestaurantRepository(firestore: firestore),
+      provinceRepository: ProvinceRepository(firestore: firestore),
+    );
+
+    final itinerary = await repository.generateItinerary(
+      const AiItineraryRequest(
+        destinationId: 'palawan-food-items',
+        destinationName: 'Palawan',
+        provinceId: 'palawan',
+        provinceName: 'Palawan',
+        budgetTierLabel: 'Budget',
+        budgetRange: '₱5k - ₱15k',
+        days: 1,
+        travelers: 1,
+        travelerType: 'Solo',
+        transportation: {'Flight'},
+        interests: {'Beaches'},
+      ),
+      coverImageUrl: '',
+    );
+
+    final food = itinerary.budgetBreakdown.firstWhere((b) => b.label == 'Food');
+    expect(food.items, hasLength(2));
+    expect(food.items.first.name, 'Chicken Inasal meal');
+    expect(food.items.first.price, 150);
+    // Categories the AI didn't break down further stay an empty list, not
+    // missing/null.
+    final transport = itinerary.budgetBreakdown.firstWhere((b) => b.label == 'Transportation');
+    expect(transport.items, isEmpty);
+  });
+
   test('generateItinerary() leaves weather empty when the destination has no coordinates', () async {
     final firestore = FakeFirebaseFirestore();
     final caller = _fakeAiComplete({

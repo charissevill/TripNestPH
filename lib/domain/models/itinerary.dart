@@ -309,12 +309,25 @@ class ItineraryActivity {
 }
 
 class BudgetItem {
-  const BudgetItem({required this.label, required this.amount, required this.iconKey, required this.colorKey});
+  const BudgetItem({
+    required this.label,
+    required this.amount,
+    required this.iconKey,
+    required this.colorKey,
+    this.items = const [],
+  });
 
   final String label;
   final double amount;
   final String iconKey;
   final String colorKey;
+
+  /// Concrete, priced examples within this category — e.g. for "Food":
+  /// "Chicken Inasal meal, ₱150". Optional and AI-provided per category (see
+  /// `ItineraryPrompts`'s guidance on which categories get these); empty for
+  /// a category the AI didn't break down further, or for itineraries saved
+  /// before this field existed.
+  final List<BudgetLineItem> items;
 
   IconData get icon => IconRegistry.resolve(iconKey);
   Color get color => AppColors.byKey(colorKey);
@@ -325,12 +338,37 @@ class BudgetItem {
       amount: (map['amount'] as num?)?.toDouble() ?? 0,
       iconKey: map['iconKey'] as String? ?? 'payments',
       colorKey: map['colorKey'] as String? ?? 'primary',
+      items: (map['items'] as List? ?? const [])
+          .map((e) => BudgetLineItem.fromMap(Map<String, dynamic>.from(e as Map)))
+          .toList(),
     );
   }
 
   Map<String, dynamic> toMap() {
-    return {'label': label, 'amount': amount, 'iconKey': iconKey, 'colorKey': colorKey};
+    return {
+      'label': label,
+      'amount': amount,
+      'iconKey': iconKey,
+      'colorKey': colorKey,
+      'items': items.map((i) => i.toMap()).toList(),
+    };
   }
+}
+
+class BudgetLineItem {
+  const BudgetLineItem({required this.name, required this.price});
+
+  final String name;
+  final double price;
+
+  factory BudgetLineItem.fromMap(Map<String, dynamic> map) {
+    return BudgetLineItem(
+      name: map['name'] as String? ?? '',
+      price: (map['price'] as num?)?.toDouble() ?? 0,
+    );
+  }
+
+  Map<String, dynamic> toMap() => {'name': name, 'price': price};
 }
 
 class WeatherForecast {

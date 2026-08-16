@@ -2311,6 +2311,41 @@ class _BudgetSummaryCard extends StatelessWidget {
                       color: item.color,
                     ),
                   ),
+                  if (item.items.isNotEmpty) ...[
+                    const SizedBox(height: AppSpacing.sm),
+                    Padding(
+                      padding: const EdgeInsets.only(left: AppSpacing.lg),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          for (final line in item.items)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 4),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      line.name,
+                                      style: theme.textTheme.bodySmall
+                                          ?.copyWith(
+                                            color: AppColors.textTertiary,
+                                          ),
+                                    ),
+                                  ),
+                                  Text(
+                                    '~₱${line.price.toStringAsFixed(0)}',
+                                    style: theme.textTheme.bodySmall
+                                        ?.copyWith(
+                                          color: AppColors.textTertiary,
+                                        ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ],
               ),
             );

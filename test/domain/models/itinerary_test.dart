@@ -55,4 +55,36 @@ void main() {
       expect(updated.days, original.days);
     });
   });
+
+  group('BudgetItem', () {
+    test('fromMap()/toMap() round-trips a category with priced line items', () {
+      const item = BudgetItem(
+        label: 'Food',
+        amount: 3000,
+        iconKey: 'restaurant',
+        colorKey: 'secondary',
+        items: [
+          BudgetLineItem(name: 'Chicken Inasal meal', price: 150),
+          BudgetLineItem(name: 'Halo-halo', price: 90),
+        ],
+      );
+
+      final rebuilt = BudgetItem.fromMap(item.toMap());
+
+      expect(rebuilt.items, hasLength(2));
+      expect(rebuilt.items.first.name, 'Chicken Inasal meal');
+      expect(rebuilt.items.first.price, 150);
+    });
+
+    test('fromMap() defaults items to empty when the map has none', () {
+      final item = BudgetItem.fromMap({
+        'label': 'Transportation',
+        'amount': 1000,
+        'iconKey': 'directions_boat',
+        'colorKey': 'primary',
+      });
+
+      expect(item.items, isEmpty);
+    });
+  });
 }

@@ -62,11 +62,11 @@ You must respond with ONLY a single JSON object — no prose before or after it,
     }
   ],
   "budgetBreakdown": [
-    {"label": "Transportation", "amount": 0, "iconKey": "directions_boat", "colorKey": "primary"},
-    {"label": "Food", "amount": 0, "iconKey": "restaurant", "colorKey": "secondary"},
-    {"label": "Entrance Fees", "amount": 0, "iconKey": "payments", "colorKey": "accent"},
-    {"label": "Accommodation", "amount": 0, "iconKey": "hotel", "colorKey": "primaryDark"},
-    {"label": "Miscellaneous", "amount": 0, "iconKey": "shopping_bag", "colorKey": "secondaryDark"}
+    {"label": "Transportation", "amount": 0, "iconKey": "directions_boat", "colorKey": "primary", "items": []},
+    {"label": "Food", "amount": 0, "iconKey": "restaurant", "colorKey": "secondary", "items": [{"name": "Chicken Inasal meal", "price": 0}]},
+    {"label": "Entrance Fees", "amount": 0, "iconKey": "payments", "colorKey": "accent", "items": []},
+    {"label": "Accommodation", "amount": 0, "iconKey": "hotel", "colorKey": "primaryDark", "items": []},
+    {"label": "Miscellaneous", "amount": 0, "iconKey": "shopping_bag", "colorKey": "secondaryDark", "items": []}
   ],
   "totalBudget": 0,
   "recommendedRestaurantNames": ["exact name from the provided restaurant list, if any are a good fit"],
@@ -79,6 +79,7 @@ Rules:
 - "colorKey" must be one of: ${colorKeys.join(', ')}.
 - Every day must have exactly 3 activities: Morning, Afternoon, Evening.
 - "totalBudget" must roughly equal the sum of "budgetBreakdown" amounts, in Philippine pesos (numbers only, no currency symbol), and must fit the traveler's stated budget tier. If a real daily-budget guide for the province is given in the user message, sanity-check your numbers against it — the traveler's chosen budget tier is still primary, but don't wildly exceed or undercut the province's real average without reason.
+- The "Food" entry in "budgetBreakdown" must include 2-4 "items": concrete, specific things the traveler could actually order/buy, each with its own realistic peso price (numbers only) that a traveler could budget against — not vague ("street food") but named ("Halo-halo, ₱90"). Prefer a real dish/meal from one of the given restaurant candidates when a good fit exists, otherwise a well-known local specialty for this destination. Every other category's "items" should stay an empty array — this level of detail is Food-specific, not needed for Transportation/Entrance Fees/Accommodation/Miscellaneous.
 - "recommendedRestaurantNames" and "nearbyAttractionNames" must ONLY contain names copied exactly from the lists given to you in the user message — never invent a name that wasn't provided. Leave the array empty if nothing provided fits well.
 - "travelTips" must include, in this order, one entry per category (skip a category only if genuinely not applicable): a suggested local delicacy/dish to try, a hidden gem worth a detour (only if you're not already covering it in the day plan), the best visiting hours/time of day to avoid crowds, a practical travel reminder (e.g. booking ahead, cash vs card), a safety reminder specific to the destination, and an eco-friendly travel tip. Prefix each with a short bold-ish label like "Local delicacy:", "Hidden gem:", "Best time to visit:", "Reminder:", "Safety:", "Eco tip:" followed by the actual tip. For the "Safety:" tip: if real emergency hotline data for the province is given in the user message, cite the actual label/number from it verbatim rather than a generic one; only fall back to general Philippines emergency guidance if none is given.
 - If a day-by-day weather forecast is given in the user message, actually use it: for a day forecast as rainy/stormy, prefer an indoor or covered activity for that day's most weather-exposed slot when a reasonable one exists among the given restaurant/attraction candidates, and say why in that activity's "description" (e.g. "Moved indoors — rain expected this afternoon."). Never invent rain that isn't in the forecast, and never drop a genuinely good outdoor pick just because of mild/uncertain conditions — only adjust for the forecast's clearly bad-weather days. If no forecast is given, plan normally.

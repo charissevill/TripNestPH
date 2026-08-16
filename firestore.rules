@@ -515,10 +515,27 @@ service cloud.firestore {
             && request.auth.uid in get(/databases/$(database)/documents/saved_itineraries/$(itineraryId)).data.collaboratorIds;
         }
 
+        // Rules has no generic "for each element" loop, so this checks each
+        // of the (already capped-at-6) possible indices explicitly — an
+        // index past the list's actual size is vacuously fine, so this
+        // still works correctly for a 2-option poll as well as a 6-option
+        // one. Without this, the client's 100-char TextField limit was only
+        // a UI suggestion — a raw write straight to Firestore could still
+        // store an arbitrarily large option string.
+        function isValidOptionAt(list, i) {
+          return list.size() <= i || (list[i] is string && list[i].size() > 0 && list[i].size() <= 150);
+        }
+
+        function allOptionsValid(list) {
+          return isValidOptionAt(list, 0) && isValidOptionAt(list, 1) && isValidOptionAt(list, 2)
+            && isValidOptionAt(list, 3) && isValidOptionAt(list, 4) && isValidOptionAt(list, 5);
+        }
+
         function isValidPoll() {
           return request.resource.data.createdBy == request.auth.uid
             && request.resource.data.question is string && request.resource.data.question.size() > 0 && request.resource.data.question.size() <= 200
-            && request.resource.data.options is list && request.resource.data.options.size() >= 2 && request.resource.data.options.size() <= 6;
+            && request.resource.data.options is list && request.resource.data.options.size() >= 2 && request.resource.data.options.size() <= 6
+            && allOptionsValid(request.resource.data.options);
         }
 
         function oldVotes() {

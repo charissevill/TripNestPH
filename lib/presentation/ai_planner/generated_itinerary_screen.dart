@@ -138,6 +138,20 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
   /// `ItineraryPrompts`'s rules), never a live quote, so it can be wrong.
   bool get _canEditBudget => _isOwner && widget.savedItineraryId != null;
 
+  /// Whether the viewer is actually a member of this trip (owner or
+  /// collaborator) — gates the Group Polls section's "New Poll" affordance,
+  /// which (unlike every other section on this screen) is otherwise offered
+  /// to *any* signed-in viewer who reaches this screen, not just this
+  /// trip's actual members; `firestore.rules`' `polls` match block would
+  /// reject the write either way, but showing a button that's guaranteed to
+  /// fail is a worse experience than not showing it. Same "assume yes until
+  /// the load finishes" default as [_isOwner], for the same reason: loading
+  /// [_savedItinerary] is asynchronous, and treating it as "not a member
+  /// yet" would flash-hide "New Poll" even for this trip's own owner while
+  /// that load is still in flight.
+  bool get _isTripMember =>
+      _savedItinerary == null || _savedItinerary!.memberIds.contains(_uid);
+
   /// A local, editable copy of the budget breakdown/total — same reasoning
   /// as [_days] below, mutated on an item price edit and persisted via
   /// [_persistBudget].
@@ -949,6 +963,7 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
     final questionController = TextEditingController();
     var optionControllers = [TextEditingController(), TextEditingController()];
     String? errorText;
+    String? optionsErrorText;
 
     final confirmed = await showDialog<bool>(
       context: context,
@@ -1000,6 +1015,18 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
                       label: const Text('Add option'),
                     ),
                   ),
+                if (optionsErrorText != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: AppSpacing.xs),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        optionsErrorText!,
+                        style: Theme.of(context).textTheme.bodySmall
+                            ?.copyWith(color: Theme.of(context).colorScheme.error),
+                      ),
+                    ),
+                  ),
               ],
             ),
           ),
@@ -1011,7 +1038,10 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
             FilledButton(
               onPressed: () {
                 if (questionController.text.trim().isEmpty) {
-                  setDialogState(() => errorText = 'Enter a question');
+                  setDialogState(() {
+                    errorText = 'Enter a question';
+                    optionsErrorText = null;
+                  });
                   return;
                 }
                 final filled = optionControllers
@@ -1019,10 +1049,21 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
                     .where((t) => t.isNotEmpty)
                     .toList();
                 if (filled.length < 2) {
-                  setDialogState(() => errorText = null);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Add at least 2 options.')),
-                  );
+                  setDialogState(() {
+                    errorText = null;
+                    optionsErrorText = 'Add at least 2 options.';
+                  });
+                  return;
+                }
+                // Distinct case-insensitively — "Restaurant A" typed twice
+                // would otherwise sit at two different indices, silently
+                // splitting votes between what looks like one option.
+                final distinct = filled.map((t) => t.toLowerCase()).toSet();
+                if (distinct.length != filled.length) {
+                  setDialogState(() {
+                    errorText = null;
+                    optionsErrorText = 'Options must be different from each other.';
+                  });
                   return;
                 }
                 Navigator.of(context).pop(true);
@@ -1752,11 +1793,12 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
                                   style: theme.textTheme.titleLarge,
                                 ),
                               ),
-                              TextButton.icon(
-                                onPressed: _createPoll,
-                                icon: const Icon(Symbols.add_rounded, size: 18),
-                                label: const Text('New Poll'),
-                              ),
+                              if (_isTripMember)
+                                TextButton.icon(
+                                  onPressed: _createPoll,
+                                  icon: const Icon(Symbols.add_rounded, size: 18),
+                                  label: const Text('New Poll'),
+                                ),
                             ],
                           ),
                           const SizedBox(height: AppSpacing.md),
@@ -1765,10 +1807,20 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
                               widget.savedItineraryId!,
                             ),
                             builder: (context, snapshot) {
+                              if (snapshot.hasError) {
+                                return Text(
+                                  'Couldn\'t load polls for this trip.',
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: AppColors.textTertiary,
+                                  ),
+                                );
+                              }
                               final polls = snapshot.data ?? const [];
                               if (polls.isEmpty) {
                                 return Text(
-                                  'No polls yet — start one to help the group decide something together.',
+                                  _isTripMember
+                                      ? 'No polls yet — start one to help the group decide something together.'
+                                      : 'No polls to show.',
                                   style: theme.textTheme.bodySmall?.copyWith(
                                     color: AppColors.textTertiary,
                                   ),

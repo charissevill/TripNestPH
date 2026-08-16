@@ -101,19 +101,19 @@ class Itinerary {
     );
   }
 
-  /// Only ever used for manual day-by-day activity edits ("Add activity"/
-  /// "Remove"/reorder on the itinerary screen) — every other field stays
-  /// exactly as generated, since those edits never touch budget/weather/
-  /// recommendations.
-  Itinerary copyWith({List<ItineraryDay>? days}) {
+  /// Used for manual day-by-day activity edits ("Add activity"/"Remove"/
+  /// reorder) and for correcting an AI-estimated [BudgetLineItem] price —
+  /// every other field stays exactly as generated, since those edits never
+  /// touch weather/recommendations/etc.
+  Itinerary copyWith({List<ItineraryDay>? days, List<BudgetItem>? budgetBreakdown, double? totalBudget}) {
     return Itinerary(
       destinationName: destinationName,
       coverImageUrl: coverImageUrl,
       totalDays: totalDays,
       travelers: travelers,
-      totalBudget: totalBudget,
+      totalBudget: totalBudget ?? this.totalBudget,
       days: days ?? this.days,
-      budgetBreakdown: budgetBreakdown,
+      budgetBreakdown: budgetBreakdown ?? this.budgetBreakdown,
       weather: weather,
       travelTips: travelTips,
       recommendedRestaurantIds: recommendedRestaurantIds,

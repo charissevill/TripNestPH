@@ -132,6 +132,17 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
   /// made before that point would silently be lost.
   bool get _canEditActivities => _isOwner && widget.savedItineraryId != null;
 
+  /// Same gating as [_canEditActivities], for correcting an AI-estimated
+  /// [BudgetLineItem] price — the AI's number is only ever an estimate (see
+  /// `ItineraryPrompts`'s rules), never a live quote, so it can be wrong.
+  bool get _canEditBudget => _isOwner && widget.savedItineraryId != null;
+
+  /// A local, editable copy of the budget breakdown/total — same reasoning
+  /// as [_days] below, mutated on an item price edit and persisted via
+  /// [_persistBudget].
+  late List<BudgetItem> _budgetBreakdown = widget.itinerary.budgetBreakdown;
+  late double _totalBudget = widget.itinerary.totalBudget;
+
   /// A local, editable copy of the itinerary's days — [widget.itinerary] is
   /// immutable (it's the value passed in via navigation), so manual activity
   /// edits mutate this instead and persist via [_persistDays].
@@ -1215,6 +1226,119 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
     }
   }
 
+  /// Same whole-document overwrite + optimistic-then-revert pattern as
+  /// [_persistDays] — see that method's doc comment for why a race isn't a
+  /// concern here either (owner-only, see [_canEditBudget]).
+  Future<void> _persistBudget(List<BudgetItem> updatedBreakdown, double updatedTotal) async {
+    final savedId = widget.savedItineraryId;
+    if (savedId == null) return;
+    final previousBreakdown = _budgetBreakdown;
+    final previousTotal = _totalBudget;
+    setState(() {
+      _budgetBreakdown = updatedBreakdown;
+      _totalBudget = updatedTotal;
+    });
+    try {
+      await _repository.updateItinerary(
+        savedId,
+        title: widget.itinerary.destinationName,
+        itinerary: widget.itinerary.copyWith(
+          budgetBreakdown: updatedBreakdown,
+          totalBudget: updatedTotal,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _budgetBreakdown = previousBreakdown;
+        _totalBudget = previousTotal;
+      });
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(AppException.from(e).message)));
+    }
+  }
+
+  /// Corrects one AI-estimated [BudgetLineItem]'s price — the category's own
+  /// `amount` and the itinerary's `totalBudget` shift by the same delta, so
+  /// a correction stays reflected everywhere instead of the line item and
+  /// the totals silently disagreeing. Reference equality to find [line]
+  /// inside its category is safe here the same way it already is for
+  /// [_removeActivity]: the exact in-memory instance rendered is always the
+  /// one passed back in.
+  Future<void> _editItemPrice(BudgetItem category, BudgetLineItem line) async {
+    final priceController = TextEditingController(
+      text: line.price.toStringAsFixed(0),
+    );
+    String? errorText;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Text('Edit "${line.name}" price'),
+          content: TextField(
+            controller: priceController,
+            autofocus: true,
+            keyboardType: const TextInputType.numberWithOptions(
+              decimal: true,
+            ),
+            decoration: InputDecoration(
+              labelText: 'Price (₱)',
+              errorText: errorText,
+              prefixIcon: const Icon(Symbols.payments_rounded, size: 20),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () {
+                final error = Validators.amount(
+                  priceController.text,
+                  required: true,
+                  maxAmount: 500000,
+                );
+                if (error != null) {
+                  setDialogState(() => errorText = error);
+                  return;
+                }
+                Navigator.of(context).pop(true);
+              },
+              child: const Text('Save'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+    final newPrice = double.parse(priceController.text.trim());
+    final delta = newPrice - line.price;
+
+    final updatedBreakdown = _budgetBreakdown.map((cat) {
+      if (cat.label != category.label) return cat;
+      return BudgetItem(
+        label: cat.label,
+        amount: (cat.amount + delta).clamp(0.0, double.infinity),
+        iconKey: cat.iconKey,
+        colorKey: cat.colorKey,
+        items: cat.items
+            .map(
+              (i) => i == line
+                  ? BudgetLineItem(name: line.name, price: newPrice, place: line.place)
+                  : i,
+            )
+            .toList(),
+      );
+    }).toList();
+    final updatedTotal = (_totalBudget + delta).clamp(0.0, double.infinity);
+
+    await _persistBudget(updatedBreakdown, updatedTotal);
+  }
+
   Future<void> _addActivity(int dayNumber) async {
     final result = await showDialog<ItineraryActivity>(
       context: context,
@@ -1519,9 +1643,16 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
                         ),
                         const SizedBox(height: AppSpacing.md),
                         _BudgetSummaryCard(
-                          itinerary: itinerary,
+                          itinerary: itinerary.copyWith(
+                            budgetBreakdown: _budgetBreakdown,
+                            totalBudget: _totalBudget,
+                          ),
                           onTapItem: (item) =>
                               _openBudgetItemPlace(item, restaurants),
+                          onEditItem: _canEditBudget
+                              ? (category, item) =>
+                                    _editItemPrice(category, item)
+                              : null,
                         ),
                         if (widget.savedItineraryId != null) ...[
                           const SizedBox(height: AppSpacing.xxl),
@@ -2287,7 +2418,7 @@ class _WeatherTile extends StatelessWidget {
 }
 
 class _BudgetSummaryCard extends StatelessWidget {
-  const _BudgetSummaryCard({required this.itinerary, this.onTapItem});
+  const _BudgetSummaryCard({required this.itinerary, this.onTapItem, this.onEditItem});
 
   final Itinerary itinerary;
 
@@ -2295,6 +2426,12 @@ class _BudgetSummaryCard extends StatelessWidget {
   /// (an itinerary saved before that field existed) — the row just renders
   /// as plain, non-tappable text in that case (see the build method below).
   final void Function(BudgetLineItem item)? onTapItem;
+
+  /// Null when the current user can't edit this trip's budget (not the
+  /// owner, or an unsaved trip) — the edit icon just doesn't render at all
+  /// in that case, same "no affordance offered" pattern as every other
+  /// owner-only control on this screen.
+  final void Function(BudgetItem category, BudgetLineItem item)? onEditItem;
 
   @override
   Widget build(BuildContext context) {
@@ -2373,15 +2510,19 @@ class _BudgetSummaryCard extends StatelessWidget {
                           for (final line in item.items)
                             Padding(
                               padding: const EdgeInsets.only(bottom: 4),
-                              child: InkWell(
-                                onTap: (onTapItem != null && line.place.isNotEmpty)
-                                    ? () => onTapItem!(line)
-                                    : null,
-                                borderRadius: BorderRadius.circular(AppRadius.sm),
-                                child: Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Expanded(
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Expanded(
+                                    child: InkWell(
+                                      onTap:
+                                          (onTapItem != null &&
+                                              line.place.isNotEmpty)
+                                          ? () => onTapItem!(line)
+                                          : null,
+                                      borderRadius: BorderRadius.circular(
+                                        AppRadius.sm,
+                                      ),
                                       child: Column(
                                         crossAxisAlignment:
                                             CrossAxisAlignment.start,
@@ -2415,15 +2556,29 @@ class _BudgetSummaryCard extends StatelessWidget {
                                         ],
                                       ),
                                     ),
-                                    Text(
-                                      '~₱${line.price.toStringAsFixed(0)}',
-                                      style: theme.textTheme.bodySmall
-                                          ?.copyWith(
-                                            color: AppColors.textTertiary,
-                                          ),
+                                  ),
+                                  Text(
+                                    '~₱${line.price.toStringAsFixed(0)}',
+                                    style: theme.textTheme.bodySmall
+                                        ?.copyWith(
+                                          color: AppColors.textTertiary,
+                                        ),
+                                  ),
+                                  if (onEditItem != null)
+                                    InkWell(
+                                      onTap: () => onEditItem!(item, line),
+                                      borderRadius: BorderRadius.circular(
+                                        AppRadius.pill,
+                                      ),
+                                      child: const Padding(
+                                        padding: EdgeInsets.only(left: 6),
+                                        child: Icon(
+                                          Symbols.edit_rounded,
+                                          size: 14,
+                                        ),
+                                      ),
                                     ),
-                                  ],
-                                ),
+                                ],
                               ),
                             ),
                         ],

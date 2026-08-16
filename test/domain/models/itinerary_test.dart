@@ -54,6 +54,21 @@ void main() {
 
       expect(updated.days, original.days);
     });
+
+    test('replaces budgetBreakdown and totalBudget, leaving days untouched', () {
+      final original = _itinerary(
+        days: const [ItineraryDay(dayNumber: 1, dateLabel: 'Day 1', activities: [])],
+      );
+      const newBreakdown = [
+        BudgetItem(label: 'Food', amount: 3200, iconKey: 'restaurant', colorKey: 'secondary'),
+      ];
+
+      final updated = original.copyWith(budgetBreakdown: newBreakdown, totalBudget: 5200);
+
+      expect(updated.budgetBreakdown, newBreakdown);
+      expect(updated.totalBudget, 5200);
+      expect(updated.days, original.days);
+    });
   });
 
   group('BudgetItem', () {

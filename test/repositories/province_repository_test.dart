@@ -2,6 +2,7 @@ import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:tripnest_ph/data/repositories/province_repository.dart';
+import 'package:tripnest_ph/domain/models/province.dart';
 
 void main() {
   late FakeFirebaseFirestore firestore;
@@ -76,4 +77,51 @@ void main() {
       expect(updated.heroImageUrl, 'https://example.com/existing-hero.jpg');
     },
   );
+
+  test('updateContent() persists cultureNotes, defaulting to empty when omitted', () async {
+    await firestore.collection('provinces').doc('bohol').set({
+      'name': 'Bohol',
+      'regionId': 'region-7',
+      'regionName': 'Central Visayas',
+      'islandGroup': 'Visayas',
+    });
+
+    await repository.updateContent(
+      'bohol',
+      overview: 'Overview',
+      localCulture: 'Culture paragraph',
+      cultureNotes: const [
+        CultureNote(title: 'Greeting customs', body: 'A warm "Maayong buntag" goes a long way.'),
+      ],
+      bestTimeToVisit: 'December to May',
+      estimatedDailyBudgetMin: 1500,
+      estimatedDailyBudgetMax: 4000,
+      travelTips: const [],
+      emergencyHotlines: const [],
+      heroImageUrl: '',
+      galleryImageUrls: const [],
+    );
+
+    final updated = await repository.getById('bohol');
+    expect(updated!.cultureNotes, hasLength(1));
+    expect(updated.cultureNotes.single.title, 'Greeting customs');
+
+    // A second call without cultureNotes clears it back to empty, matching
+    // updateContent()'s plain field-map write (not a merge) — same as every
+    // other field here.
+    await repository.updateContent(
+      'bohol',
+      overview: 'Overview',
+      localCulture: 'Culture paragraph',
+      bestTimeToVisit: 'December to May',
+      estimatedDailyBudgetMin: 1500,
+      estimatedDailyBudgetMax: 4000,
+      travelTips: const [],
+      emergencyHotlines: const [],
+      heroImageUrl: '',
+      galleryImageUrls: const [],
+    );
+    final cleared = await repository.getById('bohol');
+    expect(cleared!.cultureNotes, isEmpty);
+  });
 }

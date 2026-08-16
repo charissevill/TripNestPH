@@ -40,8 +40,11 @@ class _AdminProvinceEditScreenState extends State<AdminProvinceEditScreen> {
   final _cultureController = TextEditingController();
   final _bestTimeController = TextEditingController();
   final _newTipController = TextEditingController();
+  final _newNoteTitleController = TextEditingController();
+  final _newNoteBodyController = TextEditingController();
 
   List<String> _travelTips = [];
+  List<CultureNote> _cultureNotes = [];
   String _heroImageUrl = '';
   List<String> _galleryImageUrls = [];
   bool _saving = false;
@@ -85,6 +88,7 @@ class _AdminProvinceEditScreenState extends State<AdminProvinceEditScreen> {
       _heroImageUrl = province.heroImageUrl;
       _galleryImageUrls = [...province.galleryImageUrls];
       _travelTips = [...province.travelTips];
+      _cultureNotes = [...province.cultureNotes];
       _hotlines = [...province.emergencyHotlines];
       _loaded = true;
     }
@@ -97,6 +101,8 @@ class _AdminProvinceEditScreenState extends State<AdminProvinceEditScreen> {
     _cultureController.dispose();
     _bestTimeController.dispose();
     _newTipController.dispose();
+    _newNoteTitleController.dispose();
+    _newNoteBodyController.dispose();
     super.dispose();
   }
 
@@ -110,6 +116,18 @@ class _AdminProvinceEditScreenState extends State<AdminProvinceEditScreen> {
     });
   }
 
+  void _addCultureNote() {
+    final title = _newNoteTitleController.text.trim();
+    final body = _newNoteBodyController.text.trim();
+    if (title.isEmpty || body.isEmpty) return;
+    setState(() {
+      _cultureNotes = [..._cultureNotes, CultureNote(title: title, body: body)];
+      _newNoteTitleController.clear();
+      _newNoteBodyController.clear();
+      _dirty = true;
+    });
+  }
+
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _saving = true);
@@ -118,6 +136,7 @@ class _AdminProvinceEditScreenState extends State<AdminProvinceEditScreen> {
         widget.provinceId,
         overview: _overviewController.text.trim(),
         localCulture: _cultureController.text.trim(),
+        cultureNotes: _cultureNotes,
         bestTimeToVisit: _bestTimeController.text.trim(),
         estimatedDailyBudgetMin: _budgetMin,
         estimatedDailyBudgetMax: _budgetMax,
@@ -214,6 +233,56 @@ class _AdminProvinceEditScreenState extends State<AdminProvinceEditScreen> {
                       ),
                       validator: (v) =>
                           Validators.maxLength(v, 3000, label: 'Local Culture'),
+                    ),
+                    const SizedBox(height: AppSpacing.xl),
+                    Text(
+                      'Etiquette Cards',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    Text(
+                      'Short, titled notes shown as scannable cards on the province page — e.g. "Greeting customs", "Dress at religious sites". Optional; the paragraph above still shows on its own if you skip these.',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textTertiary),
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    ..._cultureNotes.asMap().entries.map(
+                      (entry) => ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(entry.value.title),
+                        subtitle: Text(entry.value.body, maxLines: 2, overflow: TextOverflow.ellipsis),
+                        trailing: IconButton(
+                          icon: const Icon(Symbols.close_rounded, size: 18),
+                          onPressed: () => setState(() {
+                            _cultureNotes = [..._cultureNotes]..removeAt(entry.key);
+                            _dirty = true;
+                          }),
+                        ),
+                      ),
+                    ),
+                    TextField(
+                      controller: _newNoteTitleController,
+                      maxLength: 60,
+                      decoration: const InputDecoration(hintText: 'Note title, e.g. "Greeting customs"'),
+                    ),
+                    const SizedBox(height: AppSpacing.xs),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _newNoteBodyController,
+                            maxLength: 300,
+                            maxLines: 2,
+                            decoration: const InputDecoration(hintText: 'Note body...'),
+                          ),
+                        ),
+                        IconButton(
+                          icon: Icon(
+                            Symbols.add_circle_rounded,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                          onPressed: _addCultureNote,
+                        ),
+                      ],
                     ),
                     const SizedBox(height: AppSpacing.md),
                     TextFormField(

@@ -23,6 +23,7 @@ class Province {
     this.hasContent = false,
     this.overview = '',
     this.localCulture = '',
+    this.cultureNotes = const [],
     this.bestTimeToVisit = '',
     this.estimatedDailyBudgetMin = 0,
     this.estimatedDailyBudgetMax = 0,
@@ -49,7 +50,17 @@ class Province {
   final bool hasContent;
 
   final String overview;
+
+  /// The original free-text culture field — still written to and still
+  /// shown as a fallback paragraph when [cultureNotes] is empty (most
+  /// existing provinces, until an admin fills those in for it too).
   final String localCulture;
+
+  /// Short, titled etiquette notes (e.g. "Greeting customs", "Dress at
+  /// religious sites") shown as scannable cards on the province page,
+  /// instead of [localCulture]'s single dense paragraph. Optional and
+  /// additive — a province with none just falls back to [localCulture].
+  final List<CultureNote> cultureNotes;
   final String bestTimeToVisit;
   final double estimatedDailyBudgetMin;
   final double estimatedDailyBudgetMax;
@@ -78,6 +89,9 @@ class Province {
       hasContent: map['hasContent'] as bool? ?? false,
       overview: map['overview'] as String? ?? '',
       localCulture: map['localCulture'] as String? ?? '',
+      cultureNotes: (map['cultureNotes'] as List? ?? const [])
+          .map((n) => CultureNote.fromMap(Map<String, dynamic>.from(n as Map)))
+          .toList(),
       bestTimeToVisit: map['bestTimeToVisit'] as String? ?? '',
       estimatedDailyBudgetMin: (map['estimatedDailyBudgetMin'] as num?)?.toDouble() ?? 0,
       estimatedDailyBudgetMax: (map['estimatedDailyBudgetMax'] as num?)?.toDouble() ?? 0,
@@ -101,6 +115,7 @@ class Province {
       'hasContent': hasContent,
       'overview': overview,
       'localCulture': localCulture,
+      'cultureNotes': cultureNotes.map((n) => n.toMap()).toList(),
       'bestTimeToVisit': bestTimeToVisit,
       'estimatedDailyBudgetMin': estimatedDailyBudgetMin,
       'estimatedDailyBudgetMax': estimatedDailyBudgetMax,
@@ -111,6 +126,19 @@ class Province {
       'featuredDestinationIds': featuredDestinationIds,
     };
   }
+}
+
+class CultureNote {
+  const CultureNote({required this.title, required this.body});
+
+  final String title;
+  final String body;
+
+  factory CultureNote.fromMap(Map<String, dynamic> map) {
+    return CultureNote(title: map['title'] as String? ?? '', body: map['body'] as String? ?? '');
+  }
+
+  Map<String, dynamic> toMap() => {'title': title, 'body': body};
 }
 
 class EmergencyHotline {

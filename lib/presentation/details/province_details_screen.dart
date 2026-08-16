@@ -236,10 +236,21 @@ class _ProvinceDetailsBody extends StatelessWidget {
                 const SizedBox(height: AppSpacing.xxl),
                 Text('Local Culture', style: theme.textTheme.titleLarge),
                 const SizedBox(height: AppSpacing.sm),
-                Text(
-                  province.localCulture,
-                  style: theme.textTheme.bodyMedium?.copyWith(height: 1.6),
-                ),
+                if (province.cultureNotes.isNotEmpty)
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      for (final note in province.cultureNotes) ...[
+                        _CultureNoteCard(note: note),
+                        const SizedBox(height: AppSpacing.sm),
+                      ],
+                    ],
+                  )
+                else
+                  Text(
+                    province.localCulture,
+                    style: theme.textTheme.bodyMedium?.copyWith(height: 1.6),
+                  ),
               ],
               if (data.destinations.isNotEmpty) ...[
                 const SizedBox(height: AppSpacing.xxl),
@@ -705,6 +716,47 @@ class _CircleButton extends StatelessWidget {
           shape: BoxShape.circle,
         ),
         child: Icon(icon, color: Colors.white, size: 18),
+      ),
+    );
+  }
+}
+
+/// One scannable "Local Culture" card — see [Province.cultureNotes]'s doc
+/// comment on why this only shows once an admin has filled at least one in.
+class _CultureNoteCard extends StatelessWidget {
+  const _CultureNoteCard({required this.note});
+
+  final CultureNote note;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Symbols.diversity_3_rounded, size: 16, color: theme.colorScheme.primary),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  note.title,
+                  style: theme.textTheme.titleSmall?.copyWith(color: theme.colorScheme.primary),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(note.body, style: theme.textTheme.bodyMedium?.copyWith(height: 1.5)),
+        ],
       ),
     );
   }

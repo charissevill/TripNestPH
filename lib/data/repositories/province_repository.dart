@@ -69,6 +69,7 @@ class ProvinceRepository {
     String provinceId, {
     required String overview,
     required String localCulture,
+    List<CultureNote> cultureNotes = const [],
     required String bestTimeToVisit,
     required double estimatedDailyBudgetMin,
     required double estimatedDailyBudgetMax,
@@ -82,6 +83,7 @@ class ProvinceRepository {
         'hasContent': true,
         'overview': overview,
         'localCulture': localCulture,
+        'cultureNotes': cultureNotes.map((n) => n.toMap()).toList(),
         'bestTimeToVisit': bestTimeToVisit,
         'estimatedDailyBudgetMin': estimatedDailyBudgetMin,
         'estimatedDailyBudgetMax': estimatedDailyBudgetMax,

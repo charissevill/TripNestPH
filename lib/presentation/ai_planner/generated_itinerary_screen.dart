@@ -139,16 +139,16 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
   bool get _canEditBudget => _isOwner && widget.savedItineraryId != null;
 
   /// Whether the viewer is actually a member of this trip (owner or
-  /// collaborator) — gates the Group Polls section's "New Poll" affordance,
-  /// which (unlike every other section on this screen) is otherwise offered
-  /// to *any* signed-in viewer who reaches this screen, not just this
-  /// trip's actual members; `firestore.rules`' `polls` match block would
-  /// reject the write either way, but showing a button that's guaranteed to
-  /// fail is a worse experience than not showing it. Same "assume yes until
-  /// the load finishes" default as [_isOwner], for the same reason: loading
-  /// [_savedItinerary] is asynchronous, and treating it as "not a member
-  /// yet" would flash-hide "New Poll" even for this trip's own owner while
-  /// that load is still in flight.
+  /// collaborator) — gates the "New Poll"/"Add Expense"/"Add Item"
+  /// affordances, which were otherwise offered to *any* signed-in viewer
+  /// who reaches this screen (e.g. via a guessed/shared savedId they were
+  /// never actually added to), not just this trip's real members;
+  /// `firestore.rules` would reject each of those writes either way, but
+  /// showing a button that's guaranteed to fail is a worse experience than
+  /// not showing it. Same "assume yes until the load finishes" default as
+  /// [_isOwner], for the same reason: loading [_savedItinerary] is
+  /// asynchronous, and treating it as "not a member yet" would flash-hide
+  /// these for this trip's own owner while that load is still in flight.
   bool get _isTripMember =>
       _savedItinerary == null || _savedItinerary!.memberIds.contains(_uid);
 
@@ -1710,11 +1710,12 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
                                   style: theme.textTheme.titleLarge,
                                 ),
                               ),
-                              TextButton.icon(
-                                onPressed: _addExpense,
-                                icon: const Icon(Symbols.add_rounded, size: 18),
-                                label: const Text('Add Expense'),
-                              ),
+                              if (_isTripMember)
+                                TextButton.icon(
+                                  onPressed: _addExpense,
+                                  icon: const Icon(Symbols.add_rounded, size: 18),
+                                  label: const Text('Add Expense'),
+                                ),
                             ],
                           ),
                           StreamBuilder<List<Expense>>(
@@ -1769,11 +1770,12 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
                                   style: theme.textTheme.titleLarge,
                                 ),
                               ),
-                              TextButton.icon(
-                                onPressed: _addPackingItem,
-                                icon: const Icon(Symbols.add_rounded, size: 18),
-                                label: const Text('Add Item'),
-                              ),
+                              if (_isTripMember)
+                                TextButton.icon(
+                                  onPressed: _addPackingItem,
+                                  icon: const Icon(Symbols.add_rounded, size: 18),
+                                  label: const Text('Add Item'),
+                                ),
                             ],
                           ),
                           const SizedBox(height: AppSpacing.md),

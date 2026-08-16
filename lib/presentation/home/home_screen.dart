@@ -12,6 +12,7 @@ import '../../core/services/local_preferences_service.dart';
 import '../../core/services/places_service.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/utils/app_exception.dart';
+import '../../core/utils/personalized_ranking.dart';
 import '../../core/widgets/banners/hero_banner.dart';
 import '../../core/widgets/cards/category_card.dart';
 import '../../core/widgets/cards/festival_card.dart';
@@ -367,6 +368,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   return _HomeContent(
                     data: snapshot.data!,
                     places: _places,
+                    favoriteCategories: user?.favoriteCategories ?? const [],
                     nearby: _nearby,
                     nearbyRestaurants: _nearbyRestaurants,
                     travelerLat: _travelerLat,
@@ -408,6 +410,7 @@ class _HomeContent extends StatelessWidget {
   const _HomeContent({
     required this.data,
     required this.places,
+    required this.favoriteCategories,
     required this.nearby,
     required this.nearbyRestaurants,
     required this.travelerLat,
@@ -421,6 +424,12 @@ class _HomeContent extends StatelessWidget {
 
   final _HomeData data;
   final PlacesService places;
+
+  /// `AppUser.favoriteCategories` — re-ranks (never filters) the two
+  /// carousels below that aren't already meaningfully ordered by something
+  /// else (distance, for the "Nearby" ones). Empty for a signed-out session,
+  /// which leaves both carousels in their normal, unpersonalized order.
+  final List<String> favoriteCategories;
   final List<Place> nearby;
   final List<Place> nearbyRestaurants;
   final double? travelerLat;
@@ -437,10 +446,12 @@ class _HomeContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final sidePadding = MaxWidthContainer.sidePadding(context, maxWidth: 1200);
+    final featuredPlaces = rankByFavoriteCategories(data.featuredPlaces, favoriteCategories);
+    final popularRestaurants = rankByFavoriteCategories(data.popularRestaurants, favoriteCategories);
     return SliverList.list(
       children: [
         HeroBanner(
-          items: data.featuredPlaces
+          items: featuredPlaces
               .take(4)
               .map(
                 (p) => HeroBannerItem(
@@ -531,11 +542,11 @@ class _HomeContent extends StatelessWidget {
           title: 'Featured Destinations',
           subtitle: 'Real places to explore across the Philippines',
           onSeeAll: () => context.go(RoutePaths.explore),
-          itemCount: data.featuredPlaces.length,
+          itemCount: featuredPlaces.length,
           itemBuilder: (context, i) => PlaceCard(
-            place: data.featuredPlaces[i],
-            imageUrl: _photoUrl(data.featuredPlaces[i]),
-            onTap: () => showPlaceDetailsSheet(context, place: data.featuredPlaces[i], placesService: places),
+            place: featuredPlaces[i],
+            imageUrl: _photoUrl(featuredPlaces[i]),
+            onTap: () => showPlaceDetailsSheet(context, place: featuredPlaces[i], placesService: places),
           ),
         ),
         ..._carouselSection(
@@ -544,11 +555,11 @@ class _HomeContent extends StatelessWidget {
           title: 'Popular Restaurants',
           subtitle: 'Where locals and travelers both eat well',
           onSeeAll: () => context.go('${RoutePaths.explore}?category=food'),
-          itemCount: data.popularRestaurants.length,
+          itemCount: popularRestaurants.length,
           itemBuilder: (context, i) => PlaceCard(
-            place: data.popularRestaurants[i],
-            imageUrl: _photoUrl(data.popularRestaurants[i]),
-            onTap: () => showPlaceDetailsSheet(context, place: data.popularRestaurants[i], placesService: places),
+            place: popularRestaurants[i],
+            imageUrl: _photoUrl(popularRestaurants[i]),
+            onTap: () => showPlaceDetailsSheet(context, place: popularRestaurants[i], placesService: places),
           ),
         ),
         ..._carouselSection(

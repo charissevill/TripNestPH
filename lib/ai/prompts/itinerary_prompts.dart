@@ -1,3 +1,4 @@
+import '../../domain/models/itinerary.dart';
 import '../../domain/models/province.dart';
 import '../models/itinerary_request.dart';
 
@@ -60,6 +61,7 @@ Rules:
 - "totalBudget" must roughly equal the sum of "budgetBreakdown" amounts, in Philippine pesos (numbers only, no currency symbol), and must fit the traveler's stated budget tier. If a real daily-budget guide for the province is given in the user message, sanity-check your numbers against it — the traveler's chosen budget tier is still primary, but don't wildly exceed or undercut the province's real average without reason.
 - "recommendedRestaurantNames" and "nearbyAttractionNames" must ONLY contain names copied exactly from the lists given to you in the user message — never invent a name that wasn't provided. Leave the array empty if nothing provided fits well.
 - "travelTips" must include, in this order, one entry per category (skip a category only if genuinely not applicable): a suggested local delicacy/dish to try, a hidden gem worth a detour (only if you're not already covering it in the day plan), the best visiting hours/time of day to avoid crowds, a practical travel reminder (e.g. booking ahead, cash vs card), a safety reminder specific to the destination, and an eco-friendly travel tip. Prefix each with a short bold-ish label like "Local delicacy:", "Hidden gem:", "Best time to visit:", "Reminder:", "Safety:", "Eco tip:" followed by the actual tip. For the "Safety:" tip: if real emergency hotline data for the province is given in the user message, cite the actual label/number from it verbatim rather than a generic one; only fall back to general Philippines emergency guidance if none is given.
+- If a day-by-day weather forecast is given in the user message, actually use it: for a day forecast as rainy/stormy, prefer an indoor or covered activity for that day's most weather-exposed slot when a reasonable one exists among the given restaurant/attraction candidates, and say why in that activity's "description" (e.g. "Moved indoors — rain expected this afternoon."). Never invent rain that isn't in the forecast, and never drop a genuinely good outdoor pick just because of mild/uncertain conditions — only adjust for the forecast's clearly bad-weather days. If no forecast is given, plan normally.
 - Keep every string concise and mobile-friendly — this renders in a scrollable card UI, not a document.
 - Never suggest anything illegal, unsafe, or environmentally destructive.
 ''';
@@ -76,6 +78,7 @@ Rules:
     double? provinceBudgetMax,
     String? accommodationName,
     String? priorConversationContext,
+    List<WeatherForecast> weatherForecast = const [],
   }) {
     return '''
 ${priorConversationContext != null && priorConversationContext.isNotEmpty ? '''
@@ -101,6 +104,8 @@ Other attractions available near this destination (pick from these only, if rele
 
 Top-rated hotels near this destination, already chosen and shown to the traveler separately as "Recommended Accommodations" — do not repeat them in "recommendedRestaurantNames"/"nearbyAttractionNames", but feel free to reference one by name in a travel tip if genuinely useful (e.g. proximity to a planned activity): ${candidateHotelNames.isEmpty ? 'none available' : candidateHotelNames.join(', ')}
 ${accommodationName != null && accommodationName.isNotEmpty ? '\nThe traveler is staying near $accommodationName. The restaurant/attraction lists above are already sorted by distance from there — prefer picks near the top of each list when they still fit the traveler\'s interests and budget.\n' : ''}
+
+Weather forecast for the trip: ${weatherForecast.isEmpty ? 'not available — plan without weather-based adjustments' : weatherForecast.map((w) => '${w.dayLabel}: ${w.condition}, ${w.lowTemp}–${w.highTemp}°C').join('; ')}
 
 Real safety/budget facts on file for ${request.provinceName} — use these instead of inventing generic ones:
 - Emergency hotlines: ${emergencyHotlines.isEmpty ? 'none on file — give general Philippines emergency guidance (e.g. 911) and note that the traveler should confirm the local hotline on arrival' : emergencyHotlines.map((h) => '${h.label}: ${h.number}').join(', ')}

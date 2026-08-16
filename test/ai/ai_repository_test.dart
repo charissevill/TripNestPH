@@ -273,6 +273,75 @@ void main() {
     expect(itinerary.weather[1].condition, 'Rainy');
   });
 
+  test('generateItinerary() feeds the fetched forecast into the prompt sent to the AI', () async {
+    final firestore = FakeFirebaseFirestore();
+    Map<String, dynamic>? capturedData;
+    final caller = _fakeAiComplete(
+      {
+        'days': [
+          {'dayNumber': 1, 'dateLabel': 'Day 1', 'activities': <Map<String, dynamic>>[]},
+          {'dayNumber': 2, 'dateLabel': 'Day 2', 'activities': <Map<String, dynamic>>[]},
+        ],
+        'budgetBreakdown': <Map<String, dynamic>>[],
+        'travelTips': <String>[],
+        'totalBudget': 0,
+        'recommendedRestaurantNames': <String>[],
+        'nearbyAttractionNames': <String>[],
+      },
+      onCall: (data) => capturedData = data,
+    );
+    final weatherClient = MockClient((request) async {
+      return http.Response(
+        jsonEncode({
+          'daily': {
+            'time': ['2026-08-01', '2026-08-02'],
+            'weathercode': [0, 63],
+            'temperature_2m_max': [32.4, 29.1],
+            'temperature_2m_min': [25.0, 24.2],
+          },
+        }),
+        200,
+      );
+    });
+
+    final repository = AiRepository(
+      openAiService: OpenAiService(caller: caller),
+      weatherService: WeatherService(client: weatherClient),
+      restaurantRepository: RestaurantRepository(firestore: firestore),
+      provinceRepository: ProvinceRepository(firestore: firestore),
+    );
+
+    await repository.generateItinerary(
+      const AiItineraryRequest(
+        destinationId: 'palawan-weather-prompt',
+        destinationName: 'Palawan',
+        provinceId: 'palawan',
+        provinceName: 'Palawan',
+        budgetTierLabel: 'Budget',
+        budgetRange: '₱5k - ₱15k',
+        days: 2,
+        travelers: 1,
+        travelerType: 'Solo',
+        transportation: {'Flight'},
+        interests: {'Beaches'},
+        latitude: 9.7392,
+        longitude: 118.7353,
+      ),
+      coverImageUrl: '',
+    );
+
+    final messages = capturedData!['messages'] as List;
+    final userContent = messages.last['content'] as String;
+    // The forecast the model actually sees, not just what ends up attached
+    // to the itinerary for display afterward — proves weather is resolved
+    // *before* the prompt is built, not just alongside/after the AI call.
+    expect(userContent, contains('Sunny'));
+    expect(userContent, contains('Rainy'));
+    // The system prompt's own weather-adjustment rule.
+    final systemContent = messages.first['content'] as String;
+    expect(systemContent, contains('weather forecast'));
+  });
+
   test('generateItinerary() leaves weather empty when the destination has no coordinates', () async {
     final firestore = FakeFirebaseFirestore();
     final caller = _fakeAiComplete({

@@ -121,26 +121,46 @@ class AiRepository {
     required String coverImageUrl,
     bool forceRefresh = false,
   }) async {
+    // Resolved first, on its own: a specific-destination trip already has
+    // this on the request (returns instantly, no await), and only a
+    // whole-province trip pays for the one geocoding call — everything else
+    // below either doesn't need it (restaurants/accommodations/attractions
+    // key off `request.latitude`/`longitude` directly) or does (weather), so
+    // this can't simply join the batch below without weather waiting on its
+    // own result anyway.
+    final destinationCoordinates = await _resolveDestinationCoordinates(
+      request,
+    );
+
     // Restaurants come from the curated Firestore catalog (not LGU content —
     // business-owner-submitted); accommodations and attractions come live
     // from Places API; province facts (emergency hotlines/travel tips/budget
     // guide) come from Firestore too — all fetched together so the (often
     // slower) live Places lookups don't add latency on top of the Firestore
-    // reads.
+    // reads. Weather joins this same batch (rather than running alongside
+    // the AI completion call, as before) so the forecast is already in hand
+    // by the time the prompt is built below and can actually inform which
+    // activities the model picks — not just decorate the result afterward.
     final candidateResults = await Future.wait([
       _restaurantRepository.filter(provinceId: request.provinceId, limit: 30),
       _fetchAccommodations(request),
       _fetchPlaceAttractions(request),
       _provinceRepository.getById(request.provinceId),
-      _resolveDestinationCoordinates(request),
+      destinationCoordinates.latitude != null &&
+              destinationCoordinates.longitude != null
+          ? _fetchForecast(
+              latitude: destinationCoordinates.latitude!,
+              longitude: destinationCoordinates.longitude!,
+              days: request.days,
+            )
+          : Future.value(<WeatherForecast>[]),
     ]);
     final candidateRestaurants = candidateResults[0] as List<Restaurant>;
     final accommodations = candidateResults[1] as List<PlaceRecommendation>;
     final candidatePlaceAttractions =
         candidateResults[2] as List<PlaceRecommendation>;
     final province = candidateResults[3] as Province?;
-    final destinationCoordinates =
-        candidateResults[4] as ({double? latitude, double? longitude});
+    final weather = candidateResults[4] as List<WeatherForecast>;
 
     // When the traveler said where they're staying, closer candidates lead
     // each list — combined with the explicit prompt instruction below, this
@@ -158,18 +178,6 @@ class AiRepository {
       (p) => p.latitude,
       (p) => p.longitude,
     );
-
-    // Runs alongside the (often slower) AI completion call below rather than
-    // after it, so a real forecast never adds extra wait time.
-    final weatherFuture =
-        destinationCoordinates.latitude != null &&
-            destinationCoordinates.longitude != null
-        ? _fetchForecast(
-            latitude: destinationCoordinates.latitude!,
-            longitude: destinationCoordinates.longitude!,
-            days: request.days,
-          )
-        : Future.value(<WeatherForecast>[]);
 
     final signature = jsonEncode({
       'destinationId': request.destinationId,
@@ -211,6 +219,7 @@ class AiRepository {
               provinceBudgetMax: province?.estimatedDailyBudgetMax,
               accommodationName: request.accommodationName,
               priorConversationContext: request.priorConversationContext,
+              weatherForecast: weather,
             ),
           },
         ],
@@ -226,7 +235,6 @@ class AiRepository {
       // same broken text for up to the cache's full TTL — with no way to
       // actually get a fresh attempt short of changing the form.
     }
-    final weather = await weatherFuture;
 
     final itinerary = await _parseItinerary(
       raw,

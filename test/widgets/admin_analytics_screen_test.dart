@@ -52,6 +52,33 @@ void main() {
     expect(find.text('Alona Beach'), findsOneWidget);
   });
 
+  testWidgets('shows the traveler-growth trend chart once at least 2 daily snapshots exist', (tester) async {
+    final firestore = FakeFirebaseFirestore();
+    await firestore.collection('analytics_snapshots').doc('2026-01-01').set({'date': '2026-01-01', 'travelerCount': 10});
+    await firestore.collection('analytics_snapshots').doc('2026-01-02').set({'date': '2026-01-02', 'travelerCount': 15});
+
+    await tester.pumpWidget(_wrap(AdminAnalyticsScreen(firestore: firestore)));
+    await tester.pumpAndSettle();
+
+    await tester.scrollUntilVisible(
+      find.text('Traveler Growth'),
+      300,
+      scrollable: find.byType(Scrollable),
+    );
+    expect(find.text('Traveler Growth'), findsOneWidget);
+    expect(find.text('Total signed-up travelers, last 2 days'), findsOneWidget);
+  });
+
+  testWidgets('hides the trend chart when fewer than 2 daily snapshots exist', (tester) async {
+    final firestore = FakeFirebaseFirestore();
+    await firestore.collection('analytics_snapshots').doc('2026-01-01').set({'date': '2026-01-01', 'travelerCount': 10});
+
+    await tester.pumpWidget(_wrap(AdminAnalyticsScreen(firestore: firestore)));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Traveler Growth'), findsNothing);
+  });
+
   testWidgets('shows zero stats gracefully when every collection is empty', (
     tester,
   ) async {

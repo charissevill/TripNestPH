@@ -558,6 +558,68 @@ async function summarizeReviews(apiKey, placeName, comments) {
   return content.trim();
 }
 
+/**
+ * Writes one `analytics_snapshots/{YYYY-MM-DD}` doc per day with the same
+ * platform-wide counts `AdminAnalyticsScreen` already computes live on
+ * demand — this doesn't replace that live query, it just gives the
+ * dashboard a history to chart trend lines against, which a single current
+ * snapshot can never show on its own. `count()` aggregation queries so this
+ * scales with collection count, not document count, the same reasoning
+ * `UserRepository.countAll()` etc. already use client-side.
+ */
+exports.snapshotDailyAnalytics = onSchedule(
+  { region: 'asia-southeast1', schedule: 'every day 00:10' },
+  async () => {
+    const count = async (query) => (await query.count().get()).data().count;
+
+    const [
+      travelerCount,
+      suspendedTravelerCount,
+      publishedDestinationCount,
+      publishedRestaurantCount,
+      publishedFestivalCount,
+      pendingBusinessCount,
+      approvedBusinessCount,
+      savedTripCount,
+      pendingReportCount,
+    ] = await Promise.all([
+      count(db.collection('users')),
+      count(db.collection('users').where('status', '==', 'suspended')),
+      count(db.collection('tourist_spots').where('status', '==', 'published')),
+      count(db.collection('restaurants').where('status', '==', 'published')),
+      count(db.collection('festivals').where('status', '==', 'published')),
+      count(db.collection('businesses').where('status', '==', 'pending')),
+      count(db.collection('businesses').where('status', '==', 'approved')),
+      count(db.collection('saved_itineraries')),
+      // Handled reports are deleted (see AdminReportedReviewsScreen), never
+      // left in a "resolved" state — so every doc still in this collection
+      // is, by definition, still pending.
+      count(db.collection('review_reports')),
+    ]);
+
+    // UTC date key — a day boundary a few hours off from the traveler base's
+    // actual local time doesn't matter for a long-run trend line, and this
+    // keeps the key trivially derivable/sortable without a timezone lookup.
+    const dateKey = new Date().toISOString().slice(0, 10);
+    await db
+      .collection('analytics_snapshots')
+      .doc(dateKey)
+      .set({
+        date: dateKey,
+        travelerCount,
+        suspendedTravelerCount,
+        publishedDestinationCount,
+        publishedRestaurantCount,
+        publishedFestivalCount,
+        pendingBusinessCount,
+        approvedBusinessCount,
+        savedTripCount,
+        pendingReportCount,
+        createdAt: FieldValue.serverTimestamp(),
+      });
+  },
+);
+
 exports.generateReviewDigests = onSchedule(
   { region: 'asia-southeast1', schedule: 'every 24 hours', secrets: [groqApiKey], timeoutSeconds: 540 },
   async () => {

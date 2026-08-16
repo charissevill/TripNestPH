@@ -1,6 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:provider/provider.dart';
 
@@ -10,6 +12,7 @@ import '../../core/theme/app_spacing.dart';
 import '../../core/utils/app_exception.dart';
 import '../../core/widgets/states/loading_widget.dart';
 import '../../data/repositories/admin_repository.dart';
+import '../../data/repositories/analytics_snapshot_repository.dart';
 import '../../data/repositories/business_repository.dart';
 import '../../data/repositories/destination_repository.dart';
 import '../../data/repositories/festival_repository.dart';
@@ -19,6 +22,7 @@ import '../../data/repositories/restaurant_repository.dart';
 import '../../data/repositories/review_report_repository.dart';
 import '../../data/repositories/user_repository.dart';
 import '../../domain/models/admin_user.dart';
+import '../../domain/models/analytics_snapshot.dart';
 import '../../domain/models/destination.dart';
 import '../../domain/models/province.dart';
 
@@ -66,6 +70,9 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
     firestore: widget.firestore,
   );
   late final ReviewReportRepository _reportRepository = ReviewReportRepository(
+    firestore: widget.firestore,
+  );
+  late final AnalyticsSnapshotRepository _analyticsSnapshotRepository = AnalyticsSnapshotRepository(
     firestore: widget.firestore,
   );
 
@@ -148,6 +155,10 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
       _itineraryRepository.countAll(),
       _reportRepository.streamAllForAdmin().first,
       _destinationRepository.getPopular(limit: 5),
+      // Best-effort — a brand-new deployment with no snapshots yet (or a
+      // transient read failure) should never break the rest of the
+      // dashboard, just leave the trend chart section hidden.
+      _analyticsSnapshotRepository.getRecent().catchError((_) => const <AnalyticsSnapshot>[]),
     ]);
 
     final provinces = results[5] as List;
@@ -173,6 +184,7 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
       savedTripCount: results[7] as int,
       pendingReportCount: reports.length,
       popularDestinations: results[9] as List<Destination>,
+      trend: results[10] as List<AnalyticsSnapshot>,
     );
   }
 
@@ -386,6 +398,10 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
                       ],
                     ),
                   ],
+                  if (!stats.isScoped && stats.trend.length >= 2) ...[
+                    const SizedBox(height: AppSpacing.xl),
+                    _TrendChart(snapshots: stats.trend),
+                  ],
                   if (stats.popularDestinations.isNotEmpty) ...[
                     const SizedBox(height: AppSpacing.xl),
                     Text(
@@ -429,6 +445,7 @@ class _DashboardStats {
     required this.popularDestinations,
     this.scopedProvinceName,
     this.provinceStatsCapped = false,
+    this.trend = const [],
   });
 
   final int travelerCount;
@@ -452,6 +469,13 @@ class _DashboardStats {
   final int savedTripCount;
   final int pendingReportCount;
   final List<Destination> popularDestinations;
+
+  /// Recent daily platform-wide snapshots for the trend chart — never
+  /// populated for an 'lgu' account's province-scoped dashboard, matching
+  /// [travelerCount]/etc.'s own admin-only visibility (see
+  /// `snapshotDailyAnalytics`'s doc comment on why those numbers are
+  /// platform-wide, not province-scoped).
+  final List<AnalyticsSnapshot> trend;
 
   /// Non-null only for an 'lgu' account's province-scoped dashboard — the
   /// UI uses this to know whether to show the Travelers/Businesses/Pending
@@ -502,6 +526,83 @@ class _StatCard extends StatelessWidget {
           ),
           const SizedBox(height: 2),
           Text(label, style: theme.textTheme.bodySmall),
+        ],
+      ),
+    );
+  }
+}
+
+/// Total-traveler-count trend line over [snapshots] (see
+/// `AnalyticsSnapshotRepository.getRecent`) — the one thing a single
+/// current-count stat card can never show: whether the platform is
+/// actually growing, or has been flat for weeks.
+class _TrendChart extends StatelessWidget {
+  const _TrendChart({required this.snapshots});
+
+  final List<AnalyticsSnapshot> snapshots;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final spots = [
+      for (var i = 0; i < snapshots.length; i++) FlSpot(i.toDouble(), snapshots[i].travelerCount.toDouble()),
+    ];
+    final counts = snapshots.map((s) => s.travelerCount);
+    final maxCount = counts.reduce((a, b) => a > b ? a : b).toDouble();
+
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 12, offset: const Offset(0, 6)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Traveler Growth', style: theme.textTheme.titleMedium),
+          Text(
+            'Total signed-up travelers, last ${snapshots.length} days',
+            style: theme.textTheme.bodySmall?.copyWith(color: AppColors.textTertiary),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          SizedBox(
+            height: 140,
+            child: LineChart(
+              LineChartData(
+                minY: 0,
+                // A flat-zero history would otherwise divide-by-zero this
+                // into a degenerate 0-to-0 range.
+                maxY: maxCount <= 0 ? 1 : maxCount * 1.2,
+                gridData: const FlGridData(show: false),
+                titlesData: const FlTitlesData(show: false),
+                borderData: FlBorderData(show: false),
+                lineTouchData: LineTouchData(
+                  touchTooltipData: LineTouchTooltipData(
+                    getTooltipItems: (touched) => touched.map((spot) {
+                      final snap = snapshots[spot.x.toInt()];
+                      return LineTooltipItem(
+                        '${snap.travelerCount}\n${DateFormat.MMMd().format(snap.date)}',
+                        const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12),
+                      );
+                    }).toList(),
+                  ),
+                ),
+                lineBarsData: [
+                  LineChartBarData(
+                    spots: spots,
+                    isCurved: true,
+                    color: theme.colorScheme.primary,
+                    barWidth: 2.5,
+                    dotData: const FlDotData(show: false),
+                    belowBarData: BarAreaData(show: true, color: theme.colorScheme.primary.withValues(alpha: 0.12)),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ],
       ),
     );

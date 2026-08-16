@@ -531,6 +531,17 @@ service cloud.firestore {
       allow delete: if hasAdminRole(['admin']);
     }
 
+    // ---- analytics_snapshots/{date} — one daily platform-wide stats doc,
+    // written only by the scheduled snapshotDailyAnalytics Cloud Function
+    // (Admin SDK, bypasses these rules entirely) — never client-writable.
+    // Admin-only, not 'lgu': these are the same platform-wide traveler/
+    // business/report numbers AdminAnalyticsScreen already keeps out of an
+    // LGU account's province-scoped dashboard.
+    match /analytics_snapshots/{date} {
+      allow read: if hasAdminRole(['admin']);
+      allow write: if false;
+    }
+
     // ---- reviews/{id} — public read, owner-write, admin-moderated -------
     // Admins can only flip `isHidden` (moderation), never rewrite someone
     // else's rating/comment; delete is available to the owner or an admin.

@@ -546,6 +546,18 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
       if (itinerary != null) {
         final savedId = widget.savedItineraryId;
         if (savedId != null) {
+          // Already saved — this is about to overwrite it in place, with no
+          // undo. Let the traveler see it's about to happen and back out;
+          // declining just discards the freshly generated result and leaves
+          // the saved trip exactly as it was.
+          final confirmed = await showConfirmationDialog(
+            context,
+            title: 'Replace your saved itinerary?',
+            message: 'This swaps in the new plan and can\'t be undone. Your current saved itinerary will be gone.',
+            confirmLabel: 'Replace',
+            isDestructive: true,
+          );
+          if (!confirmed || !mounted) return;
           // Already saved — overwrite the same trip in place instead of
           // leaving it stale/orphaned while this pushes a second, separate
           // unsaved copy (see updateItinerary's doc comment).

@@ -2,14 +2,17 @@ import 'dart:async';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
 import '../../core/routes/route_paths.dart';
+import '../../core/services/location_service.dart';
 import '../../core/services/places_service.dart';
 import '../../core/services/search_history_service.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
+import '../../core/utils/listing_filters.dart';
 import '../../core/utils/place_dedup.dart';
 import '../../core/widgets/dialogs/active_filter_chips.dart';
 import '../../core/widgets/dialogs/confirmation_dialog.dart';
@@ -68,6 +71,9 @@ class _SearchResult {
     required this.rating,
     required this.provinceId,
     this.place,
+    this.priceTier,
+    this.latitude,
+    this.longitude,
   });
 
   final _ResultType type;
@@ -82,6 +88,13 @@ class _SearchResult {
   /// Firestore id to look back up later, so the full result travels with
   /// the tile instead (used to open [showPlaceDetailsSheet] on tap).
   final Place? place;
+
+  /// Null for a festival (no per-listing price data) or any listing with no
+  /// price info on file — [SearchFilterSheet]'s budget filter treats a null
+  /// tier as "can't tell", never as a reason to hide the result.
+  final PriceTier? priceTier;
+  final double? latitude;
+  final double? longitude;
 }
 
 /// A dedicated full-screen search experience: debounced, live search across
@@ -175,9 +188,13 @@ class _SearchScreenState extends State<SearchScreen> {
   String? _regionId;
   String? _provinceId;
   double? _minRating;
+  PriceTier? _priceTier;
+  double? _maxDistanceKm;
+  // Resolved lazily, only once a distance filter is actually applied.
+  Position? _userPosition;
   List<Region> _regions = [];
   List<Province> _provinces = [];
-  bool get _hasFilters => _provinceId != null || _minRating != null;
+  bool get _hasFilters => _provinceId != null || _minRating != null || _priceTier != null || _maxDistanceKm != null;
 
   /// The traveler's own past search queries — real per-device history, not
   /// the four hardcoded strings this used to show every user.
@@ -347,8 +364,13 @@ class _SearchScreenState extends State<SearchScreen> {
           imageUrl: r.heroImageUrl,
           rating: r.rating,
           provinceId: r.provinceId,
+          priceTier: priceTierFromPesoSigns(r.priceRange as String),
+          latitude: r.latitude,
+          longitude: r.longitude,
         ),
       ),
+      // Festivals carry no per-listing price data — priceTier stays null,
+      // which the budget filter treats as "can't tell" rather than a miss.
       ...festivals.map(
         (f) => _SearchResult(
           type: _ResultType.festival,
@@ -358,9 +380,16 @@ class _SearchScreenState extends State<SearchScreen> {
           imageUrl: f.heroImageUrl,
           rating: f.rating,
           provinceId: f.provinceId,
+          latitude: f.latitude,
+          longitude: f.longitude,
         ),
       ),
     ];
+  }
+
+  bool _matchesPriceAndDistance(_SearchResult r) {
+    return (_priceTier == null || r.priceTier == null || r.priceTier == _priceTier) &&
+        withinDistance(lat: r.latitude, lng: r.longitude, origin: _userPosition, maxKm: _maxDistanceKm);
   }
 
   Future<void> _runSearch(String query) async {
@@ -466,6 +495,7 @@ class _SearchScreenState extends State<SearchScreen> {
             .where((r) => r.rating >= _minRating!)
             .toList();
       }
+      curatedResults = curatedResults.where(_matchesPriceAndDistance).toList();
 
       // A live place that's also one of the curated results above (e.g. a
       // restaurant the app already has saved) shouldn't show twice — the
@@ -476,6 +506,7 @@ class _SearchScreenState extends State<SearchScreen> {
       final placeResults = allLivePlaces
           .where((p) => !isDuplicateOfCurated(p.name, curatedNames))
           .map(_placeToResult)
+          .where(_matchesPriceAndDistance)
           .toList();
 
       setState(() {
@@ -507,6 +538,9 @@ class _SearchScreenState extends State<SearchScreen> {
       rating: place.rating ?? 0,
       provinceId: '',
       place: place,
+      priceTier: priceTierFromPlacesLevel(place.priceLevel),
+      latitude: place.latitude,
+      longitude: place.longitude,
     );
   }
 
@@ -524,7 +558,7 @@ class _SearchScreenState extends State<SearchScreen> {
       );
       if (!mounted || requestId != _searchRequestId) return;
       setState(() {
-        _results = _toResults(restaurants, festivals);
+        _results = _toResults(restaurants, festivals).where(_matchesPriceAndDistance).toList();
         // A province/region match only ever makes sense for a typed query
         // — this path runs with an empty query (filter-only browsing), so
         // any tile left over from a previous non-empty search must clear.
@@ -551,16 +585,31 @@ class _SearchScreenState extends State<SearchScreen> {
       regionId: _regionId,
       provinceId: _provinceId,
       minRating: _minRating,
-      onApply: (regionId, provinceId, r) {
+      priceTier: _priceTier,
+      maxDistanceKm: _maxDistanceKm,
+      onApply: (regionId, provinceId, r, priceTier, maxDistanceKm) {
         setState(() {
           _regionId = regionId;
           _provinceId = provinceId;
           _minRating = r;
+          _priceTier = priceTier;
+          _maxDistanceKm = maxDistanceKm;
         });
       },
     );
     if (applied != true) return;
+    if (_maxDistanceKm != null && _userPosition == null) await _resolveUserPosition();
     _rerunAfterFilterChange();
+  }
+
+  /// Best-effort — a denied/unavailable location just means the distance
+  /// filter has nothing to narrow by (see [withinDistance]'s no-origin
+  /// fallback) rather than blocking the rest of the filter sheet.
+  Future<void> _resolveUserPosition() async {
+    try {
+      final result = await LocationService().resolveCurrentPosition();
+      if (mounted && result.isGranted) setState(() => _userPosition = result.position);
+    } catch (_) {}
   }
 
   String? get _provinceName {
@@ -581,11 +630,23 @@ class _SearchScreenState extends State<SearchScreen> {
     _rerunAfterFilterChange();
   }
 
+  void _removePriceTierFilter() {
+    setState(() => _priceTier = null);
+    _rerunAfterFilterChange();
+  }
+
+  void _removeDistanceFilter() {
+    setState(() => _maxDistanceKm = null);
+    _rerunAfterFilterChange();
+  }
+
   void _clearFilters() {
     setState(() {
       _regionId = null;
       _provinceId = null;
       _minRating = null;
+      _priceTier = null;
+      _maxDistanceKm = null;
     });
     _rerunAfterFilterChange();
   }
@@ -746,6 +807,10 @@ class _SearchScreenState extends State<SearchScreen> {
                   onRemoveProvince: _removeProvinceFilter,
                   onRemoveMinRating: _removeMinRatingFilter,
                   onClearAll: _clearFilters,
+                  priceTier: _priceTier,
+                  onRemovePriceTier: _removePriceTierFilter,
+                  maxDistanceKm: _maxDistanceKm,
+                  onRemoveDistance: _removeDistanceFilter,
                 ),
               ),
             Expanded(

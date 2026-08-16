@@ -2,16 +2,19 @@ import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
 import '../../core/routes/route_paths.dart';
+import '../../core/services/location_service.dart';
 import '../../core/services/places_service.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/theme/breakpoints.dart';
 import '../../core/utils/app_exception.dart';
+import '../../core/utils/listing_filters.dart';
 import '../../core/utils/place_dedup.dart';
 import '../../core/widgets/buttons/animated_button.dart';
 import '../../core/widgets/cards/category_card.dart';
@@ -116,9 +119,36 @@ class _ExploreScreenState extends State<ExploreScreen> {
   String? _provinceId;
   String? _provinceName;
   double? _minRating;
+  PriceTier? _priceTier;
+  double? _maxDistanceKm;
+  // Resolved lazily, only once a distance filter is actually applied — most
+  // sessions never touch it, so there's no reason to prompt for location
+  // permission just for loading Explore.
+  Position? _userPosition;
   List<Region> _regions = [];
   List<Province> _provinces = [];
-  bool get _hasFilters => _provinceId != null || _minRating != null;
+  bool get _hasFilters => _provinceId != null || _minRating != null || _priceTier != null || _maxDistanceKm != null;
+
+  List<Place>? get _filteredDestinationPlaces => _destinationPlaces?.where((p) {
+    return (_priceTier == null || priceTierFromPlacesLevel(p.priceLevel) == _priceTier) &&
+        withinDistance(lat: p.latitude, lng: p.longitude, origin: _userPosition, maxKm: _maxDistanceKm);
+  }).toList();
+
+  List<Object>? get _filteredRestaurantItems => _restaurantItems?.where((item) {
+    return switch (item) {
+      Place p => (_priceTier == null || priceTierFromPlacesLevel(p.priceLevel) == _priceTier) &&
+          withinDistance(lat: p.latitude, lng: p.longitude, origin: _userPosition, maxKm: _maxDistanceKm),
+      Restaurant r => (_priceTier == null || priceTierFromPesoSigns(r.priceRange) == _priceTier) &&
+          withinDistance(lat: r.latitude, lng: r.longitude, origin: _userPosition, maxKm: _maxDistanceKm),
+      Object() => true,
+    };
+  }).toList();
+
+  // Festivals carry no per-listing price data, so the budget filter simply
+  // doesn't apply to this tab — only distance narrows it.
+  List<Festival>? get _filteredFestivals => _festivals
+      ?.where((f) => withinDistance(lat: f.latitude, lng: f.longitude, origin: _userPosition, maxKm: _maxDistanceKm))
+      .toList();
 
   List<Place>? _destinationPlaces;
   bool _loadingDestinations = false;
@@ -211,15 +241,35 @@ class _ExploreScreenState extends State<ExploreScreen> {
       regionId: _regionId,
       provinceId: _provinceId,
       minRating: _minRating,
-      onApply: (regionId, provinceId, r) => setState(() {
+      priceTier: _priceTier,
+      maxDistanceKm: _maxDistanceKm,
+      onApply: (regionId, provinceId, r, priceTier, maxDistanceKm) => setState(() {
         _regionId = regionId;
         _provinceId = provinceId;
         final matches = _provinces.where((p) => p.id == provinceId);
         _provinceName = matches.isEmpty ? null : matches.first.name;
         _minRating = r;
+        _priceTier = priceTier;
+        _maxDistanceKm = maxDistanceKm;
       }),
     );
-    if (applied == true) _invalidateAllTabsAndReload();
+    if (applied != true) return;
+    if (_maxDistanceKm != null && _userPosition == null) await _resolveUserPosition();
+    // The distance/budget filters are applied client-side against
+    // already-loaded items, not baked into the fetch itself — but the fetch
+    // still needs to widen its page size (see _hasFilters), so a reload is
+    // still required whenever any filter changes.
+    _invalidateAllTabsAndReload();
+  }
+
+  /// Best-effort — a denied/unavailable location just means the distance
+  /// filter silently has nothing to narrow by (see [withinDistance]'s
+  /// no-origin fallback) rather than blocking the rest of the filter sheet.
+  Future<void> _resolveUserPosition() async {
+    try {
+      final result = await LocationService().resolveCurrentPosition();
+      if (mounted && result.isGranted) setState(() => _userPosition = result.position);
+    } catch (_) {}
   }
 
   void _removeProvinceFilter() {
@@ -236,12 +286,24 @@ class _ExploreScreenState extends State<ExploreScreen> {
     _invalidateAllTabsAndReload();
   }
 
+  void _removePriceTierFilter() {
+    setState(() => _priceTier = null);
+    _invalidateAllTabsAndReload();
+  }
+
+  void _removeDistanceFilter() {
+    setState(() => _maxDistanceKm = null);
+    _invalidateAllTabsAndReload();
+  }
+
   void _clearFilters() {
     setState(() {
       _regionId = null;
       _provinceId = null;
       _provinceName = null;
       _minRating = null;
+      _priceTier = null;
+      _maxDistanceKm = null;
     });
     _invalidateAllTabsAndReload();
   }
@@ -511,6 +573,10 @@ class _ExploreScreenState extends State<ExploreScreen> {
                       onRemoveProvince: _removeProvinceFilter,
                       onRemoveMinRating: _removeMinRatingFilter,
                       onClearAll: _clearFilters,
+                      priceTier: _priceTier,
+                      onRemovePriceTier: _removePriceTierFilter,
+                      maxDistanceKm: _maxDistanceKm,
+                      onRemoveDistance: _removeDistanceFilter,
                     ),
                   ],
                 ],
@@ -615,7 +681,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
               child: _mapMode
                   ? switch (_tab) {
                       _ExploreTab.destinations => _buildMap(
-                        items: _destinationPlaces,
+                        items: _filteredDestinationPlaces,
                         isLoading: _loadingDestinations,
                         error: _destinationsError,
                         onRetry: () => _loadDestinations(reset: true),
@@ -635,7 +701,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                               ),
                       ),
                       _ExploreTab.restaurants => _buildMap(
-                        items: _restaurantItems,
+                        items: _filteredRestaurantItems,
                         isLoading: _loadingRestaurants,
                         error: _restaurantsError,
                         onRetry: () => _loadRestaurants(reset: true),
@@ -664,7 +730,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                         },
                       ),
                       _ExploreTab.festivals => _buildMap(
-                        items: _festivals,
+                        items: _filteredFestivals,
                         isLoading: _loadingFestivals,
                         error: _festivalsError,
                         onRetry: () => _loadFestivals(reset: true),
@@ -685,7 +751,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                     }
                   : switch (_tab) {
                       _ExploreTab.destinations => _buildGrid(
-                        items: _destinationPlaces,
+                        items: _filteredDestinationPlaces,
                         isLoading: _loadingDestinations,
                         error: _destinationsError,
                         // Google's 20-result cap is the whole result set —
@@ -708,7 +774,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                         ),
                       ),
                       _ExploreTab.restaurants => _buildGrid(
-                        items: _restaurantItems,
+                        items: _filteredRestaurantItems,
                         isLoading: _loadingRestaurants,
                         error: _restaurantsError,
                         hasMore: _restaurantsHasMore,
@@ -736,7 +802,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                         },
                       ),
                       _ExploreTab.festivals => _buildGrid(
-                        items: _festivals,
+                        items: _filteredFestivals,
                         isLoading: _loadingFestivals,
                         error: _festivalsError,
                         hasMore: _festivalsHasMore,

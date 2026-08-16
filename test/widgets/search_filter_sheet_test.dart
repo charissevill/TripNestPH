@@ -28,7 +28,7 @@ void main() {
                   regionId: null,
                   provinceId: null,
                   minRating: null,
-                  onApply: (_, _, _) {},
+                  onApply: (_, _, _, _, _) {},
                 ),
                 child: const Text('Open'),
               ),

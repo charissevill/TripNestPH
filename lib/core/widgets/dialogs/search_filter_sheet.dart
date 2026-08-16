@@ -4,12 +4,13 @@ import '../../../domain/models/province.dart';
 import '../../../domain/models/region.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_spacing.dart';
+import '../../utils/listing_filters.dart';
 
 const List<double> kRatingFilterOptions = [3, 4, 4.5];
 
 /// Opens [SearchFilterSheet] and returns `true` if the traveler tapped
 /// Apply (never on Cancel/dismiss) — the shared region/province + minimum-
-/// rating filter used by both the Search and Explore screens.
+/// rating/budget/distance filter used by both the Search and Explore screens.
 Future<bool?> showSearchFilterSheet(
   BuildContext context, {
   required List<Region> regions,
@@ -17,7 +18,16 @@ Future<bool?> showSearchFilterSheet(
   required String? regionId,
   required String? provinceId,
   required double? minRating,
-  required void Function(String? regionId, String? provinceId, double? minRating) onApply,
+  PriceTier? priceTier,
+  double? maxDistanceKm,
+  required void Function(
+    String? regionId,
+    String? provinceId,
+    double? minRating,
+    PriceTier? priceTier,
+    double? maxDistanceKm,
+  )
+  onApply,
 }) {
   return showModalBottomSheet<bool>(
     context: context,
@@ -29,16 +39,19 @@ Future<bool?> showSearchFilterSheet(
       regionId: regionId,
       provinceId: provinceId,
       minRating: minRating,
+      priceTier: priceTier,
+      maxDistanceKm: maxDistanceKm,
       onApply: onApply,
     ),
   );
 }
 
-/// Region → Province drill-down plus minimum-rating filters, shared across
-/// destinations, restaurants and festivals since all three carry both
-/// fields. Only [provinceId] is actually applied to content queries —
-/// region is a browsing aid to narrow the province list, not a filter
-/// dimension of its own.
+/// Region → Province drill-down plus minimum-rating/budget/distance
+/// filters, shared across destinations, restaurants and festivals. Only
+/// [provinceId] is actually applied to content queries — region is a
+/// browsing aid to narrow the province list, not a filter dimension of its
+/// own. Budget has no meaningful reading on festivals (no per-listing price
+/// data), so it's simply ignored wherever a screen applies it to that tab.
 class SearchFilterSheet extends StatefulWidget {
   const SearchFilterSheet({
     super.key,
@@ -47,6 +60,8 @@ class SearchFilterSheet extends StatefulWidget {
     required this.regionId,
     required this.provinceId,
     required this.minRating,
+    this.priceTier,
+    this.maxDistanceKm,
     required this.onApply,
   });
 
@@ -55,7 +70,16 @@ class SearchFilterSheet extends StatefulWidget {
   final String? regionId;
   final String? provinceId;
   final double? minRating;
-  final void Function(String? regionId, String? provinceId, double? minRating) onApply;
+  final PriceTier? priceTier;
+  final double? maxDistanceKm;
+  final void Function(
+    String? regionId,
+    String? provinceId,
+    double? minRating,
+    PriceTier? priceTier,
+    double? maxDistanceKm,
+  )
+  onApply;
 
   @override
   State<SearchFilterSheet> createState() => _SearchFilterSheetState();
@@ -65,6 +89,8 @@ class _SearchFilterSheetState extends State<SearchFilterSheet> {
   late String? _regionId = widget.regionId;
   late String? _provinceId = widget.provinceId;
   late double? _minRating = widget.minRating;
+  late PriceTier? _priceTier = widget.priceTier;
+  late double? _maxDistanceKm = widget.maxDistanceKm;
 
   void _selectRegion(String regionId, bool selected) {
     setState(() {
@@ -163,6 +189,34 @@ class _SearchFilterSheetState extends State<SearchFilterSheet> {
                             );
                           }).toList(),
                         ),
+                        const SizedBox(height: AppSpacing.xl),
+                        Text('Budget', style: theme.textTheme.titleSmall),
+                        const SizedBox(height: AppSpacing.sm),
+                        Wrap(
+                          spacing: AppSpacing.sm,
+                          children: PriceTier.values.map((tier) {
+                            final selected = _priceTier == tier;
+                            return ChoiceChip(
+                              label: Text(tier.label),
+                              selected: selected,
+                              onSelected: (v) => setState(() => _priceTier = v ? tier : null),
+                            );
+                          }).toList(),
+                        ),
+                        const SizedBox(height: AppSpacing.xl),
+                        Text('Distance', style: theme.textTheme.titleSmall),
+                        const SizedBox(height: AppSpacing.sm),
+                        Wrap(
+                          spacing: AppSpacing.sm,
+                          children: kDistanceFilterOptionsKm.map((km) {
+                            final selected = _maxDistanceKm == km;
+                            return ChoiceChip(
+                              label: Text('Within ${km.toStringAsFixed(0)} km'),
+                              selected: selected,
+                              onSelected: (v) => setState(() => _maxDistanceKm = v ? km : null),
+                            );
+                          }).toList(),
+                        ),
                       ],
                     ),
                   ),
@@ -176,6 +230,8 @@ class _SearchFilterSheetState extends State<SearchFilterSheet> {
                           _regionId = null;
                           _provinceId = null;
                           _minRating = null;
+                          _priceTier = null;
+                          _maxDistanceKm = null;
                         }),
                         child: const Text('Reset'),
                       ),
@@ -184,7 +240,7 @@ class _SearchFilterSheetState extends State<SearchFilterSheet> {
                     Expanded(
                       child: FilledButton(
                         onPressed: () {
-                          widget.onApply(_regionId, _provinceId, _minRating);
+                          widget.onApply(_regionId, _provinceId, _minRating, _priceTier, _maxDistanceKm);
                           Navigator.of(context).pop(true);
                         },
                         child: const Text('Apply'),

@@ -101,6 +101,32 @@ class Itinerary {
     );
   }
 
+  /// Only ever used for manual day-by-day activity edits ("Add activity"/
+  /// "Remove"/reorder on the itinerary screen) — every other field stays
+  /// exactly as generated, since those edits never touch budget/weather/
+  /// recommendations.
+  Itinerary copyWith({List<ItineraryDay>? days}) {
+    return Itinerary(
+      destinationName: destinationName,
+      coverImageUrl: coverImageUrl,
+      totalDays: totalDays,
+      travelers: travelers,
+      totalBudget: totalBudget,
+      days: days ?? this.days,
+      budgetBreakdown: budgetBreakdown,
+      weather: weather,
+      travelTips: travelTips,
+      recommendedRestaurantIds: recommendedRestaurantIds,
+      nearbyAttractionIds: nearbyAttractionIds,
+      recommendedAccommodations: recommendedAccommodations,
+      recommendedPlaceAttractions: recommendedPlaceAttractions,
+      accommodationName: accommodationName,
+      destinationId: destinationId,
+      destinationLatitude: destinationLatitude,
+      destinationLongitude: destinationLongitude,
+    );
+  }
+
   Map<String, dynamic> toMap() {
     return {
       'destinationName': destinationName,

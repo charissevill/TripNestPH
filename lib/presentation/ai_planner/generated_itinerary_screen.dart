@@ -119,6 +119,21 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
   bool get _isOwner =>
       _savedItinerary == null || _savedItinerary!.userId == _uid;
 
+  /// Manual day-by-day activity edits (add/remove/reorder) are owner-only,
+  /// same rule collaborators already have on the itinerary's other content
+  /// (see `firestore.rules`' `saved_itineraries` update block — a
+  /// collaborator's write is scoped to collaboratorIds/memberNames/
+  /// packingItems/expenses, never `itinerary` itself), and only meaningful
+  /// once the trip is actually saved — an unsaved trip's initial "Save" tap
+  /// still writes `widget.itinerary` as-is (see `_toggleSave`), so an edit
+  /// made before that point would silently be lost.
+  bool get _canEditActivities => _isOwner && widget.savedItineraryId != null;
+
+  /// A local, editable copy of the itinerary's days — [widget.itinerary] is
+  /// immutable (it's the value passed in via navigation), so manual activity
+  /// edits mutate this instead and persist via [_persistDays].
+  late List<ItineraryDay> _days = widget.itinerary.days;
+
   @override
   void initState() {
     super.initState();
@@ -968,6 +983,80 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
     }
   }
 
+  /// Whole-document overwrite — the same [_repository.updateItinerary] call
+  /// Regenerate/Refine already use, since activities live nested inside
+  /// `days[].activities[]`, not a flat id-keyed map the way packingItems
+  /// was redesigned to support atomic per-item writes. Never a race-
+  /// condition concern in practice: this is gated to the owner alone (see
+  /// [_canEditActivities]), so there's no second concurrent editor to
+  /// clobber.
+  Future<void> _persistDays(List<ItineraryDay> updated) async {
+    final savedId = widget.savedItineraryId;
+    if (savedId == null) return;
+    setState(() => _days = updated);
+    try {
+      await _repository.updateItinerary(
+        savedId,
+        title: widget.itinerary.destinationName,
+        itinerary: widget.itinerary.copyWith(days: updated),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      // The local list already moved on — revert it so the screen matches
+      // what's actually saved, rather than showing an edit that silently
+      // failed to persist.
+      setState(() => _days = widget.itinerary.days);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(AppException.from(e).message)));
+    }
+  }
+
+  Future<void> _addActivity(int dayNumber) async {
+    final result = await showDialog<ItineraryActivity>(
+      context: context,
+      builder: (context) => const _AddActivityDialog(),
+    );
+    if (result == null || !mounted) return;
+    final updated = _days
+        .map((d) => d.dayNumber == dayNumber ? ItineraryDay(dayNumber: d.dayNumber, dateLabel: d.dateLabel, activities: [...d.activities, result]) : d)
+        .toList();
+    await _persistDays(updated);
+  }
+
+  Future<void> _removeActivity(int dayNumber, ItineraryActivity activity) async {
+    final confirmed = await showConfirmationDialog(
+      context,
+      title: 'Remove this activity?',
+      message: '"${activity.title}" will be removed from Day $dayNumber.',
+      confirmLabel: 'Remove',
+      isDestructive: true,
+    );
+    if (!confirmed || !mounted) return;
+    final updated = _days
+        .map(
+          (d) => d.dayNumber == dayNumber
+              ? ItineraryDay(dayNumber: d.dayNumber, dateLabel: d.dateLabel, activities: d.activities.where((a) => a != activity).toList())
+              : d,
+        )
+        .toList();
+    await _persistDays(updated);
+  }
+
+  /// [delta] is `-1` (move earlier) or `1` (move later) — a no-op past
+  /// either end of the day's own activity list, never wrapping around or
+  /// spilling into a neighboring day.
+  Future<void> _moveActivity(int dayNumber, int index, int delta) async {
+    final updated = _days.map((d) {
+      if (d.dayNumber != dayNumber) return d;
+      final newIndex = index + delta;
+      if (newIndex < 0 || newIndex >= d.activities.length) return d;
+      final activities = [...d.activities];
+      final moved = activities.removeAt(index);
+      activities.insert(newIndex, moved);
+      return ItineraryDay(dayNumber: d.dayNumber, dateLabel: d.dateLabel, activities: activities);
+    }).toList();
+    await _persistDays(updated);
+  }
+
   Future<void> _inviteCompanions() async {
     await Share.share(
       'Join my "${widget.itinerary.destinationName}" trip on TripNest PH! Open the app, go to Saved Trips → Join a Trip, and enter this code:\n\n${widget.savedItineraryId}',
@@ -1331,7 +1420,7 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
                           style: theme.textTheme.titleLarge,
                         ),
                         const SizedBox(height: AppSpacing.md),
-                        ...itinerary.days.map(
+                        ..._days.map(
                           (day) => Padding(
                             padding: const EdgeInsets.only(
                               bottom: AppSpacing.lg,
@@ -1350,6 +1439,9 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
                                   itinerary.destinationLatitude,
                               mainDestinationLongitude:
                                   itinerary.destinationLongitude,
+                              onAddActivity: _canEditActivities ? () => _addActivity(day.dayNumber) : null,
+                              onRemoveActivity: _canEditActivities ? (activity) => _removeActivity(day.dayNumber, activity) : null,
+                              onMoveActivity: _canEditActivities ? (index, delta) => _moveActivity(day.dayNumber, index, delta) : null,
                             ),
                           ),
                         ),
@@ -1654,6 +1746,96 @@ class _RefineInstructionDialogState extends State<_RefineInstructionDialog> {
           onPressed: _hasInstruction ? _submit : null,
           child: const Text('Refine'),
         ),
+      ],
+    );
+  }
+}
+
+/// Collects a manually-added activity — see
+/// [_GeneratedItineraryScreenState._addActivity]'s doc comment. Never
+/// geocoded (no [ItineraryActivity.latitude]/`longitude`), same as any
+/// activity the AI's own location text failed to resolve — the day route
+/// map already handles that gracefully, just without a pin for this one.
+class _AddActivityDialog extends StatefulWidget {
+  const _AddActivityDialog();
+
+  @override
+  State<_AddActivityDialog> createState() => _AddActivityDialogState();
+}
+
+class _AddActivityDialogState extends State<_AddActivityDialog> {
+  final _timeController = TextEditingController();
+  final _titleController = TextEditingController();
+  final _descriptionController = TextEditingController();
+  final _locationController = TextEditingController();
+
+  bool get _isValid => _timeController.text.trim().isNotEmpty && _titleController.text.trim().isNotEmpty;
+
+  @override
+  void initState() {
+    super.initState();
+    for (final c in [_timeController, _titleController]) {
+      c.addListener(() => setState(() {}));
+    }
+  }
+
+  @override
+  void dispose() {
+    _timeController.dispose();
+    _titleController.dispose();
+    _descriptionController.dispose();
+    _locationController.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    if (!_isValid) return;
+    Navigator.of(context).pop(
+      ItineraryActivity(
+        time: _timeController.text.trim(),
+        title: _titleController.text.trim(),
+        description: _descriptionController.text.trim(),
+        iconKey: 'landscape',
+        location: _locationController.text.trim(),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Add Activity'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: _timeController,
+              autofocus: true,
+              decoration: const InputDecoration(labelText: 'Time', hintText: 'e.g. "Morning" or "2:00 PM"'),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            TextField(
+              controller: _titleController,
+              decoration: const InputDecoration(labelText: 'Title'),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            TextField(
+              controller: _descriptionController,
+              maxLines: 2,
+              decoration: const InputDecoration(labelText: 'Description (optional)'),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            TextField(
+              controller: _locationController,
+              decoration: const InputDecoration(labelText: 'Location (optional)'),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cancel')),
+        FilledButton(onPressed: _isValid ? _submit : null, child: const Text('Add')),
       ],
     );
   }
@@ -2416,6 +2598,9 @@ class _DayCard extends StatelessWidget {
     this.mainDestinationName,
     this.mainDestinationLatitude,
     this.mainDestinationLongitude,
+    this.onAddActivity,
+    this.onRemoveActivity,
+    this.onMoveActivity,
   });
 
   final ItineraryDay day;
@@ -2440,6 +2625,17 @@ class _DayCard extends StatelessWidget {
   final String? mainDestinationName;
   final double? mainDestinationLatitude;
   final double? mainDestinationLongitude;
+
+  /// Non-null only when
+  /// [_GeneratedItineraryScreenState.canEditActivities] — null hides every
+  /// add/remove/reorder affordance on this day, same pattern
+  /// [_TimelineActivity]'s own callbacks use.
+  final VoidCallback? onAddActivity;
+  final ValueChanged<ItineraryActivity>? onRemoveActivity;
+
+  /// `(activityIndex, delta)` — `delta` is `-1`/`1`, see
+  /// [_GeneratedItineraryScreenState._moveActivity]'s doc comment.
+  final void Function(int index, int delta)? onMoveActivity;
 
   @override
   Widget build(BuildContext context) {
@@ -2504,8 +2700,26 @@ class _DayCard extends StatelessWidget {
           ...List.generate(day.activities.length, (i) {
             final activity = day.activities[i];
             final isLast = i == day.activities.length - 1;
-            return _TimelineActivity(activity: activity, isLast: isLast);
+            return _TimelineActivity(
+              activity: activity,
+              isLast: isLast,
+              onRemove: onRemoveActivity == null ? null : () => onRemoveActivity!(activity),
+              onMoveUp: onMoveActivity == null || i == 0 ? null : () => onMoveActivity!(i, -1),
+              onMoveDown: onMoveActivity == null || i == day.activities.length - 1 ? null : () => onMoveActivity!(i, 1),
+            );
           }),
+          if (onAddActivity != null)
+            Padding(
+              padding: const EdgeInsets.only(top: AppSpacing.sm),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: onAddActivity,
+                  icon: const Icon(Symbols.add_rounded, size: 16),
+                  label: const Text('Add Activity'),
+                ),
+              ),
+            ),
           if (routeStops.isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(top: AppSpacing.lg),
@@ -2525,10 +2739,25 @@ class _DayCard extends StatelessWidget {
 }
 
 class _TimelineActivity extends StatelessWidget {
-  const _TimelineActivity({required this.activity, required this.isLast});
+  const _TimelineActivity({
+    required this.activity,
+    required this.isLast,
+    this.onRemove,
+    this.onMoveUp,
+    this.onMoveDown,
+  });
 
   final ItineraryActivity activity;
   final bool isLast;
+
+  /// Non-null only when [_GeneratedItineraryScreenState._canEditActivities]
+  /// — null hides the whole trailing action column, same "no callback, no
+  /// affordance" pattern the rest of this screen already uses (e.g.
+  /// [ChatBubble.onOpenPlanner]). [onMoveUp]/[onMoveDown] are independently
+  /// null at either end of the day's own activity list.
+  final VoidCallback? onRemove;
+  final VoidCallback? onMoveUp;
+  final VoidCallback? onMoveDown;
 
   @override
   Widget build(BuildContext context) {
@@ -2565,35 +2794,68 @@ class _TimelineActivity extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    activity.time,
-                    style: theme.textTheme.labelMedium?.copyWith(
-                      color: theme.colorScheme.primary,
-                    ),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          activity.time,
+                          style: theme.textTheme.labelMedium?.copyWith(
+                            color: theme.colorScheme.primary,
+                          ),
+                        ),
+                      ),
+                      if (onRemove != null) ...[
+                        InkWell(
+                          onTap: onMoveUp,
+                          child: Icon(
+                            Symbols.arrow_upward_rounded,
+                            size: 15,
+                            color: onMoveUp != null ? theme.colorScheme.onSurfaceVariant : theme.colorScheme.outlineVariant,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        InkWell(
+                          onTap: onMoveDown,
+                          child: Icon(
+                            Symbols.arrow_downward_rounded,
+                            size: 15,
+                            color: onMoveDown != null ? theme.colorScheme.onSurfaceVariant : theme.colorScheme.outlineVariant,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        InkWell(
+                          onTap: onRemove,
+                          child: Icon(Symbols.close_rounded, size: 15, color: theme.colorScheme.error),
+                        ),
+                      ],
+                    ],
                   ),
                   const SizedBox(height: 2),
                   Text(activity.title, style: theme.textTheme.titleMedium),
                   const SizedBox(height: 2),
                   Text(activity.description, style: theme.textTheme.bodySmall),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Icon(
-                        Symbols.location_on_rounded,
-                        size: 13,
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                      const SizedBox(width: 2),
-                      Expanded(
-                        child: Text(
-                          activity.location,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.bodySmall,
+                  if (activity.location.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Icon(
+                          Symbols.location_on_rounded,
+                          size: 13,
+                          color: theme.colorScheme.onSurfaceVariant,
                         ),
-                      ),
-                    ],
-                  ),
+                        const SizedBox(width: 2),
+                        Expanded(
+                          child: Text(
+                            activity.location,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.bodySmall,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ],
               ),
             ),

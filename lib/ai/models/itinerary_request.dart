@@ -20,6 +20,7 @@ class AiItineraryRequest {
     this.accommodationLatitude,
     this.accommodationLongitude,
     this.priorConversationContext,
+    this.refinementInstruction,
   });
 
   final String destinationId;
@@ -60,4 +61,11 @@ class AiItineraryRequest {
   /// restaurants/attractions than the ones the traveler just read. Null for
   /// a Planner-form-built request, which has no prior conversation to match.
   final String? priorConversationContext;
+
+  /// Set by "Refine with AI" on an already-generated itinerary — a specific,
+  /// free-text change the traveler wants (e.g. "make day 2 cheaper", "swap
+  /// the beach activity for a hike") applied on top of an otherwise normal
+  /// regeneration for the same destination/days/budget/travelers. Null for
+  /// every other request, which has no such instruction to apply.
+  final String? refinementInstruction;
 }

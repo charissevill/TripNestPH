@@ -79,9 +79,13 @@ Rules:
     String? accommodationName,
     String? priorConversationContext,
     List<WeatherForecast> weatherForecast = const [],
+    String? refinementInstruction,
   }) {
     return '''
-${priorConversationContext != null && priorConversationContext.isNotEmpty ? '''
+${refinementInstruction != null && refinementInstruction.isNotEmpty ? '''
+The traveler already has a version of this trip and wants this specific change applied: "$refinementInstruction". Keep everything else about the plan as close as reasonably possible to a normal well-planned itinerary for this destination — only adjust what the instruction actually asks for, don't use it as an excuse to redo the whole plan from scratch.
+
+''' : ''}${priorConversationContext != null && priorConversationContext.isNotEmpty ? '''
 The traveler already discussed this exact trip with our AI Travel Assistant, which replied:
 """
 $priorConversationContext

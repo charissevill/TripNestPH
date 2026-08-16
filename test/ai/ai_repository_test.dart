@@ -342,6 +342,52 @@ void main() {
     expect(systemContent, contains('weather forecast'));
   });
 
+  test('generateItinerary() feeds a refinement instruction into the prompt, when given one', () async {
+    final firestore = FakeFirebaseFirestore();
+    Map<String, dynamic>? capturedData;
+    final caller = _fakeAiComplete(
+      {
+        'days': [
+          {'dayNumber': 1, 'dateLabel': 'Day 1', 'activities': <Map<String, dynamic>>[]},
+        ],
+        'budgetBreakdown': <Map<String, dynamic>>[],
+        'travelTips': <String>[],
+        'totalBudget': 0,
+        'recommendedRestaurantNames': <String>[],
+        'nearbyAttractionNames': <String>[],
+      },
+      onCall: (data) => capturedData = data,
+    );
+
+    final repository = AiRepository(
+      openAiService: OpenAiService(caller: caller),
+      restaurantRepository: RestaurantRepository(firestore: firestore),
+      provinceRepository: ProvinceRepository(firestore: firestore),
+    );
+
+    await repository.generateItinerary(
+      const AiItineraryRequest(
+        destinationId: 'palawan-refine',
+        destinationName: 'Palawan',
+        provinceId: 'palawan',
+        provinceName: 'Palawan',
+        budgetTierLabel: 'Budget',
+        budgetRange: '₱5k - ₱15k',
+        days: 1,
+        travelers: 1,
+        travelerType: 'Solo',
+        transportation: {'Flight'},
+        interests: {'Beaches'},
+        refinementInstruction: 'Make Day 1 cheaper overall.',
+      ),
+      coverImageUrl: '',
+    );
+
+    final messages = capturedData!['messages'] as List;
+    final userContent = messages.last['content'] as String;
+    expect(userContent, contains('Make Day 1 cheaper overall.'));
+  });
+
   test('generateItinerary() leaves weather empty when the destination has no coordinates', () async {
     final firestore = FakeFirebaseFirestore();
     final caller = _fakeAiComplete({

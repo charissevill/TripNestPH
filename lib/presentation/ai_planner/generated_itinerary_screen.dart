@@ -462,7 +462,23 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
     );
   }
 
-  Future<void> _regenerate() async {
+  Future<void> _regenerate() => _regenerateInternal();
+
+  /// Asks for a specific change (e.g. "make day 2 cheaper", "swap the beach
+  /// activity for a hike"), then regenerates with that instruction applied —
+  /// see [AiItineraryRequest.refinementInstruction]'s doc comment. Declines
+  /// to even try on an empty/whitespace-only answer rather than silently
+  /// falling back to a plain regenerate the traveler didn't ask for.
+  Future<void> _refine() async {
+    final instruction = await showDialog<String>(
+      context: context,
+      builder: (context) => const _RefineInstructionDialog(),
+    );
+    if (instruction == null || instruction.trim().isEmpty || !mounted) return;
+    await _regenerateInternal(refinementInstruction: instruction.trim());
+  }
+
+  Future<void> _regenerateInternal({String? refinementInstruction}) async {
     setState(() => _regenerating = true);
     try {
       final places = await _places.searchText(
@@ -513,6 +529,7 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
           accommodationName: widget.itinerary.accommodationName.isNotEmpty
               ? widget.itinerary.accommodationName
               : null,
+          refinementInstruction: refinementInstruction,
         ),
         coverImageUrl: widget.itinerary.coverImageUrl.isNotEmpty
             ? widget.itinerary.coverImageUrl
@@ -521,7 +538,7 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
                   : province.heroImageUrl),
         // Skips the cached-response short-circuit — otherwise an identical
         // reconstructed request would just hand back this same itinerary,
-        // defeating the point of "Regenerate".
+        // defeating the point of "Regenerate"/"Refine".
         forceRefresh: true,
       );
 
@@ -1125,6 +1142,12 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
                               busy: _regenerating,
                               onTap: _regenerate,
                             ),
+                            _ActionButton(
+                              icon: Symbols.auto_awesome_rounded,
+                              label: 'Refine',
+                              busy: _regenerating,
+                              onTap: _refine,
+                            ),
                           ],
                         ),
                         if (widget.savedItineraryId != null) ...[
@@ -1456,9 +1479,10 @@ class _ActionButtonGrid extends StatelessWidget {
 
   final List<Widget> buttons;
 
-  /// 4 or fewer (unsaved trip: Save/Share/Download/Regenerate) fits on one
-  /// row; more than that (saved trip adds Remind/Offline, for 6 total) wraps
-  /// at 3 per row rather than stretching a single row to fit 5-6 buttons.
+  /// 4 or fewer fits on one row; more than that (unsaved trip: Save/Share/
+  /// Download/Regenerate/Refine, 5 total; saved trip adds Remind/Offline,
+  /// 7 total) wraps at 3 per row rather than stretching a single row to fit
+  /// them all.
   int get _perRow => buttons.length <= 4 ? buttons.length : 3;
 
   @override
@@ -1530,6 +1554,78 @@ class _ActionButton extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Asks for a specific change before "Refine with AI" regenerates —
+/// see [_GeneratedItineraryScreenState._refine]'s doc comment.
+class _RefineInstructionDialog extends StatefulWidget {
+  const _RefineInstructionDialog();
+
+  @override
+  State<_RefineInstructionDialog> createState() => _RefineInstructionDialogState();
+}
+
+class _RefineInstructionDialogState extends State<_RefineInstructionDialog> {
+  final _controller = TextEditingController();
+
+  static const List<String> _examples = [
+    'Make it cheaper overall',
+    'Swap Day 2 for something more relaxed',
+    'Add more local food spots',
+    'Make it more kid-friendly',
+  ];
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return AlertDialog(
+      title: const Text('Refine with AI'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Tell it what to change — everything else about the plan stays close to what you already have.',
+            style: theme.textTheme.bodySmall,
+          ),
+          const SizedBox(height: AppSpacing.md),
+          TextField(
+            controller: _controller,
+            autofocus: true,
+            maxLines: 3,
+            maxLength: 300,
+            decoration: const InputDecoration(hintText: 'e.g. "Make Day 2 cheaper"'),
+            onSubmitted: (value) => Navigator.of(context).pop(value),
+          ),
+          Wrap(
+            spacing: AppSpacing.xs,
+            runSpacing: AppSpacing.xs,
+            children: _examples
+                .map(
+                  (example) => ActionChip(
+                    label: Text(example, style: theme.textTheme.labelSmall),
+                    onPressed: () => setState(() => _controller.text = example),
+                  ),
+                )
+                .toList(),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cancel')),
+        FilledButton(
+          onPressed: () => Navigator.of(context).pop(_controller.text),
+          child: const Text('Refine'),
+        ),
+      ],
     );
   }
 }

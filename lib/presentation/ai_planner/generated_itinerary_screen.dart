@@ -2599,6 +2599,28 @@ class _BudgetSummaryCard extends StatelessWidget {
               ),
             );
           }),
+          const SizedBox(height: AppSpacing.xs),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                Symbols.info_rounded,
+                size: 14,
+                color: AppColors.textTertiary,
+              ),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Text(
+                  onEditItem != null
+                      ? 'Prices are AI-generated estimates, not live quotes — actual costs may vary. Tap the pencil icon to correct any that are off.'
+                      : 'Prices are AI-generated estimates, not live quotes — actual costs may vary.',
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: AppColors.textTertiary,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );

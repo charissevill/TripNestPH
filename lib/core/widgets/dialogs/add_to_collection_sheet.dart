@@ -60,6 +60,15 @@ class _AddToCollectionSheetState extends State<_AddToCollectionSheet> {
   bool _busy = false;
   final _nameController = TextEditingController();
 
+  @override
+  void initState() {
+    super.initState();
+    // Keeps the checkmark button's enabled state in sync with whether
+    // there's actually a name typed — otherwise tapping it on empty text
+    // silently closed nothing and created nothing, with no explanation.
+    _nameController.addListener(() => setState(() {}));
+  }
+
   Future<void> _select(String? collectionId) async {
     setState(() => _busy = true);
     try {
@@ -142,7 +151,7 @@ class _AddToCollectionSheetState extends State<_AddToCollectionSheet> {
                     ),
                     IconButton(
                       icon: const Icon(Symbols.check_rounded),
-                      onPressed: _busy ? null : _createAndSelect,
+                      onPressed: _busy || _nameController.text.trim().isEmpty ? null : _createAndSelect,
                     ),
                   ],
                 )

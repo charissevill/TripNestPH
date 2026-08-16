@@ -1577,10 +1577,27 @@ class _RefineInstructionDialogState extends State<_RefineInstructionDialog> {
     'Make it more kid-friendly',
   ];
 
+  bool get _hasInstruction => _controller.text.trim().isNotEmpty;
+
+  @override
+  void initState() {
+    super.initState();
+    // Keeps the Refine button's enabled state (and Enter-to-submit) in sync
+    // with whether there's actually anything to refine with — otherwise
+    // submitting empty text closed the dialog and silently did nothing,
+    // with no explanation why "Refine" didn't seem to work.
+    _controller.addListener(() => setState(() {}));
+  }
+
   @override
   void dispose() {
     _controller.dispose();
     super.dispose();
+  }
+
+  void _submit() {
+    if (!_hasInstruction) return;
+    Navigator.of(context).pop(_controller.text);
   }
 
   @override
@@ -1603,7 +1620,7 @@ class _RefineInstructionDialogState extends State<_RefineInstructionDialog> {
             maxLines: 3,
             maxLength: 300,
             decoration: const InputDecoration(hintText: 'e.g. "Make Day 2 cheaper"'),
-            onSubmitted: (value) => Navigator.of(context).pop(value),
+            onSubmitted: (_) => _submit(),
           ),
           Wrap(
             spacing: AppSpacing.xs,
@@ -1622,7 +1639,7 @@ class _RefineInstructionDialogState extends State<_RefineInstructionDialog> {
       actions: [
         TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cancel')),
         FilledButton(
-          onPressed: () => Navigator.of(context).pop(_controller.text),
+          onPressed: _hasInstruction ? _submit : null,
           child: const Text('Refine'),
         ),
       ],

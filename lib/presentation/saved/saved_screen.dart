@@ -7,14 +7,17 @@ import '../../core/providers/auth_provider.dart';
 import '../../core/providers/favorites_provider.dart';
 import '../../core/routes/route_paths.dart';
 import '../../core/services/places_service.dart';
+import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/theme/breakpoints.dart';
+import '../../core/utils/app_exception.dart';
 import '../../core/widgets/cards/destination_card.dart';
 import '../../core/widgets/cards/festival_card.dart';
 import '../../core/widgets/cards/place_card.dart';
 import '../../core/widgets/cards/restaurant_card.dart';
 import '../../core/widgets/details/place_details_sheet.dart';
 import '../../core/widgets/dialogs/add_to_collection_sheet.dart';
+import '../../core/widgets/dialogs/confirmation_dialog.dart';
 import '../../core/widgets/layout/max_width_container.dart';
 import '../../core/widgets/states/empty_state_widget.dart';
 import '../../core/widgets/states/loading_widget.dart';
@@ -72,6 +75,85 @@ class _SavedScreenState extends State<SavedScreen>
   List<String> _filterByCollection(List<String> ids, FavoriteType type, Map<String, String?> collectionByKey) {
     if (_selectedCollectionId == null) return ids;
     return ids.where((id) => collectionByKey['${type.name}:$id'] == _selectedCollectionId).toList();
+  }
+
+  Future<void> _showCollectionOptions(FavoriteCollection collection, String uid) async {
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Symbols.edit_rounded),
+              title: const Text('Rename list'),
+              onTap: () => Navigator.of(context).pop('rename'),
+            ),
+            ListTile(
+              leading: const Icon(Symbols.delete_outline_rounded, color: AppColors.error),
+              title: const Text('Delete list', style: TextStyle(color: AppColors.error)),
+              onTap: () => Navigator.of(context).pop('delete'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (!mounted || action == null) return;
+    if (action == 'rename') {
+      await _renameCollection(collection);
+    } else if (action == 'delete') {
+      await _deleteCollection(collection, uid);
+    }
+  }
+
+  Future<void> _renameCollection(FavoriteCollection collection) async {
+    final controller = TextEditingController(text: collection.name);
+    final name = await showDialog<String>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Rename list'),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            maxLength: 60,
+            onChanged: (_) => setDialogState(() {}),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cancel')),
+            FilledButton(
+              onPressed: controller.text.trim().isEmpty
+                  ? null
+                  : () => Navigator.of(context).pop(controller.text.trim()),
+              child: const Text('Save'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (name == null || !mounted) return;
+    try {
+      await _favoritesRepository.renameCollection(collection.id, name);
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(AppException.from(e).message)));
+    }
+  }
+
+  Future<void> _deleteCollection(FavoriteCollection collection, String uid) async {
+    final confirmed = await showConfirmationDialog(
+      context,
+      title: 'Delete "${collection.name}"?',
+      message: 'Favorites in this list aren\'t removed — they just go back to Unsorted.',
+      confirmLabel: 'Delete',
+      isDestructive: true,
+    );
+    if (!confirmed || !mounted) return;
+    try {
+      await _favoritesRepository.deleteCollection(uid, collection.id);
+      if (_selectedCollectionId == collection.id) setState(() => _selectedCollectionId = null);
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(AppException.from(e).message)));
+    }
   }
 
   Widget _cardWithCollectionButton({
@@ -168,27 +250,42 @@ class _SavedScreenState extends State<SavedScreen>
                       MaxWidthContainer.sidePadding(context, maxWidth: 1400),
                       AppSpacing.sm,
                     ),
-                    child: SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: Row(
-                        children: [
-                          ChoiceChip(
-                            label: const Text('All'),
-                            selected: _selectedCollectionId == null,
-                            onSelected: (_) => setState(() => _selectedCollectionId = null),
-                          ),
-                          for (final collection in collections) ...[
-                            const SizedBox(width: AppSpacing.sm),
-                            ChoiceChip(
-                              label: Text(collection.name),
-                              selected: _selectedCollectionId == collection.id,
-                              onSelected: (_) => setState(
-                                () => _selectedCollectionId = _selectedCollectionId == collection.id ? null : collection.id,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
+                            children: [
+                              ChoiceChip(
+                                label: const Text('All'),
+                                selected: _selectedCollectionId == null,
+                                onSelected: (_) => setState(() => _selectedCollectionId = null),
                               ),
-                            ),
-                          ],
-                        ],
-                      ),
+                              for (final collection in collections) ...[
+                                const SizedBox(width: AppSpacing.sm),
+                                GestureDetector(
+                                  onLongPress: () => _showCollectionOptions(collection, uid),
+                                  child: ChoiceChip(
+                                    label: Text(collection.name),
+                                    selected: _selectedCollectionId == collection.id,
+                                    onSelected: (_) => setState(
+                                      () => _selectedCollectionId = _selectedCollectionId == collection.id ? null : collection.id,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.only(top: 2),
+                          child: Text(
+                            'Long-press a list to rename or delete it.',
+                            style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                          ),
+                        ),
+                      ],
                     ),
                   );
                 },

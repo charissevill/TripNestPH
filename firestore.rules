@@ -504,6 +504,42 @@ service cloud.firestore {
                       && isValidExpense();
         allow delete: if isSignedIn() && (isTripOwner() || resource.data.loggedBy == request.auth.uid);
       }
+
+      match /polls/{pollId} {
+        function isTripOwner() {
+          return get(/databases/$(database)/documents/saved_itineraries/$(itineraryId)).data.userId == request.auth.uid;
+        }
+
+        function isTripCollaborator() {
+          return ('collaboratorIds' in get(/databases/$(database)/documents/saved_itineraries/$(itineraryId)).data)
+            && request.auth.uid in get(/databases/$(database)/documents/saved_itineraries/$(itineraryId)).data.collaboratorIds;
+        }
+
+        function isValidPoll() {
+          return request.resource.data.createdBy == request.auth.uid
+            && request.resource.data.question is string && request.resource.data.question.size() > 0 && request.resource.data.question.size() <= 200
+            && request.resource.data.options is list && request.resource.data.options.size() >= 2 && request.resource.data.options.size() <= 6;
+        }
+
+        function oldVotes() {
+          return 'votes' in resource.data ? resource.data.votes : {};
+        }
+
+        // A vote write may only ever touch the caller's own key in `votes`
+        // — otherwise any trip member could overwrite someone else's pick.
+        function onlyOwnVoteChanged() {
+          return oldVotes().diff(request.resource.data.votes).affectedKeys().hasOnly([request.auth.uid]);
+        }
+
+        allow read: if isSignedIn() && (isTripOwner() || isTripCollaborator());
+        allow create: if isSignedIn() && (isTripOwner() || isTripCollaborator()) && isValidPoll();
+        // Voting: any trip member, but only their own `votes` entry — the
+        // question/options/createdBy stay whatever the creator set.
+        allow update: if isSignedIn() && (isTripOwner() || isTripCollaborator())
+                      && onlyChangedFields(['votes'])
+                      && onlyOwnVoteChanged();
+        allow delete: if isSignedIn() && (isTripOwner() || resource.data.createdBy == request.auth.uid);
+      }
     }
 
     // ---- businesses/{id} — Business Owner submissions, admin-verified ---

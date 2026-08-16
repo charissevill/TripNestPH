@@ -41,11 +41,13 @@ import '../../core/widgets/indicators/rating_widget.dart';
 import '../../core/widgets/layout/section_header.dart';
 import '../../data/repositories/expense_repository.dart';
 import '../../data/repositories/itinerary_repository.dart';
+import '../../data/repositories/poll_repository.dart';
 import '../../data/repositories/province_repository.dart';
 import '../../data/repositories/restaurant_repository.dart';
 import '../../domain/models/expense.dart';
 import '../../domain/models/itinerary.dart';
 import '../../domain/models/packing_item.dart';
+import '../../domain/models/poll.dart';
 import '../../domain/models/province.dart';
 import '../../domain/models/restaurant.dart';
 import '../../domain/models/saved_itinerary.dart';
@@ -76,6 +78,7 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
   final ItineraryRepository _repository = ItineraryRepository();
   final RestaurantRepository _restaurantRepository = RestaurantRepository();
   final ExpenseRepository _expenseRepository = ExpenseRepository();
+  final PollRepository _pollRepository = PollRepository();
   final ItineraryOfflineService _offlineService = ItineraryOfflineService();
   final LocalPreferencesService _preferencesService = LocalPreferencesService();
   final PlacesService _places = PlacesService();
@@ -878,6 +881,159 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
     }
   }
 
+  /// Up to 6 options (mirrors `isValidPoll()` in firestore.rules) — starts
+  /// at 2 empty fields, "+ Add option" grows the list, an empty trailing
+  /// field just gets dropped on submit rather than blocking it.
+  Future<void> _createPoll() async {
+    final uid = _uid;
+    if (uid == null) return;
+    final questionController = TextEditingController();
+    var optionControllers = [TextEditingController(), TextEditingController()];
+    String? errorText;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('New Poll'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: questionController,
+                  maxLength: 200,
+                  decoration: InputDecoration(
+                    labelText: 'Question',
+                    hintText: 'e.g. Which restaurant for Day 2?',
+                    errorText: errorText,
+                    prefixIcon: const Icon(Symbols.how_to_vote_rounded, size: 20),
+                  ),
+                ),
+                for (var i = 0; i < optionControllers.length; i++)
+                  Padding(
+                    padding: const EdgeInsets.only(top: AppSpacing.sm),
+                    child: TextField(
+                      controller: optionControllers[i],
+                      maxLength: 100,
+                      decoration: InputDecoration(
+                        labelText: 'Option ${i + 1}',
+                        counterText: '',
+                        suffixIcon: optionControllers.length > 2
+                            ? IconButton(
+                                icon: const Icon(Symbols.close_rounded, size: 18),
+                                onPressed: () => setDialogState(() {
+                                  optionControllers = [...optionControllers]..removeAt(i);
+                                }),
+                              )
+                            : null,
+                      ),
+                    ),
+                  ),
+                if (optionControllers.length < 6)
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton.icon(
+                      onPressed: () => setDialogState(
+                        () => optionControllers = [...optionControllers, TextEditingController()],
+                      ),
+                      icon: const Icon(Symbols.add_rounded, size: 18),
+                      label: const Text('Add option'),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () {
+                if (questionController.text.trim().isEmpty) {
+                  setDialogState(() => errorText = 'Enter a question');
+                  return;
+                }
+                final filled = optionControllers
+                    .map((c) => c.text.trim())
+                    .where((t) => t.isNotEmpty)
+                    .toList();
+                if (filled.length < 2) {
+                  setDialogState(() => errorText = null);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Add at least 2 options.')),
+                  );
+                  return;
+                }
+                Navigator.of(context).pop(true);
+              },
+              child: const Text('Create'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+    try {
+      await _pollRepository.create(
+        itineraryId: widget.savedItineraryId!,
+        question: questionController.text.trim(),
+        options: optionControllers
+            .map((c) => c.text.trim())
+            .where((t) => t.isNotEmpty)
+            .toList(),
+        createdBy: uid,
+      );
+    } catch (e) {
+      if (mounted)
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(AppException.from(e).message)));
+    }
+  }
+
+  Future<void> _votePoll(Poll poll, int optionIndex) async {
+    final uid = _uid;
+    if (uid == null) return;
+    try {
+      await _pollRepository.vote(
+        itineraryId: widget.savedItineraryId!,
+        pollId: poll.id,
+        uid: uid,
+        optionIndex: optionIndex,
+      );
+    } catch (e) {
+      if (mounted)
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(AppException.from(e).message)));
+    }
+  }
+
+  Future<void> _deletePoll(Poll poll) async {
+    final confirmed = await showConfirmationDialog(
+      context,
+      title: 'Delete this poll?',
+      message: '"${poll.question}" and its votes will be removed.',
+      confirmLabel: 'Delete',
+      isDestructive: true,
+    );
+    if (!confirmed) return;
+    try {
+      await _pollRepository.delete(
+        itineraryId: widget.savedItineraryId!,
+        pollId: poll.id,
+      );
+    } catch (e) {
+      if (mounted)
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(AppException.from(e).message)));
+    }
+  }
+
   Future<void> _deleteExpense(Expense expense) async {
     final confirmed = await showConfirmationDialog(
       context,
@@ -1401,6 +1557,56 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
                             items: _savedItinerary!.packingItems,
                             onToggle: _togglePackingItem,
                             onRemove: _removePackingItem,
+                          ),
+                        ],
+                        if (widget.savedItineraryId != null) ...[
+                          const SizedBox(height: AppSpacing.xxl),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  'Group Polls',
+                                  style: theme.textTheme.titleLarge,
+                                ),
+                              ),
+                              TextButton.icon(
+                                onPressed: _createPoll,
+                                icon: const Icon(Symbols.add_rounded, size: 18),
+                                label: const Text('New Poll'),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: AppSpacing.md),
+                          StreamBuilder<List<Poll>>(
+                            stream: _pollRepository.streamForItinerary(
+                              widget.savedItineraryId!,
+                            ),
+                            builder: (context, snapshot) {
+                              final polls = snapshot.data ?? const [];
+                              if (polls.isEmpty) {
+                                return Text(
+                                  'No polls yet — start one to help the group decide something together.',
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: AppColors.textTertiary,
+                                  ),
+                                );
+                              }
+                              return Column(
+                                children: polls
+                                    .map(
+                                      (poll) => _PollCard(
+                                        poll: poll,
+                                        currentUid: _uid,
+                                        canDelete:
+                                            _isOwner || poll.createdBy == _uid,
+                                        onVote: (optionIndex) =>
+                                            _votePoll(poll, optionIndex),
+                                        onDelete: () => _deletePoll(poll),
+                                      ),
+                                    )
+                                    .toList(),
+                              );
+                            },
                           ),
                         ],
                         if (widget.savedItineraryId != null) ...[
@@ -2527,6 +2733,170 @@ class _PackingChecklistCard extends StatelessWidget {
                   )
                   .toList(),
             ),
+    );
+  }
+}
+
+class _PollCard extends StatelessWidget {
+  const _PollCard({
+    required this.poll,
+    required this.currentUid,
+    required this.canDelete,
+    required this.onVote,
+    required this.onDelete,
+  });
+
+  final Poll poll;
+  final String? currentUid;
+
+  /// The poll's creator can remove it; a collaborator can only remove one
+  /// they created — matches the server-side rule (firestore.rules' `polls`
+  /// match block), same reasoning as `_BudgetTrackerCard`'s delete gating.
+  final bool canDelete;
+  final void Function(int optionIndex) onVote;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final myVote = currentUid != null ? poll.votes[currentUid] : null;
+    final counts = poll.voteCounts;
+    final total = poll.totalVotes;
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                Symbols.how_to_vote_rounded,
+                size: 18,
+                color: theme.colorScheme.primary,
+              ),
+              const SizedBox(width: AppSpacing.xs),
+              Expanded(
+                child: Text(poll.question, style: theme.textTheme.titleSmall),
+              ),
+              if (canDelete)
+                InkWell(
+                  onTap: onDelete,
+                  borderRadius: BorderRadius.circular(AppRadius.pill),
+                  child: const Padding(
+                    padding: EdgeInsets.all(2),
+                    child: Icon(Symbols.close_rounded, size: 18),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          for (var i = 0; i < poll.options.length; i++)
+            Padding(
+              padding: const EdgeInsets.only(bottom: AppSpacing.xs),
+              child: _PollOptionBar(
+                label: poll.options[i],
+                count: counts[i],
+                total: total,
+                selected: myVote == i,
+                onTap: () => onVote(i),
+              ),
+            ),
+          Text(
+            total == 0 ? 'No votes yet' : '$total vote${total == 1 ? '' : 's'}',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: AppColors.textTertiary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// One tappable option row — a fill bar behind the label shows the current
+/// share of votes, and the currently-selected option (if [currentUid] has
+/// voted) gets a primary-tinted border so a re-vote is a visibly deliberate
+/// change, not an accidental duplicate tap.
+class _PollOptionBar extends StatelessWidget {
+  const _PollOptionBar({
+    required this.label,
+    required this.count,
+    required this.total,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final int count;
+  final int total;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final percent = total == 0 ? 0.0 : count / total;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(AppRadius.md),
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.sm,
+          vertical: 6,
+        ),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          border: Border.all(
+            color: selected
+                ? theme.colorScheme.primary
+                : AppColors.border,
+            width: selected ? 1.5 : 1,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                if (selected)
+                  Icon(
+                    Symbols.check_circle_rounded,
+                    size: 16,
+                    color: theme.colorScheme.primary,
+                  ),
+                if (selected) const SizedBox(width: 4),
+                Expanded(
+                  child: Text(label, style: theme.textTheme.bodyMedium),
+                ),
+                Text(
+                  count == 0 ? '' : '$count',
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: theme.colorScheme.primary,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(AppRadius.pill),
+              child: LinearProgressIndicator(
+                value: percent,
+                minHeight: 5,
+                backgroundColor: theme.colorScheme.outline,
+                color: theme.colorScheme.primary,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

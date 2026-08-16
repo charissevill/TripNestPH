@@ -486,19 +486,42 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
     );
   }
 
-  /// Opens wherever a Food line item said to get it — a real in-app
-  /// restaurant page when [line.place] matches one of this trip's already-
-  /// loaded recommended restaurants by name, otherwise a Google Maps search
-  /// for that place near the destination. No extra geocoding call: this
-  /// reuses [restaurants], the same list already fetched for the
-  /// "Recommended Restaurants" carousel, so a match is free and a miss just
-  /// falls back gracefully instead of failing.
-  void _openFoodItemPlace(BudgetLineItem line, List<Restaurant> restaurants) {
-    final match = restaurants
+  /// Opens wherever a budget line item said to get it (a Food dish's
+  /// restaurant, an Entrance Fee's attraction, ...). Tries, in order: a real
+  /// in-app restaurant page when [line.place] matches one of this trip's
+  /// already-loaded recommended restaurants by name; the same "open in
+  /// Maps" behavior [_PlaceRecommendationCard] uses when it matches one of
+  /// [Itinerary.recommendedPlaceAttractions] instead; otherwise a plain
+  /// Google Maps search for that place near the destination. No extra
+  /// geocoding call for any of these — both candidate lists are already
+  /// loaded for their own carousels, so a match is free and a miss just
+  /// falls back gracefully instead of failing. A no-op for a Transportation
+  /// item, which intentionally has no [BudgetLineItem.place] to resolve
+  /// (see `ItineraryPrompts`'s rule) — [_BudgetSummaryCard] never wires a
+  /// tap for an empty `place` in the first place.
+  void _openBudgetItemPlace(BudgetLineItem line, List<Restaurant> restaurants) {
+    final restaurantMatch = restaurants
         .where((r) => r.name.toLowerCase() == line.place.toLowerCase())
         .firstOrNull;
-    if (match != null) {
-      context.push(RoutePaths.restaurantDetails(match.id));
+    if (restaurantMatch != null) {
+      context.push(RoutePaths.restaurantDetails(restaurantMatch.id));
+      return;
+    }
+    final attractionMatch = widget.itinerary.recommendedPlaceAttractions
+        .where((p) => p.name.toLowerCase() == line.place.toLowerCase())
+        .firstOrNull;
+    if (attractionMatch != null) {
+      if (attractionMatch.mapsUri.isNotEmpty) {
+        MapsLauncher.openUrl(attractionMatch.mapsUri);
+      } else if (attractionMatch.hasCoordinates) {
+        MapsLauncher.openDirections(
+          latitude: attractionMatch.latitude!,
+          longitude: attractionMatch.longitude!,
+          label: attractionMatch.name,
+        );
+      } else {
+        MapsLauncher.openPlaceSearch('${attractionMatch.name}, Philippines');
+      }
       return;
     }
     MapsLauncher.openPlaceSearch(
@@ -1498,7 +1521,7 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
                         _BudgetSummaryCard(
                           itinerary: itinerary,
                           onTapItem: (item) =>
-                              _openFoodItemPlace(item, restaurants),
+                              _openBudgetItemPlace(item, restaurants),
                         ),
                         if (widget.savedItineraryId != null) ...[
                           const SizedBox(height: AppSpacing.xxl),

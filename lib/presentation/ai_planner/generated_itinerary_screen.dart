@@ -486,6 +486,26 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
     );
   }
 
+  /// Opens wherever a Food line item said to get it — a real in-app
+  /// restaurant page when [line.place] matches one of this trip's already-
+  /// loaded recommended restaurants by name, otherwise a Google Maps search
+  /// for that place near the destination. No extra geocoding call: this
+  /// reuses [restaurants], the same list already fetched for the
+  /// "Recommended Restaurants" carousel, so a match is free and a miss just
+  /// falls back gracefully instead of failing.
+  void _openFoodItemPlace(BudgetLineItem line, List<Restaurant> restaurants) {
+    final match = restaurants
+        .where((r) => r.name.toLowerCase() == line.place.toLowerCase())
+        .firstOrNull;
+    if (match != null) {
+      context.push(RoutePaths.restaurantDetails(match.id));
+      return;
+    }
+    MapsLauncher.openPlaceSearch(
+      '${line.place}, ${widget.itinerary.destinationName}, Philippines',
+    );
+  }
+
   Future<void> _regenerate() => _regenerateInternal();
 
   /// Asks for a specific change (e.g. "make day 2 cheaper", "swap the beach
@@ -1475,7 +1495,11 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
                           style: theme.textTheme.titleLarge,
                         ),
                         const SizedBox(height: AppSpacing.md),
-                        _BudgetSummaryCard(itinerary: itinerary),
+                        _BudgetSummaryCard(
+                          itinerary: itinerary,
+                          onTapItem: (item) =>
+                              _openFoodItemPlace(item, restaurants),
+                        ),
                         if (widget.savedItineraryId != null) ...[
                           const SizedBox(height: AppSpacing.xxl),
                           Row(
@@ -2240,9 +2264,14 @@ class _WeatherTile extends StatelessWidget {
 }
 
 class _BudgetSummaryCard extends StatelessWidget {
-  const _BudgetSummaryCard({required this.itinerary});
+  const _BudgetSummaryCard({required this.itinerary, this.onTapItem});
 
   final Itinerary itinerary;
+
+  /// Null-safe to call even for a [BudgetLineItem] with no [BudgetLineItem.place]
+  /// (an itinerary saved before that field existed) — the row just renders
+  /// as plain, non-tappable text in that case (see the build method below).
+  final void Function(BudgetLineItem item)? onTapItem;
 
   @override
   Widget build(BuildContext context) {
@@ -2321,25 +2350,57 @@ class _BudgetSummaryCard extends StatelessWidget {
                           for (final line in item.items)
                             Padding(
                               padding: const EdgeInsets.only(bottom: 4),
-                              child: Row(
-                                children: [
-                                  Expanded(
-                                    child: Text(
-                                      line.name,
+                              child: InkWell(
+                                onTap: (onTapItem != null && line.place.isNotEmpty)
+                                    ? () => onTapItem!(line)
+                                    : null,
+                                borderRadius: BorderRadius.circular(AppRadius.sm),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            line.name,
+                                            style: theme.textTheme.bodySmall
+                                                ?.copyWith(
+                                                  color: line.place.isNotEmpty
+                                                      ? theme
+                                                            .colorScheme
+                                                            .primary
+                                                      : AppColors
+                                                            .textTertiary,
+                                                  decoration:
+                                                      line.place.isNotEmpty
+                                                      ? TextDecoration
+                                                            .underline
+                                                      : null,
+                                                ),
+                                          ),
+                                          if (line.place.isNotEmpty)
+                                            Text(
+                                              'at ${line.place}',
+                                              style: theme.textTheme.labelSmall
+                                                  ?.copyWith(
+                                                    color: AppColors
+                                                        .textTertiary,
+                                                  ),
+                                            ),
+                                        ],
+                                      ),
+                                    ),
+                                    Text(
+                                      '~₱${line.price.toStringAsFixed(0)}',
                                       style: theme.textTheme.bodySmall
                                           ?.copyWith(
                                             color: AppColors.textTertiary,
                                           ),
                                     ),
-                                  ),
-                                  Text(
-                                    '~₱${line.price.toStringAsFixed(0)}',
-                                    style: theme.textTheme.bodySmall
-                                        ?.copyWith(
-                                          color: AppColors.textTertiary,
-                                        ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
                             ),
                         ],

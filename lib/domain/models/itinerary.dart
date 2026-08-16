@@ -356,19 +356,28 @@ class BudgetItem {
 }
 
 class BudgetLineItem {
-  const BudgetLineItem({required this.name, required this.price});
+  const BudgetLineItem({required this.name, required this.price, this.place = ''});
 
   final String name;
   final double price;
+
+  /// Where to actually get it — a real restaurant name when one of the
+  /// trip's candidate restaurants is a good fit, otherwise a specific named
+  /// spot/vendor type (e.g. "Larsian BBQ stalls"). Never blank for a newly
+  /// generated item (see `ItineraryPrompts`'s rule), only empty for line
+  /// items saved before this field existed — the UI just renders those as
+  /// plain, non-tappable text.
+  final String place;
 
   factory BudgetLineItem.fromMap(Map<String, dynamic> map) {
     return BudgetLineItem(
       name: map['name'] as String? ?? '',
       price: (map['price'] as num?)?.toDouble() ?? 0,
+      place: map['place'] as String? ?? '',
     );
   }
 
-  Map<String, dynamic> toMap() => {'name': name, 'price': price};
+  Map<String, dynamic> toMap() => {'name': name, 'price': price, 'place': place};
 }
 
 class WeatherForecast {

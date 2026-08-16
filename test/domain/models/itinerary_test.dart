@@ -64,8 +64,8 @@ void main() {
         iconKey: 'restaurant',
         colorKey: 'secondary',
         items: [
-          BudgetLineItem(name: 'Chicken Inasal meal', price: 150),
-          BudgetLineItem(name: 'Halo-halo', price: 90),
+          BudgetLineItem(name: 'Chicken Inasal meal', price: 150, place: 'Real Seaside Grill'),
+          BudgetLineItem(name: 'Halo-halo', price: 90, place: 'Larsian BBQ stalls'),
         ],
       );
 
@@ -74,6 +74,7 @@ void main() {
       expect(rebuilt.items, hasLength(2));
       expect(rebuilt.items.first.name, 'Chicken Inasal meal');
       expect(rebuilt.items.first.price, 150);
+      expect(rebuilt.items.first.place, 'Real Seaside Grill');
     });
 
     test('fromMap() defaults items to empty when the map has none', () {
@@ -85,6 +86,12 @@ void main() {
       });
 
       expect(item.items, isEmpty);
+    });
+
+    test('BudgetLineItem.fromMap() defaults place to empty when the map has none (a trip saved before it existed)', () {
+      final line = BudgetLineItem.fromMap({'name': 'Halo-halo', 'price': 90});
+
+      expect(line.place, isEmpty);
     });
   });
 }

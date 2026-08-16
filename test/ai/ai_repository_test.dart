@@ -448,8 +448,8 @@ void main() {
           'iconKey': 'restaurant',
           'colorKey': 'secondary',
           'items': [
-            {'name': 'Chicken Inasal meal', 'price': 150},
-            {'name': 'Halo-halo', 'price': 90},
+            {'name': 'Chicken Inasal meal', 'price': 150, 'place': 'Real Seaside Grill'},
+            {'name': 'Halo-halo', 'price': 90, 'place': 'Larsian BBQ stalls'},
           ],
         },
         {'label': 'Transportation', 'amount': 500, 'iconKey': 'directions_boat', 'colorKey': 'primary'},
@@ -487,6 +487,7 @@ void main() {
     expect(food.items, hasLength(2));
     expect(food.items.first.name, 'Chicken Inasal meal');
     expect(food.items.first.price, 150);
+    expect(food.items.first.place, 'Real Seaside Grill');
     // Categories the AI didn't break down further stay an empty list, not
     // missing/null.
     final transport = itinerary.budgetBreakdown.firstWhere((b) => b.label == 'Transportation');

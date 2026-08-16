@@ -35,9 +35,24 @@ class BusinessRepository {
         'ownerId': business.ownerId,
         'status': 'pending',
         'rejectionReason': '',
+        'viewCount': 0,
         'createdAt': FieldValue.serverTimestamp(),
       });
       return doc.id;
+    } catch (e) {
+      throw AppException.from(e);
+    }
+  }
+
+  /// Atomic +1, never a read-then-write — the same reasoning
+  /// `ReviewRepository`'s count adjustments already document: two travelers
+  /// opening this listing at nearly the same moment must never silently
+  /// clobber each other's increment. Any signed-in traveler may call this
+  /// (not just the owner — see `firestore.rules`' `isValidViewCountIncrement`
+  /// branch), since it's their own view being counted.
+  Future<void> incrementViewCount(String id) async {
+    try {
+      await _collection.doc(id).update({'viewCount': FieldValue.increment(1)});
     } catch (e) {
       throw AppException.from(e);
     }

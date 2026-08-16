@@ -31,6 +31,7 @@ import '../../core/widgets/layout/max_width_container.dart';
 import '../../core/widgets/layout/section_header.dart';
 import '../../core/widgets/states/empty_state_widget.dart';
 import '../../core/widgets/states/loading_widget.dart';
+import '../../data/repositories/business_repository.dart';
 import '../../data/repositories/destination_repository.dart';
 import '../../data/repositories/restaurant_repository.dart';
 import '../../data/repositories/user_repository.dart';
@@ -55,6 +56,7 @@ class _RestaurantDetailsScreenState extends State<RestaurantDetailsScreen> {
   final RestaurantRepository _restaurantRepository = RestaurantRepository();
   final DestinationRepository _destinationRepository = DestinationRepository();
   final UserRepository _userRepository = UserRepository();
+  final BusinessRepository _businessRepository = BusinessRepository();
 
   late Future<_RestaurantDetailsData> _future;
 
@@ -84,6 +86,12 @@ class _RestaurantDetailsScreenState extends State<RestaurantDetailsScreen> {
           targetId: restaurant.id,
         ),
       );
+    }
+    // Best-effort, and only for a business-owner-submitted listing — a
+    // legacy admin-seeded restaurant (empty businessId) has no `businesses`
+    // doc to track this on.
+    if (restaurant.businessId.isNotEmpty) {
+      unawaited(_businessRepository.incrementViewCount(restaurant.businessId).catchError((_) {}));
     }
 
     return _RestaurantDetailsData(

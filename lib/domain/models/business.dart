@@ -29,6 +29,7 @@ class Business {
     this.rejectionReason = '',
     this.restaurantId = '',
     this.accessibilityTags = const [],
+    this.viewCount = 0,
   });
 
   final String id;
@@ -78,6 +79,15 @@ class Business {
   /// isn't lost if a listing's category ever changes.
   final List<String> accessibilityTags;
 
+  /// How many times a traveler has opened this listing — every category,
+  /// not just [isFoodAndDining] (which has its own richer restaurant-page
+  /// view count baked into this same field via `RestaurantRepository`
+  /// incrementing it by [restaurantId]). System-managed like [status]: never
+  /// set directly by the owner, only ever atomically incremented by
+  /// `BusinessRepository.incrementViewCount` (see `firestore.rules`'
+  /// `isValidViewCountIncrement`).
+  final int viewCount;
+
   bool get isApproved => status == 'approved';
   bool get isPending => status == 'pending';
   bool get isRejected => status == 'rejected';
@@ -105,6 +115,7 @@ class Business {
       rejectionReason: map['rejectionReason'] as String? ?? '',
       restaurantId: map['restaurantId'] as String? ?? '',
       accessibilityTags: List<String>.from(map['accessibilityTags'] as List? ?? const []),
+      viewCount: (map['viewCount'] as num?)?.toInt() ?? 0,
     );
   }
 

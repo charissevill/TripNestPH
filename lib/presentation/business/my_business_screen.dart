@@ -481,14 +481,15 @@ class _BusinessFormState extends State<_BusinessForm> {
   }
 }
 
-/// Rating/review-count/favorite-count stats plus a recent-reviews list —
-/// only meaningful for a [BusinessCategory.foodAndDining] listing once
-/// approved and mirrored to `restaurants` (see [Business]'s class doc):
-/// that mirrored doc is the only thing travelers can ever review or
-/// favorite, since every other category has no public-facing counterpart
-/// in the app yet. `firestore.rules` already lets any signed-in user read
-/// `reviews`, and any active Admin Portal account (any role) read other
-/// travelers' `favorites` docs, so no rules changes were needed for this.
+/// View count (every category) plus rating/review-count/favorite-count
+/// stats and a recent-reviews list — that second group only meaningful for
+/// a [BusinessCategory.foodAndDining] listing once approved and mirrored to
+/// `restaurants` (see [Business]'s class doc): that mirrored doc is the
+/// only thing travelers can ever review or favorite, since every other
+/// category has no public-facing counterpart in the app yet.
+/// `firestore.rules` already lets any signed-in user read `reviews`, and
+/// any active Admin Portal account (any role) read other travelers'
+/// `favorites` docs, so no rules changes were needed for that half.
 class _PerformanceSection extends StatelessWidget {
   const _PerformanceSection({required this.business});
 
@@ -496,11 +497,20 @@ class _PerformanceSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final viewsCard = _MiniStatCard(icon: Symbols.visibility_rounded, label: 'Views', value: '${business.viewCount}');
+
     if (!business.isFoodAndDining || business.restaurantId.isEmpty) {
-      return const _Banner(
-        color: AppColors.textTertiary,
-        icon: Symbols.info_rounded,
-        text: 'Performance stats and reviews show up here once this is an approved Food & Dining listing.',
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [Expanded(child: viewsCard), const SizedBox(width: AppSpacing.sm), const Spacer()]),
+          const SizedBox(height: AppSpacing.sm),
+          const _Banner(
+            color: AppColors.textTertiary,
+            icon: Symbols.info_rounded,
+            text: 'Rating and review stats show up here once this is an approved Food & Dining listing.',
+          ),
+        ],
       );
     }
     return StreamBuilder<List<Review>>(
@@ -515,6 +525,8 @@ class _PerformanceSection extends StatelessWidget {
           children: [
             Row(
               children: [
+                Expanded(child: viewsCard),
+                const SizedBox(width: AppSpacing.sm),
                 Expanded(
                   child: _MiniStatCard(
                     icon: Symbols.star_rounded,
@@ -522,7 +534,11 @@ class _PerformanceSection extends StatelessWidget {
                     value: reviews.isEmpty ? '—' : rating.toStringAsFixed(1),
                   ),
                 ),
-                const SizedBox(width: AppSpacing.sm),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            Row(
+              children: [
                 Expanded(
                   child: _MiniStatCard(
                     icon: Symbols.reviews_rounded,

@@ -73,6 +73,15 @@ service cloud.firestore {
             || request.resource.data.reviewCount == resource.data.reviewCount - 1);
     }
 
+    // Used by the businesses match block below — a view count only ever
+    // goes up by exactly 1 per write (never a client-supplied arbitrary
+    // number), and tolerates a pre-existing document with no viewCount
+    // field yet (treated as 0) rather than erroring on the missing field.
+    function isValidViewCountIncrement() {
+      return request.resource.data.viewCount is int
+        && request.resource.data.viewCount == (resource.data.viewCount is int ? resource.data.viewCount : 0) + 1;
+    }
+
     // A traveler-triggered aggregate write is always exactly one of these
     // two shapes (see ReviewRepository) — never both fields in the same
     // write, so `reviewCount` (atomic) can never be clobbered by a
@@ -527,7 +536,13 @@ service cloud.firestore {
                     // Admin: status/rejectionReason for approve/reject/suspend, and
                     // restaurantId the one time a foodAndDining listing is first
                     // approved (see AdminBusinessListScreen._syncRestaurantBeforeApproval).
-                    || (hasAdminRole(['admin']) && onlyChangedFields(['status', 'rejectionReason', 'restaurantId']));
+                    || (hasAdminRole(['admin']) && onlyChangedFields(['status', 'rejectionReason', 'restaurantId']))
+                    // Any signed-in traveler viewing this listing (province
+                    // page tile or, for a linked restaurant, the restaurant
+                    // details screen) — never the owner's own field-edit
+                    // path, which goes through toInfoMap() and never
+                    // includes viewCount.
+                    || (isSignedIn() && onlyChangedFields(['viewCount']) && isValidViewCountIncrement());
       allow delete: if hasAdminRole(['admin']);
     }
 

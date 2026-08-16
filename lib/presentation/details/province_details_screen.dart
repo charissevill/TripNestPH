@@ -615,74 +615,91 @@ class _BusinessTile extends StatelessWidget {
 
   final Business business;
 
+  void _open(BuildContext context) {
+    // Best-effort, fire-and-forget — a failed count shouldn't block opening
+    // the sheet itself.
+    BusinessRepository().incrementViewCount(business.id).catchError((_) {});
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => _BusinessInfoSheet(business: business),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Container(
-      margin: const EdgeInsets.only(bottom: AppSpacing.sm),
-      padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(business.name, style: theme.textTheme.titleMedium),
-              ),
-              TagChip(
-                label: BusinessCategory.label(business.category),
-                color: theme.colorScheme.primary,
-              ),
-            ],
-          ),
-          if (business.description.isNotEmpty) ...[
-            const SizedBox(height: 4),
-            Text(
-              business.description,
-              style: theme.textTheme.bodySmall,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
-          if (business.address.isNotEmpty ||
-              business.contactNumber.isNotEmpty) ...[
-            const SizedBox(height: AppSpacing.xs),
+    return InkWell(
+      borderRadius: BorderRadius.circular(AppRadius.lg),
+      onTap: () => _open(context),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+        padding: const EdgeInsets.all(AppSpacing.md),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surface,
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
             Row(
               children: [
-                const Icon(
-                  Symbols.location_on_rounded,
-                  size: 14,
-                  color: AppColors.textTertiary,
-                ),
-                const SizedBox(width: 4),
                 Expanded(
                   child: Text(
-                    [
-                      business.address,
-                      business.contactNumber,
-                    ].where((s) => s.isNotEmpty).join(' · '),
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: AppColors.textTertiary,
-                    ),
+                    business.name,
+                    style: theme.textTheme.titleMedium,
                   ),
+                ),
+                TagChip(
+                  label: BusinessCategory.label(business.category),
+                  color: theme.colorScheme.primary,
                 ),
               ],
             ),
-          ],
-          if (business.websiteUrl.isNotEmpty) ...[
-            const SizedBox(height: AppSpacing.xs),
-            InkWell(
-              onTap: () => launchUrl(
-                Uri.parse(business.websiteUrl),
-                mode: LaunchMode.externalApplication,
+            if (business.description.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(
+                business.description,
+                style: theme.textTheme.bodySmall,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
-              child: Text(
+            ],
+            if (business.address.isNotEmpty ||
+                business.contactNumber.isNotEmpty) ...[
+              const SizedBox(height: AppSpacing.xs),
+              Row(
+                children: [
+                  const Icon(
+                    Symbols.location_on_rounded,
+                    size: 14,
+                    color: AppColors.textTertiary,
+                  ),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      [
+                        business.address,
+                        business.contactNumber,
+                      ].where((s) => s.isNotEmpty).join(' · '),
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textTertiary,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+            if (business.websiteUrl.isNotEmpty) ...[
+              const SizedBox(height: AppSpacing.xs),
+              // Not its own tap target — the tile itself opens
+              // _BusinessInfoSheet below, which has a proper "Visit Website"
+              // button; a nested tap target here would fight the tile's own
+              // InkWell over the same gesture.
+              Text(
                 business.websiteUrl,
                 style: TextStyle(
                   color: theme.colorScheme.primary,
@@ -690,10 +707,142 @@ class _BusinessTile extends StatelessWidget {
                   decoration: TextDecoration.underline,
                 ),
               ),
-            ),
+            ],
           ],
-        ],
+        ),
       ),
+    );
+  }
+}
+
+/// Opened by tapping a [_BusinessTile] — the full, untruncated version of
+/// what the tile already shows, plus real tap-to-call/tap-to-open actions
+/// the tile's own plain text can't offer (a nested tap target there would
+/// fight the tile's own onTap over the same gesture).
+class _BusinessInfoSheet extends StatelessWidget {
+  const _BusinessInfoSheet({required this.business});
+
+  final Business business;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Material(
+      color: theme.colorScheme.surface,
+      borderRadius: const BorderRadius.vertical(
+        top: Radius.circular(AppRadius.xxl),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.lg,
+            AppSpacing.sm,
+            AppSpacing.lg,
+            AppSpacing.xl,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 44,
+                  height: 5,
+                  margin: const EdgeInsets.only(bottom: AppSpacing.lg),
+                  decoration: BoxDecoration(
+                    color: AppColors.border,
+                    borderRadius: BorderRadius.circular(AppRadius.pill),
+                  ),
+                ),
+              ),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      business.name,
+                      style: theme.textTheme.headlineSmall,
+                    ),
+                  ),
+                  TagChip(
+                    label: BusinessCategory.label(business.category),
+                    color: theme.colorScheme.primary,
+                  ),
+                ],
+              ),
+              if (business.description.isNotEmpty) ...[
+                const SizedBox(height: AppSpacing.sm),
+                Text(
+                  business.description,
+                  style: theme.textTheme.bodyMedium?.copyWith(height: 1.5),
+                ),
+              ],
+              if (business.openingHours.isNotEmpty) ...[
+                const SizedBox(height: AppSpacing.md),
+                _InfoRow(
+                  icon: Symbols.schedule_rounded,
+                  text: business.openingHours,
+                ),
+              ],
+              if (business.address.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: AppSpacing.sm),
+                  child: InkWell(
+                    onTap: () => MapsLauncher.openPlaceSearch(business.address),
+                    child: _InfoRow(
+                      icon: Symbols.location_on_rounded,
+                      text: business.address,
+                    ),
+                  ),
+                ),
+              if (business.contactNumber.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: AppSpacing.sm),
+                  child: InkWell(
+                    onTap: () =>
+                        launchUrl(Uri.parse('tel:${business.contactNumber}')),
+                    child: _InfoRow(
+                      icon: Symbols.call_rounded,
+                      text: business.contactNumber,
+                    ),
+                  ),
+                ),
+              if (business.websiteUrl.isNotEmpty) ...[
+                const SizedBox(height: AppSpacing.md),
+                AnimatedButton(
+                  label: 'Visit Website',
+                  icon: Symbols.open_in_new_rounded,
+                  filled: false,
+                  onPressed: () => launchUrl(
+                    Uri.parse(business.websiteUrl),
+                    mode: LaunchMode.externalApplication,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _InfoRow extends StatelessWidget {
+  const _InfoRow({required this.icon, required this.text});
+
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 16, color: AppColors.textTertiary),
+        const SizedBox(width: 6),
+        Expanded(child: Text(text, style: theme.textTheme.bodyMedium)),
+      ],
     );
   }
 }
@@ -744,18 +893,27 @@ class _CultureNoteCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(Symbols.diversity_3_rounded, size: 16, color: theme.colorScheme.primary),
+              Icon(
+                Symbols.diversity_3_rounded,
+                size: 16,
+                color: theme.colorScheme.primary,
+              ),
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
                   note.title,
-                  style: theme.textTheme.titleSmall?.copyWith(color: theme.colorScheme.primary),
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    color: theme.colorScheme.primary,
+                  ),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 4),
-          Text(note.body, style: theme.textTheme.bodyMedium?.copyWith(height: 1.5)),
+          Text(
+            note.body,
+            style: theme.textTheme.bodyMedium?.copyWith(height: 1.5),
+          ),
         ],
       ),
     );

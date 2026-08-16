@@ -358,6 +358,35 @@ class _RestaurantDetailsBody extends StatelessWidget {
                   ),
                 ],
                 const SizedBox(height: AppSpacing.xl),
+                if (restaurant.reviewDigest != null) ...[
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(AppSpacing.md),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.primary.withValues(alpha: 0.06),
+                      borderRadius: BorderRadius.circular(AppRadius.lg),
+                      border: Border.all(color: theme.colorScheme.primary.withValues(alpha: 0.15)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Symbols.auto_awesome_rounded, size: 16, color: theme.colorScheme.primary),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Travelers say',
+                              style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.primary, fontWeight: FontWeight.w700),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Text(restaurant.reviewDigest!.summary, style: theme.textTheme.bodyMedium?.copyWith(height: 1.5)),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.xl),
+                ],
                 ReviewSection(
                   targetId: restaurant.id,
                   targetType: ReviewTargetType.restaurant,

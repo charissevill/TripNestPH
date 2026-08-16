@@ -1,3 +1,27 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
+/// A "Travelers say..." summary generated from a restaurant's own review
+/// text by the scheduled `generateReviewDigests` Cloud Function — never
+/// generated on-demand from the app, so opening a details page never
+/// triggers a billed AI call. Null until the listing has enough reviews
+/// (see that function's `REVIEW_DIGEST_MIN_REVIEWS`) for a first one.
+class ReviewDigest {
+  const ReviewDigest({required this.summary, required this.reviewCountAtGeneration, required this.generatedAt});
+
+  final String summary;
+  final int reviewCountAtGeneration;
+  final DateTime generatedAt;
+
+  factory ReviewDigest.fromMap(Map<String, dynamic> map) {
+    final timestamp = map['generatedAt'];
+    return ReviewDigest(
+      summary: map['summary'] as String? ?? '',
+      reviewCountAtGeneration: (map['reviewCountAtGeneration'] as num?)?.toInt() ?? 0,
+      generatedAt: timestamp is Timestamp ? timestamp.toDate() : DateTime.now(),
+    );
+  }
+}
+
 /// A restaurant, cafe or eatery surfaced on Home, Explore, and details
 /// screens. Backed by the `restaurants` Firestore collection; traveler
 /// reviews live separately in `reviews`.
@@ -27,6 +51,7 @@ class Restaurant {
     this.ownerId = '',
     this.businessId = '',
     this.accessibilityTags = const [],
+    this.reviewDigest,
   });
 
   final String id;
@@ -81,6 +106,10 @@ class Restaurant {
   /// `kAccessibilityTagOptions`.
   final List<String> accessibilityTags;
 
+  /// Set by the scheduled `generateReviewDigests` Cloud Function — see
+  /// [ReviewDigest]'s doc comment.
+  final ReviewDigest? reviewDigest;
+
   bool get hasCoordinates => latitude != null && longitude != null;
 
   factory Restaurant.fromMap(String id, Map<String, dynamic> map) {
@@ -113,6 +142,9 @@ class Restaurant {
       ownerId: map['ownerId'] as String? ?? '',
       businessId: map['businessId'] as String? ?? '',
       accessibilityTags: List<String>.from(map['accessibilityTags'] as List? ?? const []),
+      reviewDigest: map['reviewDigest'] is Map
+          ? ReviewDigest.fromMap(Map<String, dynamic>.from(map['reviewDigest'] as Map))
+          : null,
     );
   }
 
@@ -170,6 +202,7 @@ class Restaurant {
       ownerId: ownerId,
       businessId: businessId,
       accessibilityTags: accessibilityTags,
+      reviewDigest: reviewDigest,
     );
   }
 }

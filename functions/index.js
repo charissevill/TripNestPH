@@ -1,9 +1,10 @@
 const crypto = require('node:crypto');
 const { onDocumentCreated } = require('firebase-functions/v2/firestore');
 const { onCall, onRequest, HttpsError } = require('firebase-functions/v2/https');
+const { onSchedule } = require('firebase-functions/v2/scheduler');
 const { defineSecret } = require('firebase-functions/params');
 const { initializeApp } = require('firebase-admin/app');
-const { getFirestore } = require('firebase-admin/firestore');
+const { getFirestore, FieldValue } = require('firebase-admin/firestore');
 const { getMessaging } = require('firebase-admin/messaging');
 const { getAuth } = require('firebase-admin/auth');
 
@@ -493,7 +494,6 @@ async function tokensForAllUsers() {
  * broadcast doesn't keep re-attempting known-dead tokens.
  */
 async function pruneInvalidTokens(tokens, response) {
-  const { FieldValue } = require('firebase-admin/firestore');
   const invalid = [];
   response.responses.forEach((result, i) => {
     const code = result.error?.code;
@@ -506,3 +506,101 @@ async function pruneInvalidTokens(tokens, response) {
   const snapshot = await db.collection('users').where('fcmTokens', 'array-contains-any', invalid.slice(0, 30)).get();
   await Promise.all(snapshot.docs.map((doc) => doc.ref.update({ fcmTokens: FieldValue.arrayRemove(...invalid) })));
 }
+
+/**
+ * A "Travelers say..." summary generated from a listing's own review text —
+ * refreshed on a schedule (never on-demand from the app), so opening a
+ * details page is never what triggers a billed Groq call. Restaurants only
+ * for now: they're the one review target type with enough real review
+ * volume in this app to make a summary worth the API cost.
+ */
+const REVIEW_DIGEST_MIN_REVIEWS = 3;
+// A digest is only worth regenerating once enough new reviews have come in
+// since the last one — otherwise every run would spend a Groq call on every
+// popular listing for a summary that would barely have changed.
+const REVIEW_DIGEST_MIN_NEW_REVIEWS = 3;
+
+/**
+ * Same Groq chat-completions endpoint `aiComplete` proxies, called directly
+ * here instead of through it — `aiComplete` is a client-facing callable with
+ * its own auth/rate-limit/argument-validation wrapper that makes no sense
+ * for a server-triggered scheduled job, so this is a separate, minimal path
+ * to the same upstream API rather than a refactor of that tested function.
+ */
+async function summarizeReviews(apiKey, placeName, comments) {
+  const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+    body: JSON.stringify({
+      model: GROQ_MODEL,
+      temperature: 0.4,
+      max_tokens: 220,
+      messages: [
+        {
+          role: 'system',
+          content:
+            'You summarize real traveler reviews into one short, honest "Travelers say" paragraph (2-3 sentences, under 400 characters) for a Philippine tourism app. Base it ONLY on the review text given — never invent a detail, name, or complaint not actually present in it. Reflect a genuine mix of praise and any real recurring criticism, if there is one. Neutral third-person summary voice, no bullet points, no markdown, no preamble like "Travelers say" (the UI already labels it that way).',
+        },
+        {
+          role: 'user',
+          content: `Reviews for "${placeName}":\n${comments.map((c, i) => `${i + 1}. ${c}`).join('\n')}\n\nWrite the summary now.`,
+        },
+      ],
+    }),
+  });
+  if (response.status !== 200) {
+    const json = await response.json().catch(() => null);
+    throw new Error(`Groq request failed (${response.status}): ${json?.error?.message ?? 'unknown error'}`);
+  }
+  const json = await response.json();
+  const content = json?.choices?.[0]?.message?.content;
+  if (!content || !content.trim()) throw new Error('Groq returned an empty response.');
+  return content.trim();
+}
+
+exports.generateReviewDigests = onSchedule(
+  { region: 'asia-southeast1', schedule: 'every 24 hours', secrets: [groqApiKey], timeoutSeconds: 540 },
+  async () => {
+    const apiKey = groqApiKey.value();
+    if (!apiKey) return;
+
+    const listingsSnap = await db.collection('restaurants').where('status', '==', 'published').get();
+
+    for (const doc of listingsSnap.docs) {
+      const data = doc.data();
+      const reviewCount = data.reviewCount ?? 0;
+      if (reviewCount < REVIEW_DIGEST_MIN_REVIEWS) continue;
+
+      const existingDigest = data.reviewDigest;
+      const alreadyCovered = existingDigest?.reviewCountAtGeneration ?? 0;
+      if (existingDigest && reviewCount - alreadyCovered < REVIEW_DIGEST_MIN_NEW_REVIEWS) continue;
+
+      try {
+        const reviewsSnap = await db
+          .collection('reviews')
+          .where('targetId', '==', doc.id)
+          .where('targetType', '==', 'restaurant')
+          .where('isHidden', '==', false)
+          .limit(50)
+          .get();
+        const comments = reviewsSnap.docs
+          .map((d) => d.data().comment)
+          .filter((c) => typeof c === 'string' && c.trim().length > 0);
+        if (comments.length < REVIEW_DIGEST_MIN_REVIEWS) continue;
+
+        const summary = await summarizeReviews(apiKey, data.name ?? 'this place', comments);
+        await doc.ref.update({
+          reviewDigest: {
+            summary,
+            reviewCountAtGeneration: comments.length,
+            generatedAt: FieldValue.serverTimestamp(),
+          },
+        });
+      } catch (e) {
+        // Best-effort — one bad listing (a transient Groq error, say)
+        // shouldn't stop the rest of this run from generating theirs.
+        console.error(`generateReviewDigests: failed for restaurants/${doc.id}`, e);
+      }
+    }
+  },
+);

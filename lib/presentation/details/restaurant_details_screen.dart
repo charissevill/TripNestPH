@@ -267,6 +267,18 @@ class _RestaurantDetailsBody extends StatelessWidget {
                   restaurant.description,
                   style: theme.textTheme.bodyMedium?.copyWith(height: 1.6),
                 ),
+                if (restaurant.accessibilityTags.isNotEmpty) ...[
+                  const SizedBox(height: AppSpacing.lg),
+                  Text('Accessibility', style: theme.textTheme.titleMedium),
+                  const SizedBox(height: AppSpacing.sm),
+                  Wrap(
+                    spacing: AppSpacing.sm,
+                    runSpacing: AppSpacing.sm,
+                    children: restaurant.accessibilityTags
+                        .map((tag) => TagChip(label: tag, color: AppColors.success))
+                        .toList(),
+                  ),
+                ],
                 const SizedBox(height: AppSpacing.xxl),
                 Text('Location', style: theme.textTheme.titleLarge),
                 const SizedBox(height: AppSpacing.sm),

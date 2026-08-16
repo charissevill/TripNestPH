@@ -198,6 +198,7 @@ class RestaurantRepository {
         'businessId': business.id,
         'nameLower': business.name.toLowerCase(),
         'status': 'published',
+        'accessibilityTags': business.accessibilityTags,
       });
       return doc.id;
     } catch (e) {
@@ -228,6 +229,7 @@ class RestaurantRepository {
         'phoneNumber': business.contactNumber,
         'websiteUrl': business.websiteUrl,
         'nameLower': business.name.toLowerCase(),
+        'accessibilityTags': business.accessibilityTags,
       });
     } catch (e) {
       throw AppException.from(e);

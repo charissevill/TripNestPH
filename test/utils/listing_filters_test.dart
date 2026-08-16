@@ -43,6 +43,22 @@ void main() {
     });
   });
 
+  group('matchesAccessibilityTag()', () {
+    test('true when no accessibility filter is set, regardless of tags', () {
+      expect(matchesAccessibilityTag(const [], null), isTrue);
+      expect(matchesAccessibilityTag(const ['Step-free entrance'], null), isTrue);
+    });
+
+    test('false for an item with no accessibility data at all, unlike price/distance', () {
+      expect(matchesAccessibilityTag(const [], 'Step-free entrance'), isFalse);
+    });
+
+    test('true only when the item actually has the required tag', () {
+      expect(matchesAccessibilityTag(const ['Accessible restroom'], 'Step-free entrance'), isFalse);
+      expect(matchesAccessibilityTag(const ['Step-free entrance', 'Accessible restroom'], 'Step-free entrance'), isTrue);
+    });
+  });
+
   group('withinDistance()', () {
     // Manila and Cebu City are roughly 570km apart.
     const manila = (lat: 14.5995, lng: 120.9842);

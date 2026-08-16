@@ -38,6 +38,17 @@ PriceTier? priceTierFromPesoSigns(String priceRange) {
 
 const List<double> kDistanceFilterOptionsKm = [5, 10, 25, 50];
 
+/// Unlike [withinDistance] or the price-tier helpers above, an item with no
+/// accessibility data at all does NOT pass a set filter — a traveler
+/// filtering for a specific accessibility need is relying on this being
+/// accurate, and silently showing an unverified listing (e.g. every live
+/// Places result, which never carries this data) would be actively
+/// misleading, not just imprecise.
+bool matchesAccessibilityTag(List<String> tags, String? required) {
+  if (required == null) return true;
+  return tags.contains(required);
+}
+
 /// True when the point at [lat]/[lng] falls within [maxKm] of [origin] —
 /// and also true whenever the comparison can't be made ([maxKm] unset, or
 /// either point missing), so a listing with no coordinates on file is never

@@ -74,6 +74,7 @@ class _SearchResult {
     this.priceTier,
     this.latitude,
     this.longitude,
+    this.accessibilityTags = const [],
   });
 
   final _ResultType type;
@@ -95,6 +96,12 @@ class _SearchResult {
   final PriceTier? priceTier;
   final double? latitude;
   final double? longitude;
+
+  /// Only ever non-empty for a restaurant — see [matchesAccessibilityTag]'s
+  /// doc comment on why an empty list (festival, or a live Places result,
+  /// which never carries this data at all) fails an active filter rather
+  /// than passing it by default like [priceTier] does.
+  final List<String> accessibilityTags;
 }
 
 /// A dedicated full-screen search experience: debounced, live search across
@@ -190,11 +197,13 @@ class _SearchScreenState extends State<SearchScreen> {
   double? _minRating;
   PriceTier? _priceTier;
   double? _maxDistanceKm;
+  String? _accessibilityTag;
   // Resolved lazily, only once a distance filter is actually applied.
   Position? _userPosition;
   List<Region> _regions = [];
   List<Province> _provinces = [];
-  bool get _hasFilters => _provinceId != null || _minRating != null || _priceTier != null || _maxDistanceKm != null;
+  bool get _hasFilters =>
+      _provinceId != null || _minRating != null || _priceTier != null || _maxDistanceKm != null || _accessibilityTag != null;
 
   /// The traveler's own past search queries — real per-device history, not
   /// the four hardcoded strings this used to show every user.
@@ -367,6 +376,7 @@ class _SearchScreenState extends State<SearchScreen> {
           priceTier: priceTierFromPesoSigns(r.priceRange as String),
           latitude: r.latitude,
           longitude: r.longitude,
+          accessibilityTags: List<String>.from(r.accessibilityTags as List),
         ),
       ),
       // Festivals carry no per-listing price data — priceTier stays null,
@@ -387,9 +397,10 @@ class _SearchScreenState extends State<SearchScreen> {
     ];
   }
 
-  bool _matchesPriceAndDistance(_SearchResult r) {
+  bool _matchesFilters(_SearchResult r) {
     return (_priceTier == null || r.priceTier == null || r.priceTier == _priceTier) &&
-        withinDistance(lat: r.latitude, lng: r.longitude, origin: _userPosition, maxKm: _maxDistanceKm);
+        withinDistance(lat: r.latitude, lng: r.longitude, origin: _userPosition, maxKm: _maxDistanceKm) &&
+        matchesAccessibilityTag(r.accessibilityTags, _accessibilityTag);
   }
 
   Future<void> _runSearch(String query) async {
@@ -495,7 +506,7 @@ class _SearchScreenState extends State<SearchScreen> {
             .where((r) => r.rating >= _minRating!)
             .toList();
       }
-      curatedResults = curatedResults.where(_matchesPriceAndDistance).toList();
+      curatedResults = curatedResults.where(_matchesFilters).toList();
 
       // A live place that's also one of the curated results above (e.g. a
       // restaurant the app already has saved) shouldn't show twice — the
@@ -506,7 +517,7 @@ class _SearchScreenState extends State<SearchScreen> {
       final placeResults = allLivePlaces
           .where((p) => !isDuplicateOfCurated(p.name, curatedNames))
           .map(_placeToResult)
-          .where(_matchesPriceAndDistance)
+          .where(_matchesFilters)
           .toList();
 
       setState(() {
@@ -558,7 +569,7 @@ class _SearchScreenState extends State<SearchScreen> {
       );
       if (!mounted || requestId != _searchRequestId) return;
       setState(() {
-        _results = _toResults(restaurants, festivals).where(_matchesPriceAndDistance).toList();
+        _results = _toResults(restaurants, festivals).where(_matchesFilters).toList();
         // A province/region match only ever makes sense for a typed query
         // — this path runs with an empty query (filter-only browsing), so
         // any tile left over from a previous non-empty search must clear.
@@ -587,13 +598,15 @@ class _SearchScreenState extends State<SearchScreen> {
       minRating: _minRating,
       priceTier: _priceTier,
       maxDistanceKm: _maxDistanceKm,
-      onApply: (regionId, provinceId, r, priceTier, maxDistanceKm) {
+      accessibilityTag: _accessibilityTag,
+      onApply: (regionId, provinceId, r, priceTier, maxDistanceKm, accessibilityTag) {
         setState(() {
           _regionId = regionId;
           _provinceId = provinceId;
           _minRating = r;
           _priceTier = priceTier;
           _maxDistanceKm = maxDistanceKm;
+          _accessibilityTag = accessibilityTag;
         });
       },
     );
@@ -640,6 +653,11 @@ class _SearchScreenState extends State<SearchScreen> {
     _rerunAfterFilterChange();
   }
 
+  void _removeAccessibilityTagFilter() {
+    setState(() => _accessibilityTag = null);
+    _rerunAfterFilterChange();
+  }
+
   void _clearFilters() {
     setState(() {
       _regionId = null;
@@ -647,6 +665,7 @@ class _SearchScreenState extends State<SearchScreen> {
       _minRating = null;
       _priceTier = null;
       _maxDistanceKm = null;
+      _accessibilityTag = null;
     });
     _rerunAfterFilterChange();
   }
@@ -811,6 +830,8 @@ class _SearchScreenState extends State<SearchScreen> {
                   onRemovePriceTier: _removePriceTierFilter,
                   maxDistanceKm: _maxDistanceKm,
                   onRemoveDistance: _removeDistanceFilter,
+                  accessibilityTag: _accessibilityTag,
+                  onRemoveAccessibilityTag: _removeAccessibilityTagFilter,
                 ),
               ),
             Expanded(

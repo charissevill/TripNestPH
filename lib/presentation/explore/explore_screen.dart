@@ -121,25 +121,30 @@ class _ExploreScreenState extends State<ExploreScreen> {
   double? _minRating;
   PriceTier? _priceTier;
   double? _maxDistanceKm;
+  String? _accessibilityTag;
   // Resolved lazily, only once a distance filter is actually applied — most
   // sessions never touch it, so there's no reason to prompt for location
   // permission just for loading Explore.
   Position? _userPosition;
   List<Region> _regions = [];
   List<Province> _provinces = [];
-  bool get _hasFilters => _provinceId != null || _minRating != null || _priceTier != null || _maxDistanceKm != null;
+  bool get _hasFilters =>
+      _provinceId != null || _minRating != null || _priceTier != null || _maxDistanceKm != null || _accessibilityTag != null;
 
   List<Place>? get _filteredDestinationPlaces => _destinationPlaces?.where((p) {
     return (_priceTier == null || priceTierFromPlacesLevel(p.priceLevel) == _priceTier) &&
-        withinDistance(lat: p.latitude, lng: p.longitude, origin: _userPosition, maxKm: _maxDistanceKm);
+        withinDistance(lat: p.latitude, lng: p.longitude, origin: _userPosition, maxKm: _maxDistanceKm) &&
+        matchesAccessibilityTag(const [], _accessibilityTag);
   }).toList();
 
   List<Object>? get _filteredRestaurantItems => _restaurantItems?.where((item) {
     return switch (item) {
       Place p => (_priceTier == null || priceTierFromPlacesLevel(p.priceLevel) == _priceTier) &&
-          withinDistance(lat: p.latitude, lng: p.longitude, origin: _userPosition, maxKm: _maxDistanceKm),
+          withinDistance(lat: p.latitude, lng: p.longitude, origin: _userPosition, maxKm: _maxDistanceKm) &&
+          matchesAccessibilityTag(const [], _accessibilityTag),
       Restaurant r => (_priceTier == null || priceTierFromPesoSigns(r.priceRange) == _priceTier) &&
-          withinDistance(lat: r.latitude, lng: r.longitude, origin: _userPosition, maxKm: _maxDistanceKm),
+          withinDistance(lat: r.latitude, lng: r.longitude, origin: _userPosition, maxKm: _maxDistanceKm) &&
+          matchesAccessibilityTag(r.accessibilityTags, _accessibilityTag),
       Object() => true,
     };
   }).toList();
@@ -243,7 +248,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
       minRating: _minRating,
       priceTier: _priceTier,
       maxDistanceKm: _maxDistanceKm,
-      onApply: (regionId, provinceId, r, priceTier, maxDistanceKm) => setState(() {
+      accessibilityTag: _accessibilityTag,
+      onApply: (regionId, provinceId, r, priceTier, maxDistanceKm, accessibilityTag) => setState(() {
         _regionId = regionId;
         _provinceId = provinceId;
         final matches = _provinces.where((p) => p.id == provinceId);
@@ -251,6 +257,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
         _minRating = r;
         _priceTier = priceTier;
         _maxDistanceKm = maxDistanceKm;
+        _accessibilityTag = accessibilityTag;
       }),
     );
     if (applied != true) return;
@@ -296,6 +303,11 @@ class _ExploreScreenState extends State<ExploreScreen> {
     _invalidateAllTabsAndReload();
   }
 
+  void _removeAccessibilityTagFilter() {
+    setState(() => _accessibilityTag = null);
+    _invalidateAllTabsAndReload();
+  }
+
   void _clearFilters() {
     setState(() {
       _regionId = null;
@@ -304,6 +316,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
       _minRating = null;
       _priceTier = null;
       _maxDistanceKm = null;
+      _accessibilityTag = null;
     });
     _invalidateAllTabsAndReload();
   }
@@ -577,6 +590,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
                       onRemovePriceTier: _removePriceTierFilter,
                       maxDistanceKm: _maxDistanceKm,
                       onRemoveDistance: _removeDistanceFilter,
+                      accessibilityTag: _accessibilityTag,
+                      onRemoveAccessibilityTag: _removeAccessibilityTagFilter,
                     ),
                   ],
                 ],

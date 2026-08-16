@@ -28,6 +28,7 @@ class Business {
     this.status = 'pending',
     this.rejectionReason = '',
     this.restaurantId = '',
+    this.accessibilityTags = const [],
   });
 
   final String id;
@@ -71,6 +72,12 @@ class Business {
   /// can never set this themselves (see `firestore.rules`).
   final String restaurantId;
 
+  /// Owner-declared accessibility notes (e.g. "Step-free entrance") — see
+  /// [kAccessibilityTagOptions]. Mirrored onto the linked `restaurants` doc
+  /// like [cuisine]/[priceRange]; stored here regardless of category so it
+  /// isn't lost if a listing's category ever changes.
+  final List<String> accessibilityTags;
+
   bool get isApproved => status == 'approved';
   bool get isPending => status == 'pending';
   bool get isRejected => status == 'rejected';
@@ -97,6 +104,7 @@ class Business {
       status: map['status'] as String? ?? 'pending',
       rejectionReason: map['rejectionReason'] as String? ?? '',
       restaurantId: map['restaurantId'] as String? ?? '',
+      accessibilityTags: List<String>.from(map['accessibilityTags'] as List? ?? const []),
     );
   }
 
@@ -119,9 +127,20 @@ class Business {
       'cuisine': cuisine,
       'priceRange': priceRange,
       'openingHours': openingHours,
+      'accessibilityTags': accessibilityTags,
     };
   }
 }
+
+/// Fixed vocabulary offered on the business listing form and the Search/
+/// Explore accessibility filter — kept short and concrete rather than
+/// free-text, so a filter can match against it reliably.
+const List<String> kAccessibilityTagOptions = [
+  'Step-free entrance',
+  'Accessible restroom',
+  'Wheelchair-friendly seating',
+  'Senior/PWD priority lane',
+];
 
 class BusinessCategory {
   BusinessCategory._();

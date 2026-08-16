@@ -112,6 +112,7 @@ class _BusinessFormState extends State<_BusinessForm> {
 
   late String _category =
       widget.existing?.category ?? BusinessCategory.accommodation;
+  late final Set<String> _accessibilityTags = {...(widget.existing?.accessibilityTags ?? const [])};
   Province? _selectedProvince;
   late Future<List<Province>> _provincesFuture;
   bool _saving = false;
@@ -192,6 +193,7 @@ class _BusinessFormState extends State<_BusinessForm> {
       openingHours: _category == BusinessCategory.foodAndDining
           ? _openingHoursController.text.trim()
           : '',
+      accessibilityTags: _accessibilityTags.toList(),
     );
 
     try {
@@ -378,6 +380,24 @@ class _BusinessFormState extends State<_BusinessForm> {
                     ),
                   ),
                 ],
+                const SizedBox(height: AppSpacing.md),
+                Text('Accessibility', style: Theme.of(context).textTheme.titleSmall),
+                const SizedBox(height: AppSpacing.xs),
+                Wrap(
+                  spacing: AppSpacing.sm,
+                  runSpacing: AppSpacing.sm,
+                  children: kAccessibilityTagOptions.map((tag) {
+                    final selected = _accessibilityTags.contains(tag);
+                    return FilterChip(
+                      label: Text(tag),
+                      selected: selected,
+                      onSelected: (v) => setState(() {
+                        v ? _accessibilityTags.add(tag) : _accessibilityTags.remove(tag);
+                        _dirty = true;
+                      }),
+                    );
+                  }).toList(),
+                ),
                 const SizedBox(height: AppSpacing.md),
                 DropdownButtonFormField<Province>(
                   initialValue: _selectedProvince,

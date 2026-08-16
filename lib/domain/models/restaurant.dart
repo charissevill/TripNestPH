@@ -26,6 +26,7 @@ class Restaurant {
     this.facebookUrl = '',
     this.ownerId = '',
     this.businessId = '',
+    this.accessibilityTags = const [],
   });
 
   final String id;
@@ -76,6 +77,10 @@ class Restaurant {
   /// empty for the same legacy restaurants as [ownerId].
   final String businessId;
 
+  /// Owner-declared accessibility notes, mirrored from `Business` — see
+  /// `kAccessibilityTagOptions`.
+  final List<String> accessibilityTags;
+
   bool get hasCoordinates => latitude != null && longitude != null;
 
   factory Restaurant.fromMap(String id, Map<String, dynamic> map) {
@@ -107,6 +112,7 @@ class Restaurant {
       facebookUrl: map['facebookUrl'] as String? ?? '',
       ownerId: map['ownerId'] as String? ?? '',
       businessId: map['businessId'] as String? ?? '',
+      accessibilityTags: List<String>.from(map['accessibilityTags'] as List? ?? const []),
     );
   }
 
@@ -134,6 +140,7 @@ class Restaurant {
       'facebookUrl': facebookUrl,
       'ownerId': ownerId,
       'businessId': businessId,
+      'accessibilityTags': accessibilityTags,
     };
   }
 
@@ -162,6 +169,7 @@ class Restaurant {
       facebookUrl: facebookUrl,
       ownerId: ownerId,
       businessId: businessId,
+      accessibilityTags: accessibilityTags,
     );
   }
 }

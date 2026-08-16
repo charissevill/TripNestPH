@@ -18,6 +18,8 @@ class ActiveFilterChips extends StatelessWidget {
     this.onRemovePriceTier,
     this.maxDistanceKm,
     this.onRemoveDistance,
+    this.accessibilityTag,
+    this.onRemoveAccessibilityTag,
   });
 
   final String? provinceName;
@@ -29,6 +31,8 @@ class ActiveFilterChips extends StatelessWidget {
   final VoidCallback? onRemovePriceTier;
   final double? maxDistanceKm;
   final VoidCallback? onRemoveDistance;
+  final String? accessibilityTag;
+  final VoidCallback? onRemoveAccessibilityTag;
 
   @override
   Widget build(BuildContext context) {
@@ -47,6 +51,8 @@ class ActiveFilterChips extends StatelessWidget {
             deleteIcon: const Icon(Symbols.close_rounded, size: 16),
             onDeleted: onRemoveDistance,
           ),
+        if (accessibilityTag != null)
+          Chip(label: Text(accessibilityTag!), deleteIcon: const Icon(Symbols.close_rounded, size: 16), onDeleted: onRemoveAccessibilityTag),
         ActionChip(label: const Text('Clear all'), onPressed: onClearAll),
       ],
     );

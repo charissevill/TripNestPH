@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../domain/models/business.dart';
 import '../../../domain/models/province.dart';
 import '../../../domain/models/region.dart';
 import '../../theme/app_colors.dart';
@@ -10,7 +11,8 @@ const List<double> kRatingFilterOptions = [3, 4, 4.5];
 
 /// Opens [SearchFilterSheet] and returns `true` if the traveler tapped
 /// Apply (never on Cancel/dismiss) — the shared region/province + minimum-
-/// rating/budget/distance filter used by both the Search and Explore screens.
+/// rating/budget/distance/accessibility filter used by both the Search and
+/// Explore screens.
 Future<bool?> showSearchFilterSheet(
   BuildContext context, {
   required List<Region> regions,
@@ -20,12 +22,14 @@ Future<bool?> showSearchFilterSheet(
   required double? minRating,
   PriceTier? priceTier,
   double? maxDistanceKm,
+  String? accessibilityTag,
   required void Function(
     String? regionId,
     String? provinceId,
     double? minRating,
     PriceTier? priceTier,
     double? maxDistanceKm,
+    String? accessibilityTag,
   )
   onApply,
 }) {
@@ -41,17 +45,19 @@ Future<bool?> showSearchFilterSheet(
       minRating: minRating,
       priceTier: priceTier,
       maxDistanceKm: maxDistanceKm,
+      accessibilityTag: accessibilityTag,
       onApply: onApply,
     ),
   );
 }
 
-/// Region → Province drill-down plus minimum-rating/budget/distance
-/// filters, shared across destinations, restaurants and festivals. Only
-/// [provinceId] is actually applied to content queries — region is a
-/// browsing aid to narrow the province list, not a filter dimension of its
-/// own. Budget has no meaningful reading on festivals (no per-listing price
-/// data), so it's simply ignored wherever a screen applies it to that tab.
+/// Region → Province drill-down plus minimum-rating/budget/distance/
+/// accessibility filters, shared across destinations, restaurants and
+/// festivals. Only [provinceId] is actually applied to content queries —
+/// region is a browsing aid to narrow the province list, not a filter
+/// dimension of its own. Budget/accessibility have no meaningful reading on
+/// destinations or festivals (no per-listing price/accessibility data), so
+/// they're simply ignored wherever a screen applies them to those tabs.
 class SearchFilterSheet extends StatefulWidget {
   const SearchFilterSheet({
     super.key,
@@ -62,6 +68,7 @@ class SearchFilterSheet extends StatefulWidget {
     required this.minRating,
     this.priceTier,
     this.maxDistanceKm,
+    this.accessibilityTag,
     required this.onApply,
   });
 
@@ -72,12 +79,14 @@ class SearchFilterSheet extends StatefulWidget {
   final double? minRating;
   final PriceTier? priceTier;
   final double? maxDistanceKm;
+  final String? accessibilityTag;
   final void Function(
     String? regionId,
     String? provinceId,
     double? minRating,
     PriceTier? priceTier,
     double? maxDistanceKm,
+    String? accessibilityTag,
   )
   onApply;
 
@@ -91,6 +100,7 @@ class _SearchFilterSheetState extends State<SearchFilterSheet> {
   late double? _minRating = widget.minRating;
   late PriceTier? _priceTier = widget.priceTier;
   late double? _maxDistanceKm = widget.maxDistanceKm;
+  late String? _accessibilityTag = widget.accessibilityTag;
 
   void _selectRegion(String regionId, bool selected) {
     setState(() {
@@ -217,6 +227,21 @@ class _SearchFilterSheetState extends State<SearchFilterSheet> {
                             );
                           }).toList(),
                         ),
+                        const SizedBox(height: AppSpacing.xl),
+                        Text('Accessibility', style: theme.textTheme.titleSmall),
+                        const SizedBox(height: AppSpacing.sm),
+                        Wrap(
+                          spacing: AppSpacing.sm,
+                          runSpacing: AppSpacing.sm,
+                          children: kAccessibilityTagOptions.map((tag) {
+                            final selected = _accessibilityTag == tag;
+                            return ChoiceChip(
+                              label: Text(tag),
+                              selected: selected,
+                              onSelected: (v) => setState(() => _accessibilityTag = v ? tag : null),
+                            );
+                          }).toList(),
+                        ),
                       ],
                     ),
                   ),
@@ -232,6 +257,7 @@ class _SearchFilterSheetState extends State<SearchFilterSheet> {
                           _minRating = null;
                           _priceTier = null;
                           _maxDistanceKm = null;
+                          _accessibilityTag = null;
                         }),
                         child: const Text('Reset'),
                       ),
@@ -240,7 +266,7 @@ class _SearchFilterSheetState extends State<SearchFilterSheet> {
                     Expanded(
                       child: FilledButton(
                         onPressed: () {
-                          widget.onApply(_regionId, _provinceId, _minRating, _priceTier, _maxDistanceKm);
+                          widget.onApply(_regionId, _provinceId, _minRating, _priceTier, _maxDistanceKm, _accessibilityTag);
                           Navigator.of(context).pop(true);
                         },
                         child: const Text('Apply'),

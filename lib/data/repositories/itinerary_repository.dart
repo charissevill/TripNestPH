@@ -110,7 +110,7 @@ class ItineraryRepository {
           itinerary: itinerary,
           savedAt: DateTime.now(),
           memberNames: ownerName.isEmpty ? const {} : {userId: ownerName},
-          packingItems: PackingItem.defaults(),
+          packingItems: PackingItem.suggestedFor(itinerary),
           startDate: startDate,
         ).toMap(),
       );

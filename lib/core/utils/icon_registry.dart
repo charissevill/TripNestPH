@@ -40,4 +40,14 @@ class IconRegistry {
   /// Reverse lookup used only when authoring/seeding content in code.
   static String keyFor(IconData icon) =>
       _icons.entries.firstWhere((e) => e.value == icon, orElse: () => _icons.entries.first).key;
+
+  /// Keys the AI itinerary prompt (`ItineraryPrompts.iconKeys`) is allowed to
+  /// pick for an activity/budget item/travel tip — every registered key
+  /// except the four "current sky condition" ones that only make sense next
+  /// to a specific day's weather forecast tile, not a general activity.
+  /// Single source of truth for that allow-list, so it can never drift out
+  /// of sync with what's actually registered here.
+  static List<String> get contentKeys => _icons.keys
+      .where((k) => !const {'cloud', 'rainy', 'thunderstorm', 'foggy'}.contains(k))
+      .toList();
 }

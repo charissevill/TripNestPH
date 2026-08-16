@@ -1,3 +1,5 @@
+import '../../core/theme/app_colors.dart';
+import '../../core/utils/icon_registry.dart';
 import '../../domain/models/itinerary.dart';
 import '../../domain/models/province.dart';
 import '../models/itinerary_request.dart';
@@ -9,19 +11,16 @@ import '../models/itinerary_request.dart';
 class ItineraryPrompts {
   ItineraryPrompts._();
 
-  /// Valid [IconRegistry] keys the model may use for activity/budget icons.
-  /// Constraining the choice keeps every generated icon resolvable; an
-  /// invalid key just falls back to a default rather than breaking anything.
-  static const List<String> iconKeys = [
-    'wb_sunny', 'wb_cloudy', 'payments', 'directions_boat', 'diversity_3',
-    'sim_card', 'hotel', 'restaurant', 'hiking', 'flight_land', 'flight_takeoff',
-    'beach_access', 'lunch_dining', 'local_pizza', 'shopping_bag', 'eco',
-    'celebration', 'landscape', 'forest', 'account_balance',
-  ];
+  /// Valid [IconRegistry] keys the model may use for activity/budget icons —
+  /// sourced from [IconRegistry.contentKeys] itself rather than a separate
+  /// retyped list, so this can never drift out of sync with what
+  /// [IconRegistry] actually resolves. Constraining the choice keeps every
+  /// generated icon resolvable; an invalid key just falls back to a default
+  /// rather than breaking anything.
+  static List<String> get iconKeys => IconRegistry.contentKeys;
 
-  static const List<String> colorKeys = [
-    'primary', 'primaryDark', 'secondary', 'secondaryDark', 'accent', 'accentDark', 'error',
-  ];
+  /// Sourced from [AppColors.paletteKeys], same reasoning as [iconKeys].
+  static List<String> get colorKeys => AppColors.paletteKeys;
 
   /// Concrete, actionable guidance per Planner form Trip Pace option —
   /// deliberately never asks the model to change how many activities a day

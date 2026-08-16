@@ -12,6 +12,7 @@ import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../ai/models/itinerary_request.dart';
+import '../../ai/planner_options.dart';
 import '../../ai/providers/ai_planner_provider.dart';
 import '../../core/providers/auth_provider.dart';
 import '../../core/routes/route_paths.dart';
@@ -594,7 +595,7 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
       final travelerType = travelers <= 1
           ? 'Solo'
           : (travelers == 2 ? 'Couple' : 'Friends');
-      final (budgetTierLabel, budgetRange) = _inferBudgetTier(
+      final (budgetTierLabel, budgetRange) = inferBudgetTier(
         widget.itinerary.totalBudget,
       );
 
@@ -610,8 +611,8 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
           days: widget.itinerary.totalDays,
           travelers: travelers,
           travelerType: travelerType,
-          transportation: const {'Van / Car Rental'},
-          interests: const {'Beaches', 'Food'},
+          transportation: const {defaultTransportation},
+          interests: defaultInterests,
           latitude: place.latitude,
           longitude: place.longitude,
           accommodationName: widget.itinerary.accommodationName.isNotEmpty
@@ -680,12 +681,6 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
   void _showRegenerateError(String reason) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(reason)));
-  }
-
-  (String, String) _inferBudgetTier(double totalBudget) {
-    if (totalBudget >= 40000) return ('Luxury', '₱40k+');
-    if (totalBudget >= 15000) return ('Mid-range', '₱15k – ₱40k');
-    return ('Budget', '₱5k – ₱15k');
   }
 
   Rect? _sharePositionOrigin() {

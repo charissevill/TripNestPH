@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 
 import '../../ai/models/ai_message.dart';
 import '../../ai/models/itinerary_request.dart';
+import '../../ai/planner_options.dart';
 import '../../ai/providers/ai_chat_provider.dart';
 import '../../ai/providers/ai_planner_provider.dart';
 import '../../ai/widgets/chat_bubble.dart';
@@ -458,15 +459,6 @@ class _AiChatScreenState extends State<AiChatScreen> {
     await chat.deleteSession(sessionId);
   }
 
-  /// Mirrors `_BudgetTier`'s labels/ranges in [AiPlannerScreen] — kept as a
-  /// small local literal rather than a shared import since it's exactly
-  /// three fixed display strings, not logic that could drift.
-  static const List<(String label, String range)> _budgetTiers = [
-    ('Budget', '₱5k – ₱15k'),
-    ('Mid-range', '₱15k – ₱40k'),
-    ('Luxury', '₱40k+'),
-  ];
-
   /// The nearest user turn before [assistantMessage] — normally the request
   /// that produced it (e.g. "Plan a 3-day trip to Baguio"), and specific
   /// enough to drive a Places text search for the destination itself, unlike
@@ -488,7 +480,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
       caseSensitive: false,
     ).allMatches(content).map((m) => int.parse(m.group(1)!));
     if (numbers.isEmpty) return 3;
-    return numbers.reduce((a, b) => a > b ? a : b).clamp(1, 14);
+    return numbers.reduce((a, b) => a > b ? a : b).clamp(minTripDays, maxTripDays);
   }
 
   int _extractBudgetTierIndex(String text) {
@@ -654,7 +646,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
       }
 
       if (!mounted) return;
-      final tier = _budgetTiers[_extractBudgetTierIndex(combinedText)];
+      final tier = budgetTiers[_extractBudgetTierIndex(combinedText)];
 
       final planner = context.read<AiPlannerProvider>();
       final itinerary = await planner.generate(
@@ -663,12 +655,12 @@ class _AiChatScreenState extends State<AiChatScreen> {
           destinationName: place.name,
           provinceId: province.id,
           provinceName: province.name,
-          budgetTierLabel: tier.$1,
-          budgetRange: tier.$2,
+          budgetTierLabel: tier.label,
+          budgetRange: tier.range,
           days: _extractDays(assistantMessage.content),
           travelers: travelers,
           travelerType: travelerType,
-          transportation: const {'Van / Car Rental'},
+          transportation: const {defaultTransportation},
           interests: _extractInterests(combinedText),
           latitude: place.latitude,
           longitude: place.longitude,

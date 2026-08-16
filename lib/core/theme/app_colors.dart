@@ -99,6 +99,15 @@ class AppColors {
     Color(0x99000000),
   ];
 
+  /// Every key [byKey] resolves to a real, distinct color for — single
+  /// source of truth for anything that needs to enumerate the allowed set
+  /// (e.g. `ItineraryPrompts.colorKeys`) instead of retyping it separately.
+  /// 'primary' is [byKey]'s fallback for an unrecognized key too, but is
+  /// still listed here as a real, pickable color in its own right.
+  static const List<String> paletteKeys = [
+    'primary', 'primaryDark', 'secondary', 'secondaryDark', 'accent', 'accentDark', 'error',
+  ];
+
   /// Resolves a semantic color key (e.g. from Firestore-persisted content)
   /// to one of the palette constants above. Content should only ever pick
   /// from this fixed set — never arbitrary hex values — to keep the UI

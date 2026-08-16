@@ -7,6 +7,7 @@ import 'package:material_symbols_icons/symbols.dart';
 import 'package:provider/provider.dart';
 
 import '../../ai/models/itinerary_request.dart';
+import '../../ai/planner_options.dart';
 import '../../ai/providers/ai_planner_provider.dart';
 import '../../core/routes/route_paths.dart';
 import '../../core/services/places_service.dart';
@@ -22,64 +23,6 @@ import '../../data/repositories/province_repository.dart';
 import '../../domain/models/destination.dart';
 import '../../domain/models/place.dart';
 import '../../domain/models/province.dart';
-
-class _BudgetTier {
-  const _BudgetTier(this.label, this.range, this.icon);
-
-  final String label;
-  final String range;
-  final IconData icon;
-}
-
-const List<_BudgetTier> _budgetTiers = [
-  _BudgetTier('Budget', '₱5k – ₱15k', Symbols.savings_rounded),
-  _BudgetTier(
-    'Mid-range',
-    '₱15k – ₱40k',
-    Symbols.account_balance_wallet_rounded,
-  ),
-  _BudgetTier('Luxury', '₱40k+', Symbols.diamond_rounded),
-];
-
-const List<(String, IconData)> _transportOptions = [
-  ('Flight', Symbols.flight_rounded),
-  ('Van / Car Rental', Symbols.directions_car_rounded),
-  ('Bus', Symbols.directions_bus_rounded),
-  ('Ferry / Boat', Symbols.directions_boat_rounded),
-  ('Motorbike', Symbols.two_wheeler_rounded),
-];
-
-const List<(String, IconData)> _interestOptions = [
-  ('Beaches', Symbols.beach_access_rounded),
-  ('Mountains', Symbols.landscape_rounded),
-  ('Food', Symbols.restaurant_rounded),
-  ('Culture & Heritage', Symbols.account_balance_rounded),
-  ('Adventure', Symbols.hiking_rounded),
-  ('Festivals', Symbols.celebration_rounded),
-  ('Nature', Symbols.forest_rounded),
-  ('Nightlife', Symbols.nightlife_rounded),
-];
-
-const List<(String, IconData)> _travelerTypeOptions = [
-  ('Solo', Symbols.person_rounded),
-  ('Couple', Symbols.favorite_rounded),
-  ('Family', Symbols.family_restroom_rounded),
-  ('Friends', Symbols.groups_rounded),
-];
-
-/// Single-select, unlike [_interestOptions] (which activities to lean
-/// toward) — this is about overall pacing/density, woven into the same one
-/// generation call as every other form field rather than generating
-/// multiple full itineraries to choose between (2-3x the Groq/Places cost
-/// for every single trip, whether or not the traveler even wanted a
-/// choice).
-const List<(String, IconData)> _tripPaceOptions = [
-  ('Relaxed', Symbols.self_improvement_rounded),
-  ('Balanced', Symbols.balance_rounded),
-  ('Adventure-Packed', Symbols.hiking_rounded),
-  ('Foodie Focus', Symbols.restaurant_rounded),
-  ('Culture Deep-dive', Symbols.museum_rounded),
-];
 
 /// The AI itinerary request form: destination, budget tier, trip length,
 /// traveler count/type, transportation and interests, ending in a large
@@ -127,8 +70,8 @@ class _AiPlannerScreenState extends State<AiPlannerScreen> {
   int _days = 3;
   int _travelers = 2;
   String _travelerType = 'Couple';
-  final Set<String> _transportation = {'Van / Car Rental'};
-  final Set<String> _interests = {'Beaches', 'Food'};
+  final Set<String> _transportation = {defaultTransportation};
+  final Set<String> _interests = {...defaultInterests};
   String _tripPace = 'Balanced';
 
   /// Solo/Couple are exactly what they say; Family/Friends are open-ended
@@ -161,8 +104,8 @@ class _AiPlannerScreenState extends State<AiPlannerScreen> {
       context,
       title: 'How many days?',
       initial: _days,
-      min: 1,
-      max: 14,
+      min: minTripDays,
+      max: maxTripDays,
     );
     if (value != null) setState(() => _days = value);
   }
@@ -224,7 +167,7 @@ class _AiPlannerScreenState extends State<AiPlannerScreen> {
     final place = _placeDestination;
     final province = _province;
     if (destination == null && place == null && province == null) return;
-    final tier = _budgetTiers[_budgetTierIndex];
+    final tier = budgetTiers[_budgetTierIndex];
 
     final planner = context.read<AiPlannerProvider>();
     final itinerary = await planner.generate(
@@ -459,13 +402,13 @@ class _AiPlannerScreenState extends State<AiPlannerScreen> {
             ),
             const SizedBox(height: AppSpacing.sm),
             Row(
-              children: List.generate(_budgetTiers.length, (i) {
-                final tier = _budgetTiers[i];
+              children: List.generate(budgetTiers.length, (i) {
+                final tier = budgetTiers[i];
                 final selected = _budgetTierIndex == i;
                 return Expanded(
                   child: Padding(
                     padding: EdgeInsets.only(
-                      right: i == _budgetTiers.length - 1 ? 0 : AppSpacing.sm,
+                      right: i == budgetTiers.length - 1 ? 0 : AppSpacing.sm,
                     ),
                     child: _SelectableCard(
                       icon: tier.icon,
@@ -626,7 +569,7 @@ class _AiPlannerScreenState extends State<AiPlannerScreen> {
             Wrap(
               spacing: AppSpacing.sm,
               runSpacing: AppSpacing.sm,
-              children: _travelerTypeOptions.map((option) {
+              children: travelerTypeOptions.map((option) {
                 final (label, icon) = option;
                 final selected = _travelerType == label;
                 return _SelectableChip(
@@ -650,7 +593,7 @@ class _AiPlannerScreenState extends State<AiPlannerScreen> {
             Wrap(
               spacing: AppSpacing.sm,
               runSpacing: AppSpacing.sm,
-              children: _transportOptions.map((option) {
+              children: transportOptions.map((option) {
                 final (label, icon) = option;
                 final selected = _transportation.contains(label);
                 return _SelectableChip(
@@ -673,7 +616,7 @@ class _AiPlannerScreenState extends State<AiPlannerScreen> {
             Wrap(
               spacing: AppSpacing.sm,
               runSpacing: AppSpacing.sm,
-              children: _interestOptions.map((option) {
+              children: interestOptions.map((option) {
                 final (label, icon) = option;
                 final selected = _interests.contains(label);
                 return _SelectableChip(
@@ -695,7 +638,7 @@ class _AiPlannerScreenState extends State<AiPlannerScreen> {
             Wrap(
               spacing: AppSpacing.sm,
               runSpacing: AppSpacing.sm,
-              children: _tripPaceOptions.map((option) {
+              children: tripPaceOptions.map((option) {
                 final (label, icon) = option;
                 final selected = _tripPace == label;
                 return _SelectableChip(

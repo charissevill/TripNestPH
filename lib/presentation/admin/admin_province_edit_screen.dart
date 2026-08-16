@@ -42,9 +42,12 @@ class _AdminProvinceEditScreenState extends State<AdminProvinceEditScreen> {
   final _newTipController = TextEditingController();
   final _newNoteTitleController = TextEditingController();
   final _newNoteBodyController = TextEditingController();
+  final _newTransportModeController = TextEditingController();
+  final _newTransportNoteController = TextEditingController();
 
   List<String> _travelTips = [];
   List<CultureNote> _cultureNotes = [];
+  List<TransportNote> _localTransport = [];
   String _heroImageUrl = '';
   List<String> _galleryImageUrls = [];
   bool _saving = false;
@@ -89,6 +92,7 @@ class _AdminProvinceEditScreenState extends State<AdminProvinceEditScreen> {
       _galleryImageUrls = [...province.galleryImageUrls];
       _travelTips = [...province.travelTips];
       _cultureNotes = [...province.cultureNotes];
+      _localTransport = [...province.localTransport];
       _hotlines = [...province.emergencyHotlines];
       _loaded = true;
     }
@@ -103,6 +107,8 @@ class _AdminProvinceEditScreenState extends State<AdminProvinceEditScreen> {
     _newTipController.dispose();
     _newNoteTitleController.dispose();
     _newNoteBodyController.dispose();
+    _newTransportModeController.dispose();
+    _newTransportNoteController.dispose();
     super.dispose();
   }
 
@@ -128,6 +134,18 @@ class _AdminProvinceEditScreenState extends State<AdminProvinceEditScreen> {
     });
   }
 
+  void _addTransportNote() {
+    final mode = _newTransportModeController.text.trim();
+    final note = _newTransportNoteController.text.trim();
+    if (mode.isEmpty || note.isEmpty) return;
+    setState(() {
+      _localTransport = [..._localTransport, TransportNote(mode: mode, note: note)];
+      _newTransportModeController.clear();
+      _newTransportNoteController.clear();
+      _dirty = true;
+    });
+  }
+
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _saving = true);
@@ -137,6 +155,7 @@ class _AdminProvinceEditScreenState extends State<AdminProvinceEditScreen> {
         overview: _overviewController.text.trim(),
         localCulture: _cultureController.text.trim(),
         cultureNotes: _cultureNotes,
+        localTransport: _localTransport,
         bestTimeToVisit: _bestTimeController.text.trim(),
         estimatedDailyBudgetMin: _budgetMin,
         estimatedDailyBudgetMax: _budgetMax,
@@ -281,6 +300,56 @@ class _AdminProvinceEditScreenState extends State<AdminProvinceEditScreen> {
                             color: Theme.of(context).colorScheme.primary,
                           ),
                           onPressed: _addCultureNote,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.xl),
+                    Text(
+                      'Getting Around',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    Text(
+                      'Practical local transport notes, e.g. "Jeepney" — "Flag down anywhere along the route, ₱13 minimum fare". Shown on the province page and on generated itineraries for this province.',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textTertiary),
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    ..._localTransport.asMap().entries.map(
+                      (entry) => ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(entry.value.mode),
+                        subtitle: Text(entry.value.note, maxLines: 2, overflow: TextOverflow.ellipsis),
+                        trailing: IconButton(
+                          icon: const Icon(Symbols.close_rounded, size: 18),
+                          onPressed: () => setState(() {
+                            _localTransport = [..._localTransport]..removeAt(entry.key);
+                            _dirty = true;
+                          }),
+                        ),
+                      ),
+                    ),
+                    TextField(
+                      controller: _newTransportModeController,
+                      maxLength: 40,
+                      decoration: const InputDecoration(hintText: 'Mode, e.g. "Jeepney"'),
+                    ),
+                    const SizedBox(height: AppSpacing.xs),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _newTransportNoteController,
+                            maxLength: 300,
+                            maxLines: 2,
+                            decoration: const InputDecoration(hintText: 'Note...'),
+                          ),
+                        ),
+                        IconButton(
+                          icon: Icon(
+                            Symbols.add_circle_rounded,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                          onPressed: _addTransportNote,
                         ),
                       ],
                     ),

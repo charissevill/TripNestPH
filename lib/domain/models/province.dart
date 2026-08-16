@@ -24,6 +24,7 @@ class Province {
     this.overview = '',
     this.localCulture = '',
     this.cultureNotes = const [],
+    this.localTransport = const [],
     this.bestTimeToVisit = '',
     this.estimatedDailyBudgetMin = 0,
     this.estimatedDailyBudgetMax = 0,
@@ -61,6 +62,14 @@ class Province {
   /// instead of [localCulture]'s single dense paragraph. Optional and
   /// additive — a province with none just falls back to [localCulture].
   final List<CultureNote> cultureNotes;
+
+  /// Practical getting-around notes (e.g. "Jeepney" — "Flag down anywhere
+  /// along the route, ₱13 minimum fare") shown both on the province page and
+  /// surfaced on a generated itinerary for this province, since a traveler
+  /// reading their day plan is exactly when this is most useful. Optional
+  /// and additive, same as [cultureNotes] — a province with none just shows
+  /// no Getting Around section anywhere.
+  final List<TransportNote> localTransport;
   final String bestTimeToVisit;
   final double estimatedDailyBudgetMin;
   final double estimatedDailyBudgetMax;
@@ -92,6 +101,9 @@ class Province {
       cultureNotes: (map['cultureNotes'] as List? ?? const [])
           .map((n) => CultureNote.fromMap(Map<String, dynamic>.from(n as Map)))
           .toList(),
+      localTransport: (map['localTransport'] as List? ?? const [])
+          .map((n) => TransportNote.fromMap(Map<String, dynamic>.from(n as Map)))
+          .toList(),
       bestTimeToVisit: map['bestTimeToVisit'] as String? ?? '',
       estimatedDailyBudgetMin: (map['estimatedDailyBudgetMin'] as num?)?.toDouble() ?? 0,
       estimatedDailyBudgetMax: (map['estimatedDailyBudgetMax'] as num?)?.toDouble() ?? 0,
@@ -116,6 +128,7 @@ class Province {
       'overview': overview,
       'localCulture': localCulture,
       'cultureNotes': cultureNotes.map((n) => n.toMap()).toList(),
+      'localTransport': localTransport.map((n) => n.toMap()).toList(),
       'bestTimeToVisit': bestTimeToVisit,
       'estimatedDailyBudgetMin': estimatedDailyBudgetMin,
       'estimatedDailyBudgetMax': estimatedDailyBudgetMax,
@@ -139,6 +152,20 @@ class CultureNote {
   }
 
   Map<String, dynamic> toMap() => {'title': title, 'body': body};
+}
+
+class TransportNote {
+  const TransportNote({required this.mode, required this.note});
+
+  /// The mode of transport, e.g. "Jeepney", "Tricycle", "Habal-habal".
+  final String mode;
+  final String note;
+
+  factory TransportNote.fromMap(Map<String, dynamic> map) {
+    return TransportNote(mode: map['mode'] as String? ?? '', note: map['note'] as String? ?? '');
+  }
+
+  Map<String, dynamic> toMap() => {'mode': mode, 'note': note};
 }
 
 class EmergencyHotline {

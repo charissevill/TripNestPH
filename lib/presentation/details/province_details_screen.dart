@@ -251,6 +251,20 @@ class _ProvinceDetailsBody extends StatelessWidget {
                     province.localCulture,
                     style: theme.textTheme.bodyMedium?.copyWith(height: 1.6),
                   ),
+                if (province.localTransport.isNotEmpty) ...[
+                  const SizedBox(height: AppSpacing.xxl),
+                  Text('Getting Around', style: theme.textTheme.titleLarge),
+                  const SizedBox(height: AppSpacing.sm),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      for (final note in province.localTransport) ...[
+                        _TransportNoteCard(note: note),
+                        const SizedBox(height: AppSpacing.sm),
+                      ],
+                    ],
+                  ),
+                ],
               ],
               if (data.destinations.isNotEmpty) ...[
                 const SizedBox(height: AppSpacing.xxl),
@@ -912,6 +926,57 @@ class _CultureNoteCard extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             note.body,
+            style: theme.textTheme.bodyMedium?.copyWith(height: 1.5),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// One scannable "Getting Around" card — same shape as [_CultureNoteCard],
+/// reused (not shared) since [TransportNote] and [CultureNote] are distinct
+/// types with different field names.
+class _TransportNoteCard extends StatelessWidget {
+  const _TransportNoteCard({required this.note});
+
+  final TransportNote note;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Symbols.directions_bus_rounded,
+                size: 16,
+                color: theme.colorScheme.primary,
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  note.mode,
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    color: theme.colorScheme.primary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            note.note,
             style: theme.textTheme.bodyMedium?.copyWith(height: 1.5),
           ),
         ],

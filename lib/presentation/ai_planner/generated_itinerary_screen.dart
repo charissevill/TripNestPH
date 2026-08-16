@@ -138,6 +138,7 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
   void initState() {
     super.initState();
     _loadRecommendations();
+    unawaited(_resolveProvince());
     if (widget.savedItineraryId != null) {
       _loadSavedItinerary();
       _loadOfflineStatus();
@@ -455,20 +456,25 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
   /// silently overwriting an already-saved trip or piling up a back-stack
   /// entry per regenerate.
   /// Best-effort — an unresolved province just means [showEmergencyAccessSheet]
-  /// falls back to its nationwide-only view, never blocks opening it at all.
-  Future<void> _showEmergency() async {
-    if (!_resolvedEmergencyProvince) {
-      try {
-        final provinces = await ProvinceRepository().getAll();
-        _emergencyProvince = matchProvinceByAddress(
-          widget.itinerary.destinationName,
-          provinces,
-        );
-      } catch (_) {
-        _emergencyProvince = null;
-      }
-      _resolvedEmergencyProvince = true;
+  /// falls back to its nationwide-only view, never blocks opening it at all,
+  /// and the "Getting Around" section (see [build]) simply doesn't show.
+  Future<void> _resolveProvince() async {
+    if (_resolvedEmergencyProvince) return;
+    try {
+      final provinces = await ProvinceRepository().getAll();
+      _emergencyProvince = matchProvinceByAddress(
+        widget.itinerary.destinationName,
+        provinces,
+      );
+    } catch (_) {
+      _emergencyProvince = null;
     }
+    _resolvedEmergencyProvince = true;
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _showEmergency() async {
+    await _resolveProvince();
     if (!mounted) return;
     showEmergencyAccessSheet(
       context,
@@ -1537,6 +1543,24 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
                                 .toList(),
                           ),
                         ),
+                        if (_emergencyProvince != null &&
+                            _emergencyProvince!.localTransport.isNotEmpty) ...[
+                          const SizedBox(height: AppSpacing.xl),
+                          Text(
+                            'Getting Around',
+                            style: theme.textTheme.titleLarge,
+                          ),
+                          const SizedBox(height: AppSpacing.md),
+                          Column(
+                            children: [
+                              for (final note
+                                  in _emergencyProvince!.localTransport) ...[
+                                _TransportNoteTile(note: note),
+                                const SizedBox(height: AppSpacing.sm),
+                              ],
+                            ],
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -1545,6 +1569,54 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _TransportNoteTile extends StatelessWidget {
+  const _TransportNoteTile({required this.note});
+
+  final TransportNote note;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Symbols.directions_bus_rounded,
+                size: 16,
+                color: theme.colorScheme.primary,
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  note.mode,
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    color: theme.colorScheme.primary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            note.note,
+            style: theme.textTheme.bodyMedium?.copyWith(height: 1.5),
+          ),
+        ],
       ),
     );
   }

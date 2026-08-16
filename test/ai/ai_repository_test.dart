@@ -474,6 +474,100 @@ void main() {
     expect(userContent.indexOf('Near Bistro'), lessThan(userContent.indexOf('Far Away Diner')));
   });
 
+  test('generateItinerary() sorts candidate restaurants by distance from the destination itself, when no accommodation is given', () async {
+    final firestore = FakeFirebaseFirestore();
+    // Seeded far-then-near, same reasoning as the accommodation-anchored
+    // sort test above — proves the fallback anchor (the destination's own
+    // resolved coordinates) does the same job when there's no accommodation
+    // to anchor on instead.
+    await firestore.collection('restaurants').doc('far-restaurant').set({
+      'name': 'Far Away Diner',
+      'cuisine': 'Filipino',
+      'provinceId': 'palawan',
+      'provinceName': 'Palawan',
+      'heroImageUrl': '',
+      'galleryImageUrls': <String>[],
+      'rating': 4.0,
+      'reviewCount': 5,
+      'priceRange': '₱',
+      'description': '',
+      'openingHours': '',
+      'menuHighlights': <String>[],
+      'status': 'published',
+      'latitude': 10.5,
+      'longitude': 119.5,
+    });
+    await firestore.collection('restaurants').doc('near-restaurant').set({
+      'name': 'Near Bistro',
+      'cuisine': 'Filipino',
+      'provinceId': 'palawan',
+      'provinceName': 'Palawan',
+      'heroImageUrl': '',
+      'galleryImageUrls': <String>[],
+      'rating': 4.0,
+      'reviewCount': 5,
+      'priceRange': '₱',
+      'description': '',
+      'openingHours': '',
+      'menuHighlights': <String>[],
+      'status': 'published',
+      'latitude': 9.7392,
+      'longitude': 118.7353,
+    });
+
+    Map<String, dynamic>? capturedData;
+    final caller = _fakeAiComplete(
+      {
+        'days': [
+          {'dayNumber': 1, 'dateLabel': 'Day 1', 'activities': <Map<String, dynamic>>[]},
+        ],
+        'budgetBreakdown': <Map<String, dynamic>>[],
+        'travelTips': <String>[],
+        'totalBudget': 0,
+        'recommendedRestaurantNames': <String>[],
+        'nearbyAttractionNames': <String>[],
+      },
+      onCall: (data) => capturedData = data,
+    );
+
+    final repository = AiRepository(
+      openAiService: OpenAiService(caller: caller),
+      restaurantRepository: RestaurantRepository(firestore: firestore),
+      provinceRepository: ProvinceRepository(firestore: firestore),
+    );
+
+    // Destination coordinates set, no accommodation at all — exactly a
+    // specific-destination trip where the traveler skipped that optional
+    // field. A destinationId unused by any other test in this file — the
+    // AI response cache is keyed by request signature (destinationId/days/
+    // travelers/travelerType/budget/transportation/interests/
+    // accommodationName — deliberately not latitude/longitude), so reusing
+    // one would silently serve another test's cached response instead of
+    // hitting this test's own fake.
+    await repository.generateItinerary(
+      const AiItineraryRequest(
+        destinationId: 'palawan-anchor-fallback',
+        destinationName: 'Palawan',
+        provinceId: 'palawan',
+        provinceName: 'Palawan',
+        budgetTierLabel: 'Budget',
+        budgetRange: '₱5k - ₱15k',
+        days: 1,
+        travelers: 1,
+        travelerType: 'Solo',
+        transportation: {'Flight'},
+        interests: {'Beaches'},
+        latitude: 9.7392,
+        longitude: 118.7353,
+      ),
+      coverImageUrl: '',
+    );
+
+    final messages = capturedData!['messages'] as List;
+    final userContent = messages.last['content'] as String;
+    expect(userContent.indexOf('Near Bistro'), lessThan(userContent.indexOf('Far Away Diner')));
+  });
+
   test(
     'generateItinerary() geocodes an activity location that matches no candidate list, via a live Places search',
     () async {

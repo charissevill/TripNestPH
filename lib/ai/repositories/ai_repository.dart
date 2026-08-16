@@ -162,21 +162,29 @@ class AiRepository {
     final province = candidateResults[3] as Province?;
     final weather = candidateResults[4] as List<WeatherForecast>;
 
-    // When the traveler said where they're staying, closer candidates lead
-    // each list — combined with the explicit prompt instruction below, this
-    // gives the AI both a ranking signal and an instruction, since it can't
-    // reliably reason about real-world distance from a bare coordinate.
-    _sortByDistanceFromAccommodation(
+    // Closer candidates lead each list — anchored on the accommodation when
+    // the traveler gave one, otherwise on the destination itself (always
+    // resolved by now, even for a whole-province trip — see
+    // _resolveDestinationCoordinates), so every trip gets a real geographic
+    // ranking signal, not just ones with a stated accommodation. Combined
+    // with the explicit prompt instruction below, this both biases which
+    // candidates the model picks and pushes it to keep a single day's picks
+    // near each other — the model can't reliably reason about real-world
+    // distance from a bare coordinate itself, so the list order has to do
+    // that work for it.
+    _sortByDistanceFromAnchor(
       candidateRestaurants,
       request,
       (r) => r.latitude,
       (r) => r.longitude,
+      fallbackAnchor: destinationCoordinates,
     );
-    _sortByDistanceFromAccommodation(
+    _sortByDistanceFromAnchor(
       candidatePlaceAttractions,
       request,
       (p) => p.latitude,
       (p) => p.longitude,
+      fallbackAnchor: destinationCoordinates,
     );
 
     final signature = jsonEncode({
@@ -282,29 +290,31 @@ class AiRepository {
     );
   }
 
-  /// Sorts [items] ascending by distance from [request]'s accommodation
-  /// coordinate, in place — a no-op if the traveler didn't specify one.
-  /// An item with no coordinates of its own sorts last (never excluded),
-  /// so it can still be picked, just without a ranking boost.
-  void _sortByDistanceFromAccommodation<T>(
+  /// Sorts [items] ascending by distance from an anchor point, in place —
+  /// [request]'s accommodation coordinate when the traveler gave one,
+  /// otherwise [fallbackAnchor] (the resolved destination itself). A no-op
+  /// only when neither anchor is available. An item with no coordinates of
+  /// its own sorts last (never excluded), so it can still be picked, just
+  /// without a ranking boost.
+  void _sortByDistanceFromAnchor<T>(
     List<T> items,
     AiItineraryRequest request,
     double? Function(T) latitudeOf,
-    double? Function(T) longitudeOf,
-  ) {
-    final accommodationLat = request.accommodationLatitude;
-    final accommodationLng = request.accommodationLongitude;
+    double? Function(T) longitudeOf, {
+    required ({double? latitude, double? longitude}) fallbackAnchor,
+  }) {
+    final anchorLat = request.accommodationLatitude ?? fallbackAnchor.latitude;
+    final anchorLng = request.accommodationLongitude ?? fallbackAnchor.longitude;
     // Also covers the empty-list case: `_fetchAccommodations`/
     // `_fetchPlaceAttractions` return a `const []` when the destination has
     // no coordinates, and sorting an unmodifiable list throws.
-    if (accommodationLat == null || accommodationLng == null || items.isEmpty)
-      return;
+    if (anchorLat == null || anchorLng == null || items.isEmpty) return;
 
     double distanceOf(T item) {
       final lat = latitudeOf(item);
       final lng = longitudeOf(item);
       if (lat == null || lng == null) return double.infinity;
-      return haversineKm(accommodationLat, accommodationLng, lat, lng);
+      return haversineKm(anchorLat, anchorLng, lat, lng);
     }
 
     items.sort((a, b) => distanceOf(a).compareTo(distanceOf(b)));

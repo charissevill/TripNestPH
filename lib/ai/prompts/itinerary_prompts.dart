@@ -103,7 +103,8 @@ Restaurants available near this destination (pick from these only, if relevant):
 Other attractions available near this destination (pick from these only, if relevant): ${candidateAttractionNames.isEmpty ? 'none provided' : candidateAttractionNames.join(', ')}
 
 Top-rated hotels near this destination, already chosen and shown to the traveler separately as "Recommended Accommodations" — do not repeat them in "recommendedRestaurantNames"/"nearbyAttractionNames", but feel free to reference one by name in a travel tip if genuinely useful (e.g. proximity to a planned activity): ${candidateHotelNames.isEmpty ? 'none available' : candidateHotelNames.join(', ')}
-${accommodationName != null && accommodationName.isNotEmpty ? '\nThe traveler is staying near $accommodationName. The restaurant/attraction lists above are already sorted by distance from there — prefer picks near the top of each list when they still fit the traveler\'s interests and budget.\n' : ''}
+
+The restaurant/attraction lists above are already sorted by distance from ${accommodationName != null && accommodationName.isNotEmpty ? 'where the traveler is staying ($accommodationName)' : request.destinationName} — prefer picks near the top of each list when they still fit the traveler's interests and budget. Within a single day, prefer activities that are close to each other over ones further down either list, so the day doesn't zigzag back and forth across the destination — a realistic day trades a small amount of "best possible pick" for one that's actually a sane route to follow in order.
 
 Weather forecast for the trip: ${weatherForecast.isEmpty ? 'not available — plan without weather-based adjustments' : weatherForecast.map((w) => '${w.dayLabel}: ${w.condition}, ${w.lowTemp}–${w.highTemp}°C').join('; ')}
 

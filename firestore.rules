@@ -368,6 +368,22 @@ service cloud.firestore {
       // anything, permanently.
       allow delete: if isSignedIn() && (resource.data.userId == request.auth.uid || isActiveAdmin());
       allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      // The only thing ever changed on an existing favorite doc — which
+      // named collection (see favorite_collections below) it's sorted
+      // into. Everything else about a favorite is create-once/delete, never
+      // edited in place.
+      allow update: if isSignedIn() && resource.data.userId == request.auth.uid && onlyChangedFields(['collectionId']);
+    }
+
+    // ---- favorite_collections/{id} — named lists a traveler groups their
+    // favorites into (e.g. "Bohol 2026") — entirely private, no admin or
+    // cross-user use case at all, unlike favorites itself above.
+    match /favorite_collections/{collectionId} {
+      allow read, delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid
+                    && request.resource.data.name is string
+                    && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 60;
+      allow update: if isSignedIn() && resource.data.userId == request.auth.uid && onlyChangedFields(['name']);
     }
 
     // ---- trip_photos/{id} — private "My Photos" travel journal -----------

@@ -9,6 +9,7 @@ class FirestorePaths {
   static const String restaurants = 'restaurants';
   static const String festivals = 'festivals';
   static const String favorites = 'favorites';
+  static const String favoriteCollections = 'favorite_collections';
   static const String savedItineraries = 'saved_itineraries';
   static const String reviews = 'reviews';
   static const String notifications = 'notifications';

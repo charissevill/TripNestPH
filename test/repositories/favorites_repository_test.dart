@@ -112,4 +112,62 @@ void main() {
     expect(result, hasLength(1));
     expect(result.single.id, 'places/abc');
   });
+
+  group('favorite collections', () {
+    test('createCollection() shows up in streamCollections(), newest last', () async {
+      await repository.createCollection('user-1', 'Bohol 2026');
+      await repository.createCollection('user-1', 'Food to try');
+
+      final result = await repository.streamCollections('user-1').first;
+
+      expect(result.map((c) => c.name), ['Bohol 2026', 'Food to try']);
+      expect(result.every((c) => c.userId == 'user-1'), isTrue);
+    });
+
+    test('setCollection() assigns an already-saved favorite, reflected in streamFavoriteDocs()', () async {
+      await repository.add('user-1', FavoriteType.destination, 'dest-1');
+      final collectionId = await repository.createCollection('user-1', 'Bohol 2026');
+
+      await repository.setCollection('user-1', FavoriteType.destination, 'dest-1', collectionId);
+
+      final docs = await repository.streamFavoriteDocs('user-1').first;
+      expect(docs.single.itemId, 'dest-1');
+      expect(docs.single.collectionId, collectionId);
+    });
+
+    test('setCollection() with null clears it back to Unsorted', () async {
+      await repository.add('user-1', FavoriteType.destination, 'dest-1');
+      final collectionId = await repository.createCollection('user-1', 'Bohol 2026');
+      await repository.setCollection('user-1', FavoriteType.destination, 'dest-1', collectionId);
+
+      await repository.setCollection('user-1', FavoriteType.destination, 'dest-1', null);
+
+      final docs = await repository.streamFavoriteDocs('user-1').first;
+      expect(docs.single.collectionId, isNull);
+    });
+
+    test('deleteCollection() removes the list and un-assigns it from every favorite that had it', () async {
+      await repository.add('user-1', FavoriteType.destination, 'dest-1');
+      await repository.add('user-1', FavoriteType.restaurant, 'rest-1');
+      final collectionId = await repository.createCollection('user-1', 'Bohol 2026');
+      await repository.setCollection('user-1', FavoriteType.destination, 'dest-1', collectionId);
+      await repository.setCollection('user-1', FavoriteType.restaurant, 'rest-1', collectionId);
+
+      await repository.deleteCollection('user-1', collectionId);
+
+      expect(await repository.streamCollections('user-1').first, isEmpty);
+      final docs = await repository.streamFavoriteDocs('user-1').first;
+      expect(docs.every((d) => d.collectionId == null), isTrue);
+    });
+
+    test('deleteAllForUser() also removes that user\'s collections', () async {
+      await repository.createCollection('user-1', 'Bohol 2026');
+      await repository.createCollection('user-2', 'Someone else\'s list');
+
+      await repository.deleteAllForUser('user-1');
+
+      expect(await repository.streamCollections('user-1').first, isEmpty);
+      expect(await repository.streamCollections('user-2').first, hasLength(1));
+    });
+  });
 }

@@ -67,6 +67,20 @@ const List<(String, IconData)> _travelerTypeOptions = [
   ('Friends', Symbols.groups_rounded),
 ];
 
+/// Single-select, unlike [_interestOptions] (which activities to lean
+/// toward) — this is about overall pacing/density, woven into the same one
+/// generation call as every other form field rather than generating
+/// multiple full itineraries to choose between (2-3x the Groq/Places cost
+/// for every single trip, whether or not the traveler even wanted a
+/// choice).
+const List<(String, IconData)> _tripPaceOptions = [
+  ('Relaxed', Symbols.self_improvement_rounded),
+  ('Balanced', Symbols.balance_rounded),
+  ('Adventure-Packed', Symbols.hiking_rounded),
+  ('Foodie Focus', Symbols.restaurant_rounded),
+  ('Culture Deep-dive', Symbols.museum_rounded),
+];
+
 /// The AI itinerary request form: destination, budget tier, trip length,
 /// traveler count/type, transportation and interests, ending in a large
 /// "Generate Itinerary" call to action that hands off to [AiPlannerProvider].
@@ -115,6 +129,7 @@ class _AiPlannerScreenState extends State<AiPlannerScreen> {
   String _travelerType = 'Couple';
   final Set<String> _transportation = {'Van / Car Rental'};
   final Set<String> _interests = {'Beaches', 'Food'};
+  String _tripPace = 'Balanced';
 
   /// Solo/Couple are exactly what they say; Family/Friends are open-ended
   /// group sizes. Keeps "How many travelers?" and "Who's traveling?" from
@@ -228,6 +243,7 @@ class _AiPlannerScreenState extends State<AiPlannerScreen> {
         travelerType: _travelerType,
         transportation: _transportation,
         interests: _interests,
+        tripPace: _tripPace,
         // Provinces have no single coordinate (see the Places API plan's
         // reasoning for not fabricating one), so a whole-province request
         // just skips the itinerary's weather section — same graceful
@@ -667,6 +683,26 @@ class _AiPlannerScreenState extends State<AiPlannerScreen> {
                   onTap: () => setState(() {
                     if (!_interests.remove(label)) _interests.add(label);
                   }),
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: AppSpacing.xxl),
+            const _FieldLabel(
+              icon: Symbols.tune_rounded,
+              label: 'Trip pace',
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            Wrap(
+              spacing: AppSpacing.sm,
+              runSpacing: AppSpacing.sm,
+              children: _tripPaceOptions.map((option) {
+                final (label, icon) = option;
+                final selected = _tripPace == label;
+                return _SelectableChip(
+                  label: label,
+                  icon: icon,
+                  selected: selected,
+                  onTap: () => setState(() => _tripPace = label),
                 );
               }).toList(),
             ),

@@ -23,6 +23,26 @@ class ItineraryPrompts {
     'primary', 'primaryDark', 'secondary', 'secondaryDark', 'accent', 'accentDark', 'error',
   ];
 
+  /// Concrete, actionable guidance per Planner form Trip Pace option —
+  /// deliberately never asks the model to change how many activities a day
+  /// has (still always exactly 3, per the rule below) so this can never
+  /// contradict that rule; "Relaxed" instead leans on which activities get
+  /// picked and how they're paced within that same fixed structure.
+  static String _tripPaceGuidance(String pace) {
+    switch (pace) {
+      case 'Relaxed':
+        return 'favor low-key, unhurried picks (leisurely meals, scenic downtime, an easy short walk) over packed or physically demanding ones, and write activity descriptions that leave real breathing room between them (e.g. a later start, a longer break at midday) rather than a tightly back-to-back schedule.';
+      case 'Adventure-Packed':
+        return 'prioritize active, outdoor, physically-engaging picks (hiking, water activities, adventure tours) over passive sightseeing wherever a real candidate fits.';
+      case 'Foodie Focus':
+        return 'let food lead the plan — prioritize the strongest restaurant/food-market picks from the candidate list for as many meal slots as make sense, beyond just one obligatory food stop per day.';
+      case 'Culture Deep-dive':
+        return 'prioritize heritage sites, museums, historical landmarks and local cultural experiences from the candidate lists over generic sightseeing or leisure spots.';
+      default:
+        return 'a normal, well-rounded mix — no particular activity type should dominate the plan.';
+    }
+  }
+
   static String system() {
     return '''
 You are the trip-planning engine inside TripNest PH, a Philippine tourism app. You produce complete, realistic, practical day-by-day travel itineraries for real Philippine destinations.
@@ -80,6 +100,7 @@ Rules:
     String? priorConversationContext,
     List<WeatherForecast> weatherForecast = const [],
     String? refinementInstruction,
+    String? tripPace,
   }) {
     return '''
 ${refinementInstruction != null && refinementInstruction.isNotEmpty ? '''
@@ -101,6 +122,7 @@ Plan a trip with these details:
 - Budget tier: ${request.budgetTierLabel} (${request.budgetRange} total for the whole trip, all travelers combined)
 - Preferred transportation: ${request.transportation.isEmpty ? 'no preference' : request.transportation.join(', ')}
 - Interests: ${request.interests.isEmpty ? 'general sightseeing' : request.interests.join(', ')}
+${tripPace != null && tripPace.isNotEmpty ? '- Trip pace: $tripPace — ${_tripPaceGuidance(tripPace)}\n' : ''}
 
 Restaurants available near this destination (pick from these only, if relevant): ${candidateRestaurantNames.isEmpty ? 'none provided' : candidateRestaurantNames.join(', ')}
 

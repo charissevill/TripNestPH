@@ -21,6 +21,7 @@ class AiItineraryRequest {
     this.accommodationLongitude,
     this.priorConversationContext,
     this.refinementInstruction,
+    this.tripPace,
   });
 
   final String destinationId;
@@ -68,4 +69,12 @@ class AiItineraryRequest {
   /// regeneration for the same destination/days/budget/travelers. Null for
   /// every other request, which has no such instruction to apply.
   final String? refinementInstruction;
+
+  /// One of the Planner form's Trip Pace options (e.g. "Relaxed",
+  /// "Adventure-Packed", "Foodie Focus") — how densely-packed the days
+  /// should feel and which kind of activity to weight, woven into the same
+  /// single generation call as every other form field. Null for a request
+  /// built outside the Planner form (chat-driven or refine-only), where the
+  /// prompt just omits any pacing guidance rather than assuming one.
+  final String? tripPace;
 }

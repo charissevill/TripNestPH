@@ -198,6 +198,7 @@ class AiRepository {
       'accommodationName': request.accommodationName,
       'priorConversationContext': request.priorConversationContext,
       'refinementInstruction': request.refinementInstruction,
+      'tripPace': request.tripPace,
     });
 
     // "Regenerate" on the result screen deliberately skips the cache lookup
@@ -230,6 +231,7 @@ class AiRepository {
               priorConversationContext: request.priorConversationContext,
               weatherForecast: weather,
               refinementInstruction: request.refinementInstruction,
+              tripPace: request.tripPace,
             ),
           },
         ],

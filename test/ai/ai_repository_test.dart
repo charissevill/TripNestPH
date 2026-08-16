@@ -546,6 +546,58 @@ void main() {
     expect(entranceFees.items.first.place, 'Chocolate Hills Complex');
   });
 
+  test('generateItinerary() carries the Accommodation category\'s priced line item through to the itinerary', () async {
+    final firestore = FakeFirebaseFirestore();
+    final caller = _fakeAiComplete({
+      'days': [
+        {'dayNumber': 1, 'dateLabel': 'Day 1', 'activities': <Map<String, dynamic>>[]},
+      ],
+      'budgetBreakdown': [
+        {
+          'label': 'Accommodation',
+          'amount': 2500,
+          'iconKey': 'hotel',
+          'colorKey': 'primaryDark',
+          'items': [
+            {'name': '1 night stay', 'price': 2500, 'place': 'Real Beach Resort'},
+          ],
+        },
+      ],
+      'travelTips': <String>[],
+      'totalBudget': 2500,
+      'recommendedRestaurantNames': <String>[],
+      'nearbyAttractionNames': <String>[],
+    });
+
+    final repository = AiRepository(
+      openAiService: OpenAiService(caller: caller),
+      restaurantRepository: RestaurantRepository(firestore: firestore),
+      provinceRepository: ProvinceRepository(firestore: firestore),
+    );
+
+    final itinerary = await repository.generateItinerary(
+      const AiItineraryRequest(
+        destinationId: 'bohol-accommodation-items',
+        destinationName: 'Bohol',
+        provinceId: 'bohol',
+        provinceName: 'Bohol',
+        budgetTierLabel: 'Mid-range',
+        budgetRange: '₱15k - ₱40k',
+        days: 1,
+        travelers: 2,
+        travelerType: 'Couple',
+        transportation: {'Van / Car Rental'},
+        interests: {'Nature'},
+      ),
+      coverImageUrl: '',
+    );
+
+    final accommodation = itinerary.budgetBreakdown.firstWhere((b) => b.label == 'Accommodation');
+    expect(accommodation.items, hasLength(1));
+    expect(accommodation.items.first.name, '1 night stay');
+    expect(accommodation.items.first.place, 'Real Beach Resort');
+  });
+
   test('generateItinerary() leaves weather empty when the destination has no coordinates', () async {
     final firestore = FakeFirebaseFirestore();
     final caller = _fakeAiComplete({

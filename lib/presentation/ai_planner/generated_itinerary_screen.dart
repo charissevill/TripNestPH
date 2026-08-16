@@ -498,18 +498,20 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
   }
 
   /// Opens wherever a budget line item said to get it (a Food dish's
-  /// restaurant, an Entrance Fee's attraction, ...). Tries, in order: a real
-  /// in-app restaurant page when [line.place] matches one of this trip's
-  /// already-loaded recommended restaurants by name; the same "open in
-  /// Maps" behavior [_PlaceRecommendationCard] uses when it matches one of
-  /// [Itinerary.recommendedPlaceAttractions] instead; otherwise a plain
+  /// restaurant, an Entrance Fee's attraction, an Accommodation item's
+  /// hotel, ...). Tries, in order: a real in-app restaurant page when
+  /// [line.place] matches one of this trip's already-loaded recommended
+  /// restaurants by name; the same "open in Maps" behavior
+  /// [_PlaceRecommendationCard] uses when it matches one of
+  /// [Itinerary.recommendedPlaceAttractions] or
+  /// [Itinerary.recommendedAccommodations] instead; otherwise a plain
   /// Google Maps search for that place near the destination. No extra
-  /// geocoding call for any of these — both candidate lists are already
-  /// loaded for their own carousels, so a match is free and a miss just
-  /// falls back gracefully instead of failing. A no-op for a Transportation
-  /// item, which intentionally has no [BudgetLineItem.place] to resolve
-  /// (see `ItineraryPrompts`'s rule) — [_BudgetSummaryCard] never wires a
-  /// tap for an empty `place` in the first place.
+  /// geocoding call for any of these — all three candidate lists are
+  /// already loaded for their own carousels, so a match is free and a miss
+  /// just falls back gracefully instead of failing. A no-op for a
+  /// Transportation item, which intentionally has no [BudgetLineItem.place]
+  /// to resolve (see `ItineraryPrompts`'s rule) — [_BudgetSummaryCard] never
+  /// wires a tap for an empty `place` in the first place.
   void _openBudgetItemPlace(BudgetLineItem line, List<Restaurant> restaurants) {
     final restaurantMatch = restaurants
         .where((r) => r.name.toLowerCase() == line.place.toLowerCase())
@@ -518,26 +520,34 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
       context.push(RoutePaths.restaurantDetails(restaurantMatch.id));
       return;
     }
-    final attractionMatch = widget.itinerary.recommendedPlaceAttractions
-        .where((p) => p.name.toLowerCase() == line.place.toLowerCase())
-        .firstOrNull;
-    if (attractionMatch != null) {
-      if (attractionMatch.mapsUri.isNotEmpty) {
-        MapsLauncher.openUrl(attractionMatch.mapsUri);
-      } else if (attractionMatch.hasCoordinates) {
-        MapsLauncher.openDirections(
-          latitude: attractionMatch.latitude!,
-          longitude: attractionMatch.longitude!,
-          label: attractionMatch.name,
-        );
-      } else {
-        MapsLauncher.openPlaceSearch('${attractionMatch.name}, Philippines');
-      }
+    final placeMatch = [
+      ...widget.itinerary.recommendedPlaceAttractions,
+      ...widget.itinerary.recommendedAccommodations,
+    ].where((p) => p.name.toLowerCase() == line.place.toLowerCase()).firstOrNull;
+    if (placeMatch != null) {
+      _openPlaceRecommendation(placeMatch);
       return;
     }
     MapsLauncher.openPlaceSearch(
       '${line.place}, ${widget.itinerary.destinationName}, Philippines',
     );
+  }
+
+  /// Same "open in Maps" priority [_PlaceRecommendationCard] uses for its
+  /// own tap target — factored out so [_openBudgetItemPlace] can reuse it
+  /// instead of duplicating the mapsUri/coordinates/fallback chain.
+  void _openPlaceRecommendation(PlaceRecommendation place) {
+    if (place.mapsUri.isNotEmpty) {
+      MapsLauncher.openUrl(place.mapsUri);
+    } else if (place.hasCoordinates) {
+      MapsLauncher.openDirections(
+        latitude: place.latitude!,
+        longitude: place.longitude!,
+        label: place.name,
+      );
+    } else {
+      MapsLauncher.openPlaceSearch('${place.name}, Philippines');
+    }
   }
 
   Future<void> _regenerate() => _regenerateInternal();

@@ -18,11 +18,23 @@ import 'review_list.dart';
 /// [ReviewList] rows plus a "Write a Review" CTA, with inline edit/delete
 /// for the current user's own review. Drop this into any Details screen.
 class ReviewSection extends StatefulWidget {
-  const ReviewSection({super.key, required this.targetId, required this.targetType, required this.reviewCount});
+  const ReviewSection({
+    super.key,
+    required this.targetId,
+    required this.targetType,
+    required this.reviewCount,
+    this.ownerUserId,
+  });
 
   final String targetId;
   final ReviewTargetType targetType;
   final int reviewCount;
+
+  /// The restaurant's `ownerId`, when [targetType] is [ReviewTargetType.restaurant].
+  /// When this matches the signed-in uid, review tiles get a "Reply as
+  /// owner" action. Left null for destinations/festivals, which have no
+  /// owner concept.
+  final String? ownerUserId;
 
   @override
   State<ReviewSection> createState() => _ReviewSectionState();
@@ -116,6 +128,41 @@ class _ReviewSectionState extends State<ReviewSection> {
     }
   }
 
+  Future<void> _replyToReview(BuildContext context, Review review) async {
+    final controller = TextEditingController(text: review.ownerReply ?? '');
+    final replyText = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(review.hasOwnerReply ? 'Edit your reply' : 'Reply to this review'),
+        content: TextField(
+          controller: controller,
+          maxLines: 4,
+          autofocus: true,
+          maxLength: 1000,
+          decoration: const InputDecoration(hintText: 'Thank the traveler, or address their feedback...'),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cancel')),
+          FilledButton(
+            onPressed: () {
+              final text = controller.text.trim();
+              if (text.isEmpty) return;
+              Navigator.of(context).pop(text);
+            },
+            child: const Text('Post Reply'),
+          ),
+        ],
+      ),
+    );
+    if (replyText == null || !context.mounted) return;
+    try {
+      await _repository.setOwnerReply(review, replyText);
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(AppException.from(e).message)));
+    }
+  }
+
   Future<void> _deleteReview(BuildContext context, Review review) async {
     final confirmed = await showConfirmationDialog(
       context,
@@ -137,6 +184,8 @@ class _ReviewSectionState extends State<ReviewSection> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final currentUid = context.watch<AuthProvider>().firebaseUser?.uid;
+    final canReplyAsOwner =
+        currentUid != null && widget.ownerUserId != null && widget.ownerUserId!.isNotEmpty && widget.ownerUserId == currentUid;
 
     return StreamBuilder<List<Review>>(
       stream: _repository.streamForTarget(widget.targetId, widget.targetType),
@@ -190,6 +239,8 @@ class _ReviewSectionState extends State<ReviewSection> {
                 onEdit: (r) => _writeReview(context, existing: r),
                 onDelete: (r) => _deleteReview(context, r),
                 onReport: (r) => _reportReview(context, r),
+                canReplyAsOwner: canReplyAsOwner,
+                onReply: (r) => _replyToReview(context, r),
               ),
           ],
         );

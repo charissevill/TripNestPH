@@ -105,6 +105,20 @@ void main() {
     expect(reviews.single.verified, isFalse);
   });
 
+  test('setOwnerReply() attaches a reply the model reads back via hasOwnerReply', () async {
+    await reviewRepository.addReview(review: _review(id: '', rating: 4));
+    final review = (await reviewRepository.getByUser('user-1')).single;
+    expect(review.hasOwnerReply, isFalse);
+
+    await reviewRepository.setOwnerReply(review, '  Thanks for visiting!  ');
+
+    final updated = (await reviewRepository.getByUser('user-1')).single;
+    expect(updated.hasOwnerReply, isTrue);
+    // Trimmed before it's written, so stray whitespace never round-trips.
+    expect(updated.ownerReply, 'Thanks for visiting!');
+    expect(updated.ownerRepliedAt, isNotNull);
+  });
+
   test('getByUser() only returns that user\'s reviews, newest first', () async {
     await reviewRepository.addReview(
       review: Review(

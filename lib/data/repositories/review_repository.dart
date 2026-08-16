@@ -199,6 +199,21 @@ class ReviewRepository {
     }
   }
 
+  /// Sets (or edits) the restaurant owner's public reply to [review].
+  /// Firestore rules restrict this write to the uid on `restaurants/
+  /// {review.targetId}.ownerId`, and to exactly these two fields — matches
+  /// the `onlyChangedFields(['ownerReply', 'ownerRepliedAt'])` branch there.
+  Future<void> setOwnerReply(Review review, String replyText) async {
+    try {
+      await _collection.doc(review.id).update({
+        'ownerReply': replyText.trim(),
+        'ownerRepliedAt': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      throw AppException.from(e);
+    }
+  }
+
   Future<void> deleteReview(Review review) async {
     try {
       await _collection.doc(review.id).delete();

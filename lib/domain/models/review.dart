@@ -27,6 +27,8 @@ class Review {
     this.photoUrls = const [],
     this.isHidden = false,
     this.verified = false,
+    this.ownerReply,
+    this.ownerRepliedAt,
   });
 
   final String id;
@@ -53,12 +55,22 @@ class Review {
   /// verified one, just without the "Verified Visit" label.
   final bool verified;
 
+  /// Set only by the restaurant's owner (`Restaurant.ownerId`) replying to
+  /// this review — null/empty means no reply yet. Firestore rules restrict
+  /// writing this pair of fields to that one uid, on restaurant-targeted
+  /// reviews only.
+  final String? ownerReply;
+  final DateTime? ownerRepliedAt;
+
+  bool get hasOwnerReply => ownerReply != null && ownerReply!.trim().isNotEmpty;
+
   /// Human-readable relative-ish date, e.g. "March 2026", matching the copy
   /// style used throughout the rest of the app.
   String get date => DateFormat.yMMMM().format(createdAt);
 
   factory Review.fromMap(String id, Map<String, dynamic> map) {
     final timestamp = map['createdAt'];
+    final repliedAt = map['ownerRepliedAt'];
     return Review(
       id: id,
       userId: map['userId'] as String? ?? '',
@@ -72,6 +84,8 @@ class Review {
       photoUrls: List<String>.from(map['photoUrls'] as List? ?? const []),
       isHidden: map['isHidden'] as bool? ?? false,
       verified: map['verified'] as bool? ?? false,
+      ownerReply: map['ownerReply'] as String?,
+      ownerRepliedAt: repliedAt is Timestamp ? repliedAt.toDate() : null,
     );
   }
 

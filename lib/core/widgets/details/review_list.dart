@@ -18,6 +18,8 @@ class ReviewList extends StatelessWidget {
     this.onEdit,
     this.onDelete,
     this.onReport,
+    this.canReplyAsOwner = false,
+    this.onReply,
   });
 
   final List<Review> reviews;
@@ -28,6 +30,11 @@ class ReviewList extends StatelessWidget {
   /// Only offered on someone else's review — reporting your own would be
   /// pointless, so [_ReviewTile] hides this whenever [isOwn] is true.
   final ValueChanged<Review>? onReport;
+
+  /// True when the signed-in viewer owns the restaurant these reviews were
+  /// left on — the only case a reply action is ever shown.
+  final bool canReplyAsOwner;
+  final ValueChanged<Review>? onReply;
 
   @override
   Widget build(BuildContext context) {
@@ -42,6 +49,8 @@ class ReviewList extends StatelessWidget {
                 onEdit: onEdit,
                 onDelete: onDelete,
                 onReport: onReport,
+                canReplyAsOwner: canReplyAsOwner,
+                onReply: onReply,
               ),
             ),
           )
@@ -51,13 +60,23 @@ class ReviewList extends StatelessWidget {
 }
 
 class _ReviewTile extends StatelessWidget {
-  const _ReviewTile({required this.review, required this.isOwn, this.onEdit, this.onDelete, this.onReport});
+  const _ReviewTile({
+    required this.review,
+    required this.isOwn,
+    this.onEdit,
+    this.onDelete,
+    this.onReport,
+    this.canReplyAsOwner = false,
+    this.onReply,
+  });
 
   final Review review;
   final bool isOwn;
   final ValueChanged<Review>? onEdit;
   final ValueChanged<Review>? onDelete;
   final ValueChanged<Review>? onReport;
+  final bool canReplyAsOwner;
+  final ValueChanged<Review>? onReply;
 
   @override
   Widget build(BuildContext context) {
@@ -123,6 +142,46 @@ class _ReviewTile extends StatelessWidget {
                       borderRadius: BorderRadius.circular(AppRadius.md),
                       child: CachedNetworkImage(imageUrl: review.photoUrls[i], width: 64, height: 64, fit: BoxFit.cover),
                     ),
+                  ),
+                ),
+              ],
+              if (review.hasOwnerReply) ...[
+                const SizedBox(height: AppSpacing.sm),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(AppSpacing.sm),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primary.withValues(alpha: 0.06),
+                    borderRadius: BorderRadius.circular(AppRadius.md),
+                    border: Border.all(color: theme.colorScheme.primary.withValues(alpha: 0.15)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Symbols.storefront_rounded, size: 14, color: theme.colorScheme.primary),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Reply from the owner',
+                            style: theme.textTheme.labelMedium?.copyWith(color: theme.colorScheme.primary, fontWeight: FontWeight.w700),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(review.ownerReply!, style: theme.textTheme.bodyMedium),
+                    ],
+                  ),
+                ),
+              ],
+              if (canReplyAsOwner) ...[
+                const SizedBox(height: 4),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton(
+                    style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: const Size(0, 32)),
+                    onPressed: () => onReply?.call(review),
+                    child: Text(review.hasOwnerReply ? 'Edit reply' : 'Reply as owner'),
                   ),
                 ),
               ],

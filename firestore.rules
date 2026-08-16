@@ -123,6 +123,15 @@ service cloud.firestore {
       return isActiveAdmin() && adminData().role in roles;
     }
 
+    // Used only by the reviews match block below, to let a restaurant's
+    // owner reply to reviews left on their own listing — mirrors the
+    // adminData()/isActiveAdmin() get()-then-compare pattern above.
+    function isRestaurantOwner(restaurantId) {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/restaurants/$(restaurantId))
+        && get(/databases/$(database)/documents/restaurants/$(restaurantId)).data.ownerId == request.auth.uid;
+    }
+
     // An 'lgu' account only manages the one province staged for it at
     // invite time (AdminUser.provinceId); 'admin' has no such restriction.
     // Used everywhere provinces/tourist_spots/festivals are written instead
@@ -517,7 +526,13 @@ service cloud.firestore {
       allow update: if (isSignedIn() && resource.data.userId == request.auth.uid && isValidReview()
                         && request.resource.data.targetId == resource.data.targetId
                         && request.resource.data.targetType == resource.data.targetType)
-                    || (hasAdminRole(['admin']) && onlyChangedFields(['isHidden']));
+                    || (hasAdminRole(['admin']) && onlyChangedFields(['isHidden']))
+                    // A restaurant owner replying to a review left on their
+                    // own listing — never able to touch the review's own
+                    // rating/comment/photos, only the reply pair.
+                    || (resource.data.targetType == 'restaurant'
+                        && isRestaurantOwner(resource.data.targetId)
+                        && onlyChangedFields(['ownerReply', 'ownerRepliedAt']));
       allow delete: if (isSignedIn() && resource.data.userId == request.auth.uid) || hasAdminRole(['admin']);
     }
 

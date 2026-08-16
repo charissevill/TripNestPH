@@ -344,6 +344,7 @@ class _RestaurantDetailsBody extends StatelessWidget {
                   targetId: restaurant.id,
                   targetType: ReviewTargetType.restaurant,
                   reviewCount: restaurant.reviewCount,
+                  ownerUserId: restaurant.ownerId,
                 ),
               ],
             ),

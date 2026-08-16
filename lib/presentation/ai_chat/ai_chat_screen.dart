@@ -20,8 +20,12 @@ import '../../core/services/location_service.dart';
 import '../../core/services/places_service.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
+import '../../core/utils/chat_entity_matcher.dart';
 import '../../core/utils/province_matcher.dart';
 import '../../core/widgets/branding/app_logo.dart';
+import '../../core/widgets/cards/place_card.dart';
+import '../../core/widgets/cards/restaurant_card.dart';
+import '../../core/widgets/details/place_details_sheet.dart';
 import '../../core/widgets/dialogs/confirmation_dialog.dart';
 import '../../core/widgets/layout/max_width_container.dart';
 import '../../data/repositories/province_repository.dart';
@@ -58,6 +62,15 @@ class _AiChatScreenState extends State<AiChatScreen> {
   /// location) just means the chat falls back to less-specific context,
   /// same as before this existed.
   String? _realDataContext;
+
+  /// Every live [Place]/curated [Restaurant] fed into [_realDataContext]
+  /// this session, keyed by lowercased name — lets [_matchedKnownEntities]
+  /// resolve a **bolded** name in a reply back to the real object it named,
+  /// so the chat can show an actual tappable card instead of just text. Only
+  /// ever contains places/restaurants the model was actually given, so a
+  /// match here is never a coincidence — the model didn't invent the name.
+  final Map<String, Place> _knownPlacesByName = {};
+  final Map<String, Restaurant> _knownRestaurantsByName = {};
 
   @override
   void initState() {
@@ -314,6 +327,28 @@ class _AiChatScreenState extends State<AiChatScreen> {
         );
       }
 
+      // cultureNotes (titled etiquette cards) when a province has them,
+      // otherwise the older plain-paragraph localCulture field — same
+      // fallback the province page itself uses (see _CultureNoteCard's doc
+      // comment on ProvinceDetailsScreen). Grounds "how do I greet someone",
+      // "what should I wear at a temple/church", "local customs" questions
+      // in real, admin-curated content instead of the model's own general
+      // knowledge of the Philippines.
+      final withCulture = provinces
+          .where((p) => p.cultureNotes.isNotEmpty || p.localCulture.isNotEmpty)
+          .toList();
+      if (withCulture.isNotEmpty) {
+        parts.add(
+          'Real local culture/etiquette notes on file per province (use these — never a generic guess — when the traveler asks about local customs, greetings, dress code, or etiquette): '
+          '${withCulture.map((p) {
+            final text = p.cultureNotes.isNotEmpty
+                ? p.cultureNotes.map((n) => '${n.title}: ${n.body}').join('; ')
+                : p.localCulture;
+            return '${p.name}: $text';
+          }).join(' | ')}.',
+        );
+      }
+
       final withBudget = provinces
           .where(
             (p) =>
@@ -327,8 +362,32 @@ class _AiChatScreenState extends State<AiChatScreen> {
         );
       }
 
-      if (mounted && parts.isNotEmpty)
-        setState(() => _realDataContext = parts.join(' '));
+      // Every Place/Restaurant actually handed to the model this session —
+      // see _knownPlacesByName's doc comment. Keyed last-write-wins by
+      // lowercased name, which is fine here: a genuine collision is the
+      // same real-world place appearing in two of these lists.
+      final knownPlaces = <String, Place>{
+        for (final p in attractionPlaces) p.name.trim().toLowerCase(): p,
+        for (final p in [...nearbyTraveler.attractions, ...nearbyTraveler.restaurants, ...nearbyTraveler.accommodations])
+          p.name.trim().toLowerCase(): p,
+        for (final list in accommodationsByAttraction.values)
+          for (final p in list) p.name.trim().toLowerCase(): p,
+      };
+      final knownRestaurants = <String, Restaurant>{
+        for (final r in restaurants) r.name.trim().toLowerCase(): r,
+      };
+
+      if (mounted && parts.isNotEmpty) {
+        setState(() {
+          _realDataContext = parts.join(' ');
+          _knownPlacesByName
+            ..clear()
+            ..addAll(knownPlaces);
+          _knownRestaurantsByName
+            ..clear()
+            ..addAll(knownRestaurants);
+        });
+      }
     } catch (_) {
       // Best-effort — chat still works fine with just profile-based context.
     }
@@ -481,6 +540,24 @@ class _AiChatScreenState extends State<AiChatScreen> {
     ).firstMatch(content);
     final destination = match?.group(1)?.trim();
     return (destination == null || destination.isEmpty) ? null : destination;
+  }
+
+  /// Real places/restaurants the reply actually named — see
+  /// [extractBoldNames]'s doc comment for how the names themselves are
+  /// found; this just resolves each against [_knownPlacesByName]/
+  /// [_knownRestaurantsByName].
+  List<Object> _matchedKnownEntities(String content) {
+    final matches = <Object>[];
+    for (final name in extractBoldNames(content)) {
+      final place = _knownPlacesByName[name];
+      final restaurant = _knownRestaurantsByName[name];
+      if (place != null) {
+        matches.add(place);
+      } else if (restaurant != null) {
+        matches.add(restaurant);
+      }
+    }
+    return matches;
   }
 
   Set<String> _extractInterests(String text) {
@@ -656,10 +733,19 @@ class _AiChatScreenState extends State<AiChatScreen> {
                       itemBuilder: (context, i) {
                         if (i == chat.messages.length)
                           return const TypingIndicator();
-                        return ChatBubble(
-                          message: chat.messages[i],
-                          onOpenPlanner: () =>
-                              _generateFromChat(chat.messages[i]),
+                        final message = chat.messages[i];
+                        final matches = message.isUser || message.isError
+                            ? const <Object>[]
+                            : _matchedKnownEntities(message.content);
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            ChatBubble(
+                              message: message,
+                              onOpenPlanner: () => _generateFromChat(message),
+                            ),
+                            if (matches.isNotEmpty) _ChatEntityCardsRow(entities: matches, places: _places),
+                          ],
                         );
                       },
                     ),
@@ -808,6 +894,52 @@ class _GeneratingDialog extends StatelessWidget {
               }),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// A horizontal row of real place/restaurant cards under an assistant
+/// reply — see [_AiChatScreenState._matchedKnownEntities]'s doc comment.
+/// Each [entities] item is either a [Place] or a [Restaurant]; anything
+/// else is a programming error in that matcher, not a case to design
+/// around here.
+class _ChatEntityCardsRow extends StatelessWidget {
+  const _ChatEntityCardsRow({required this.entities, required this.places});
+
+  final List<Object> entities;
+  final PlacesService places;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+      child: SizedBox(
+        height: 190,
+        child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          itemCount: entities.length,
+          separatorBuilder: (_, _) => const SizedBox(width: AppSpacing.sm),
+          itemBuilder: (context, i) {
+            final entity = entities[i];
+            return switch (entity) {
+              Place place => PlaceCard(
+                place: place,
+                width: 160,
+                imageHeight: 100,
+                imageUrl: place.photoNames.isNotEmpty ? places.photoUrl(place.photoNames.first) : '',
+                onTap: () => showPlaceDetailsSheet(context, place: place, placesService: places),
+              ),
+              Restaurant restaurant => RestaurantCard(
+                restaurant: restaurant,
+                width: 160,
+                imageHeight: 100,
+                onTap: () => context.push(RoutePaths.restaurantDetails(restaurant.id)),
+              ),
+              Object() => const SizedBox.shrink(),
+            };
+          },
         ),
       ),
     );

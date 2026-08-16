@@ -23,6 +23,7 @@ import '../../core/widgets/details/details_gallery_app_bar.dart';
 import '../../core/widgets/details/info_stat_card.dart';
 import '../../core/widgets/details/map_preview.dart';
 import '../../core/widgets/details/review_section.dart';
+import '../../core/widgets/dialogs/emergency_access_sheet.dart';
 import '../../core/widgets/indicators/rating_widget.dart';
 import '../../core/widgets/layout/max_width_container.dart';
 import '../../core/widgets/layout/section_header.dart';
@@ -161,6 +162,11 @@ class _RestaurantDetailsBody extends StatelessWidget {
             isSaved: saved.isRestaurantSaved(restaurant.id),
             onToggleSaved: () => saved.toggleRestaurant(restaurant.id),
             onShare: () => Share.share(ShareText.forRestaurant(restaurant)),
+            onEmergency: () => showEmergencyAccessSheet(
+              context,
+              provinceId: restaurant.provinceId,
+              provinceName: restaurant.provinceName,
+            ),
             heroTag: 'restaurant-${restaurant.id}',
           ),
           SliverPadding(

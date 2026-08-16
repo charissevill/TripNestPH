@@ -33,6 +33,7 @@ import '../../core/utils/province_matcher.dart';
 import '../../core/utils/reminder_picker.dart';
 import '../../core/widgets/banners/offline_banner.dart';
 import '../../core/widgets/dialogs/confirmation_dialog.dart';
+import '../../core/widgets/dialogs/emergency_access_sheet.dart';
 import '../../core/widgets/cards/restaurant_card.dart';
 import '../../core/widgets/cards/travel_image_frame.dart';
 import '../../core/widgets/details/trip_route_map.dart';
@@ -45,6 +46,7 @@ import '../../data/repositories/restaurant_repository.dart';
 import '../../domain/models/expense.dart';
 import '../../domain/models/itinerary.dart';
 import '../../domain/models/packing_item.dart';
+import '../../domain/models/province.dart';
 import '../../domain/models/restaurant.dart';
 import '../../domain/models/saved_itinerary.dart';
 
@@ -84,6 +86,14 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
   bool _isAvailableOffline = false;
   List<Restaurant> _recommendedRestaurants = [];
   SavedItinerary? _savedItinerary;
+
+  /// Resolved lazily the first time the Emergency button is tapped, then
+  /// cached — [Itinerary] has no stored province reference (see
+  /// [_regenerate]'s doc comment), so this name-matches
+  /// [Itinerary.destinationName] against the same province list, with no
+  /// live Places call needed for what's meant to be a one-tap action.
+  Province? _emergencyProvince;
+  bool _resolvedEmergencyProvince = false;
 
   /// Non-null once the traveler edits the trip's start date — re-fetched for
   /// that specific date range rather than trusting [Itinerary.weather],
@@ -429,6 +439,29 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
   /// itinerary via `pushReplacement` — same place, new content, without
   /// silently overwriting an already-saved trip or piling up a back-stack
   /// entry per regenerate.
+  /// Best-effort — an unresolved province just means [showEmergencyAccessSheet]
+  /// falls back to its nationwide-only view, never blocks opening it at all.
+  Future<void> _showEmergency() async {
+    if (!_resolvedEmergencyProvince) {
+      try {
+        final provinces = await ProvinceRepository().getAll();
+        _emergencyProvince = matchProvinceByAddress(
+          widget.itinerary.destinationName,
+          provinces,
+        );
+      } catch (_) {
+        _emergencyProvince = null;
+      }
+      _resolvedEmergencyProvince = true;
+    }
+    if (!mounted) return;
+    showEmergencyAccessSheet(
+      context,
+      provinceId: _emergencyProvince?.id,
+      provinceName: _emergencyProvince?.name,
+    );
+  }
+
   Future<void> _regenerate() async {
     setState(() => _regenerating = true);
     try {
@@ -969,6 +1002,15 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
                         onTap: () => context.pop(),
                       ),
                     ),
+                    actions: [
+                      Padding(
+                        padding: const EdgeInsets.only(right: AppSpacing.md),
+                        child: _CircleButton(
+                          icon: Symbols.emergency_rounded,
+                          onTap: _showEmergency,
+                        ),
+                      ),
+                    ],
                     flexibleSpace: FlexibleSpaceBar(
                       collapseMode: CollapseMode.pin,
                       background: Stack(

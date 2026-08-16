@@ -20,6 +20,7 @@ import '../../core/widgets/buttons/animated_button.dart';
 import '../../core/widgets/cards/destination_card.dart';
 import '../../core/widgets/cards/tag_chip.dart';
 import '../../core/widgets/details/details_gallery_app_bar.dart';
+import '../../core/widgets/dialogs/emergency_access_sheet.dart';
 import '../../core/widgets/details/info_stat_card.dart';
 import '../../core/widgets/details/map_preview.dart';
 import '../../core/widgets/details/review_section.dart';
@@ -160,6 +161,11 @@ class _FestivalDetailsBody extends StatelessWidget {
             isSaved: saved.isFestivalSaved(festival.id),
             onToggleSaved: () => saved.toggleFestival(festival.id),
             onShare: () => Share.share(ShareText.forFestival(festival)),
+            onEmergency: () => showEmergencyAccessSheet(
+              context,
+              provinceId: festival.provinceId,
+              provinceName: festival.provinceName,
+            ),
             heroTag: 'festival-${festival.id}',
           ),
           SliverPadding(

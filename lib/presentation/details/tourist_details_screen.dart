@@ -24,6 +24,7 @@ import '../../core/widgets/cards/tag_chip.dart';
 import '../../core/widgets/carousels/nearby_places_section.dart';
 import '../../core/widgets/details/current_weather_card.dart';
 import '../../core/widgets/details/details_gallery_app_bar.dart';
+import '../../core/widgets/dialogs/emergency_access_sheet.dart';
 import '../../core/widgets/details/info_stat_card.dart';
 import '../../core/widgets/details/map_preview.dart';
 import '../../core/widgets/details/review_section.dart';
@@ -173,6 +174,11 @@ class _TouristDetailsBody extends StatelessWidget {
             isSaved: saved.isDestinationSaved(destination.id),
             onToggleSaved: () => saved.toggleDestination(destination.id),
             onShare: () => Share.share(ShareText.forDestination(destination)),
+            onEmergency: () => showEmergencyAccessSheet(
+              context,
+              provinceId: destination.provinceId,
+              provinceName: destination.provinceName,
+            ),
             heroTag: 'destination-${destination.id}',
           ),
           SliverPadding(

@@ -19,6 +19,7 @@ class DetailsGalleryAppBar extends StatefulWidget {
     this.isSaved,
     this.onToggleSaved,
     required this.onShare,
+    this.onEmergency,
     this.heroTag,
     this.expandedHeight = 340,
   });
@@ -31,6 +32,12 @@ class DetailsGalleryAppBar extends StatefulWidget {
   final bool? isSaved;
   final VoidCallback? onToggleSaved;
   final VoidCallback onShare;
+
+  /// Opens [showEmergencyAccessSheet] — null hides the button entirely (a
+  /// listing whose province couldn't be resolved at all, not just one with
+  /// no hotlines on file; the sheet itself already has a nationwide
+  /// fallback for that case).
+  final VoidCallback? onEmergency;
   final Object? heroTag;
   final double expandedHeight;
 
@@ -68,6 +75,10 @@ class _DetailsGalleryAppBarState extends State<DetailsGalleryAppBar> with AutoAd
       ),
       title: Text(widget.title, maxLines: 1, overflow: TextOverflow.ellipsis),
       actions: [
+        if (widget.onEmergency != null) ...[
+          _CircleIconButton(icon: Symbols.emergency_rounded, onTap: widget.onEmergency!),
+          const SizedBox(width: AppSpacing.sm),
+        ],
         _CircleIconButton(icon: Symbols.ios_share_rounded, onTap: widget.onShare),
         if (widget.isSaved != null && widget.onToggleSaved != null) ...[
           const SizedBox(width: AppSpacing.sm),

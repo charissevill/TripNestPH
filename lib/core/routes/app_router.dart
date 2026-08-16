@@ -39,7 +39,6 @@ import '../../presentation/onboarding/onboarding_screen.dart';
 import '../../presentation/festivals/upcoming_festivals_screen.dart';
 import '../../presentation/places/nearby_places_screen.dart';
 import '../../presentation/profile/edit_profile_screen.dart';
-import '../../presentation/profile/my_photos_screen.dart';
 import '../../presentation/profile/profile_screen.dart';
 import '../../presentation/profile/recently_viewed_screen.dart';
 import '../../presentation/saved/saved_screen.dart';
@@ -149,10 +148,6 @@ GoRouter buildAppRouter(AuthProvider authProvider) {
       GoRoute(
         path: RoutePaths.recentlyViewed,
         builder: (context, state) => const RecentlyViewedScreen(),
-      ),
-      GoRoute(
-        path: RoutePaths.myPhotos,
-        builder: (context, state) => const MyPhotosScreen(),
       ),
       GoRoute(
         path: RoutePaths.savedItineraries,

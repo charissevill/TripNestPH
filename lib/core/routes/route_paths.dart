@@ -28,7 +28,6 @@ class RoutePaths {
   static const String notifications = '/notifications';
   static const String editProfile = '/profile/edit';
   static const String recentlyViewed = '/profile/recently-viewed';
-  static const String myPhotos = '/profile/my-photos';
   static String legalInfo(String topicKey) => '/settings/legal/$topicKey';
   static const String legalInfoPattern = '/settings/legal/:topicKey';
   static const String faq = '/settings/faq';

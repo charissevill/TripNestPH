@@ -395,14 +395,6 @@ service cloud.firestore {
       allow update: if isSignedIn() && resource.data.userId == request.auth.uid && onlyChangedFields(['name']);
     }
 
-    // ---- trip_photos/{id} — private "My Photos" travel journal -----------
-    // Same shape as favorites above, minus the admin-read exception: no
-    // admin/dashboard use case for a personal photo journal.
-    match /trip_photos/{photoId} {
-      allow read, delete: if isSignedIn() && resource.data.userId == request.auth.uid;
-      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
-    }
-
     // ---- saved_itineraries/{id} — owner + shared-trip collaborators ------
     // Admin Portal accounts get read access too, for the Analytics
     // "Saved Trips" trend — never write.

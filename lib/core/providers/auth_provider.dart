@@ -8,12 +8,10 @@ import '../../data/repositories/favorites_repository.dart';
 import '../../data/repositories/itinerary_repository.dart';
 import '../../data/repositories/notification_repository.dart';
 import '../../data/repositories/review_repository.dart';
-import '../../data/repositories/trip_photo_repository.dart';
 import '../../data/repositories/user_repository.dart';
 import '../../domain/models/admin_user.dart';
 import '../../domain/models/app_user.dart';
 import '../services/auth_service.dart';
-import '../services/storage_service.dart';
 import '../utils/app_exception.dart';
 import '../utils/view_status.dart';
 
@@ -28,18 +26,14 @@ class AuthProvider extends ChangeNotifier {
     ItineraryRepository? itineraryRepository,
     ReviewRepository? reviewRepository,
     AdminRepository? adminRepository,
-    TripPhotoRepository? tripPhotoRepository,
     NotificationRepository? notificationRepository,
-    StorageService? storageService,
   })  : _authService = authService ?? AuthService(),
         _userRepository = userRepository ?? UserRepository(),
         _favoritesRepositoryOverride = favoritesRepository,
         _itineraryRepositoryOverride = itineraryRepository,
         _reviewRepositoryOverride = reviewRepository,
         _adminRepositoryOverride = adminRepository,
-        _tripPhotoRepositoryOverride = tripPhotoRepository,
-        _notificationRepositoryOverride = notificationRepository,
-        _storageServiceOverride = storageService {
+        _notificationRepositoryOverride = notificationRepository {
     _authSubscription = _authService.authStateChanges.listen(
       _onAuthStateChanged,
       // Without this, a stream error (unlikely, but possible from the
@@ -65,16 +59,12 @@ class AuthProvider extends ChangeNotifier {
   final ItineraryRepository? _itineraryRepositoryOverride;
   final ReviewRepository? _reviewRepositoryOverride;
   final AdminRepository? _adminRepositoryOverride;
-  final TripPhotoRepository? _tripPhotoRepositoryOverride;
   final NotificationRepository? _notificationRepositoryOverride;
-  final StorageService? _storageServiceOverride;
   FavoritesRepository? _favoritesRepositoryInstance;
   ItineraryRepository? _itineraryRepositoryInstance;
   ReviewRepository? _reviewRepositoryInstance;
   AdminRepository? _adminRepositoryInstance;
-  TripPhotoRepository? _tripPhotoRepositoryInstance;
   NotificationRepository? _notificationRepositoryInstance;
-  StorageService? _storageServiceInstance;
 
   FavoritesRepository get _favoritesRepository =>
       _favoritesRepositoryOverride ?? (_favoritesRepositoryInstance ??= FavoritesRepository());
@@ -82,11 +72,8 @@ class AuthProvider extends ChangeNotifier {
       _itineraryRepositoryOverride ?? (_itineraryRepositoryInstance ??= ItineraryRepository());
   ReviewRepository get _reviewRepository => _reviewRepositoryOverride ?? (_reviewRepositoryInstance ??= ReviewRepository());
   AdminRepository get _adminRepository => _adminRepositoryOverride ?? (_adminRepositoryInstance ??= AdminRepository());
-  TripPhotoRepository get _tripPhotoRepository =>
-      _tripPhotoRepositoryOverride ?? (_tripPhotoRepositoryInstance ??= TripPhotoRepository());
   NotificationRepository get _notificationRepository =>
       _notificationRepositoryOverride ?? (_notificationRepositoryInstance ??= NotificationRepository());
-  StorageService get _storageService => _storageServiceOverride ?? (_storageServiceInstance ??= StorageService());
 
   late final StreamSubscription<User?> _authSubscription;
   StreamSubscription<AppUser?>? _profileSubscription;
@@ -299,11 +286,6 @@ class AuthProvider extends ChangeNotifier {
         for (final review in reviews) {
           await _reviewRepository.deleteReview(review);
         }
-        final photos = await _tripPhotoRepository.getAllForUser(uid);
-        for (final photo in photos) {
-          await _storageService.deleteByUrl(photo.photoUrl);
-        }
-        await _tripPhotoRepository.deleteAllForUser(uid);
         await _notificationRepository.deleteAllForUser(uid);
         await _favoritesRepository.deleteAllForUser(uid);
         await _itineraryRepository.deleteAllForUser(uid);

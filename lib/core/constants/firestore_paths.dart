@@ -21,7 +21,6 @@ class FirestorePaths {
   static const String businesses = 'businesses';
   static const String reviewReports = 'review_reports';
   static const String contentReports = 'content_reports';
-  static const String tripPhotos = 'trip_photos';
   static const String searchTrends = 'search_trends';
   static const String analyticsSnapshots = 'analytics_snapshots';
 
@@ -37,5 +36,4 @@ class FirestorePaths {
   static const String storageReviewPhotos = 'review_photos';
   static const String storageDestinationPhotos = 'destination_photos';
   static const String storageBusinessGallery = 'business_gallery';
-  static const String storageTripPhotos = 'trip_photos';
 }

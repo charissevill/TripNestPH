@@ -47,14 +47,6 @@ service firebase.storage {
       allow write: if isOwner(userId) && isImage() && request.resource.size < 5 * 1024 * 1024;
     }
 
-    // "My Photos" travel journal — private per-user, same owner-write shape
-    // as review_photos above, but reads are owner-only too (never a public
-    // gallery, unlike reviews).
-    match /trip_photos/{userId}/{fileName} {
-      allow read: if isOwner(userId);
-      allow write: if isOwner(userId) && isImage() && request.resource.size < 5 * 1024 * 1024;
-    }
-
     // Destination/festival photos are managed from the Admin Portal
     // (tourist spots and festivals by admin/lgu) — matches firestore.rules'
     // write permissions for those same collections. Reads stay open to any

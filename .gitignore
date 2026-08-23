@@ -1,5 +1,7 @@
 # Environment secrets — never commit real API keys.
 .env
+extensions/*.env
+extensions/*.secret.local
 
 # Miscellaneous
 *.class
@@ -46,6 +48,7 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+/android/build/
 
 # Node (Cloud Functions)
 functions/node_modules/

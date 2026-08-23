@@ -8,14 +8,16 @@ import '../../domain/models/poll.dart';
 /// group votes ("Which restaurant for Day 2?") among the trip's owner and
 /// collaborators.
 class PollRepository {
-  PollRepository({FirebaseFirestore? firestore}) : _db = firestore ?? FirebaseFirestore.instance;
+  PollRepository({FirebaseFirestore? firestore})
+    : _db = firestore ?? FirebaseFirestore.instance;
 
   final FirebaseFirestore _db;
 
-  CollectionReference<Map<String, dynamic>> _collection(String itineraryId) => _db
-      .collection(FirestorePaths.savedItineraries)
-      .doc(itineraryId)
-      .collection(FirestorePaths.polls);
+  CollectionReference<Map<String, dynamic>> _collection(String itineraryId) =>
+      _db
+          .collection(FirestorePaths.savedItineraries)
+          .doc(itineraryId)
+          .collection(FirestorePaths.polls);
 
   Stream<List<Poll>> streamForItinerary(String itineraryId) {
     return _collection(itineraryId)
@@ -56,13 +58,39 @@ class PollRepository {
     required int optionIndex,
   }) async {
     try {
-      await _collection(itineraryId).doc(pollId).update({'votes.$uid': optionIndex});
+      await _collection(
+        itineraryId,
+      ).doc(pollId).update({'votes.$uid': optionIndex});
     } catch (e) {
       throw AppException.from(e);
     }
   }
 
-  Future<void> delete({required String itineraryId, required String pollId}) async {
+  /// Edits a poll's question/options — clears [Poll.votes] in the same
+  /// write, since a shifted or removed option would leave existing votes
+  /// pointing at the wrong index (or none at all). Matches
+  /// firestore.rules' `polls` update rule, which requires the same reset.
+  Future<void> update({
+    required String itineraryId,
+    required String pollId,
+    required String question,
+    required List<String> options,
+  }) async {
+    try {
+      await _collection(itineraryId).doc(pollId).update({
+        'question': question,
+        'options': options,
+        'votes': const {},
+      });
+    } catch (e) {
+      throw AppException.from(e);
+    }
+  }
+
+  Future<void> delete({
+    required String itineraryId,
+    required String pollId,
+  }) async {
     try {
       await _collection(itineraryId).doc(pollId).delete();
     } catch (e) {

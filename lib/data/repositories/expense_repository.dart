@@ -7,20 +7,24 @@ import '../../domain/models/expense.dart';
 /// Firestore access for a saved itinerary's `expenses` subcollection —
 /// actual spend logged against its AI-generated budget breakdown.
 class ExpenseRepository {
-  ExpenseRepository({FirebaseFirestore? firestore}) : _db = firestore ?? FirebaseFirestore.instance;
+  ExpenseRepository({FirebaseFirestore? firestore})
+    : _db = firestore ?? FirebaseFirestore.instance;
 
   final FirebaseFirestore _db;
 
-  CollectionReference<Map<String, dynamic>> _collection(String itineraryId) => _db
-      .collection(FirestorePaths.savedItineraries)
-      .doc(itineraryId)
-      .collection(FirestorePaths.expenses);
+  CollectionReference<Map<String, dynamic>> _collection(String itineraryId) =>
+      _db
+          .collection(FirestorePaths.savedItineraries)
+          .doc(itineraryId)
+          .collection(FirestorePaths.expenses);
 
   Stream<List<Expense>> streamForItinerary(String itineraryId) {
     return _collection(itineraryId)
         .orderBy('createdAt', descending: true)
         .snapshots()
-        .map((s) => s.docs.map((d) => Expense.fromMap(d.id, d.data())).toList());
+        .map(
+          (s) => s.docs.map((d) => Expense.fromMap(d.id, d.data())).toList(),
+        );
   }
 
   Future<void> add({
@@ -48,7 +52,33 @@ class ExpenseRepository {
     }
   }
 
-  Future<void> delete({required String itineraryId, required String expenseId}) async {
+  /// `loggedBy` is deliberately not editable here — matches
+  /// firestore.rules' `expenses` update rule, which only lets it through
+  /// when the resulting doc's `loggedBy` still equals the caller's own uid.
+  Future<void> update({
+    required String itineraryId,
+    required String expenseId,
+    required String category,
+    required double amount,
+    required String note,
+    List<String> splitBetween = const [],
+  }) async {
+    try {
+      await _collection(itineraryId).doc(expenseId).update({
+        'category': category,
+        'amount': amount,
+        'note': note,
+        'splitBetween': splitBetween,
+      });
+    } catch (e) {
+      throw AppException.from(e);
+    }
+  }
+
+  Future<void> delete({
+    required String itineraryId,
+    required String expenseId,
+  }) async {
     try {
       await _collection(itineraryId).doc(expenseId).delete();
     } catch (e) {

@@ -11,6 +11,7 @@ class RoutePaths {
   static const String register = '/register';
   static const String forgotPassword = '/forgot-password';
   static const String verifyEmail = '/verify-email';
+  static const String businessOwnerApplication = '/business-owner-application';
 
   // Bottom-nav shell branches.
   static const String home = '/home';
@@ -23,6 +24,14 @@ class RoutePaths {
   static const String search = '/search';
   static const String settings = '/settings';
   static const String generatedItinerary = '/planner/itinerary';
+  static const String manualItinerary = '/planner/manual';
+
+  // Deep links into a specific section of the itinerary screen — same
+  // extra-passed itinerary/savedId as [generatedItinerary], just opened
+  // pre-scrolled to that section instead of the top.
+  static const String tripExpenses = '/planner/itinerary/expenses';
+  static const String tripPacking = '/planner/itinerary/packing';
+  static const String tripPolls = '/planner/itinerary/polls';
   static const String aiChat = '/ai-chat';
   static const String savedItineraries = '/saved-itineraries';
   static const String notifications = '/notifications';
@@ -54,6 +63,7 @@ class RoutePaths {
   static const String adminBulkImport = '/admin/bulk-import';
   static const String adminBulkProvinceContent = '/admin/bulk-province-content';
   static const String myBusiness = '/my-business';
+  static const String adminBusinessOwnerApplications = '/admin/business-owner-applications';
 
   // Detail routes, parameterized by id.
   static String destinationDetails(String id) => '/destination/$id';

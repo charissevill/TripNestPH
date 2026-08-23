@@ -8,8 +8,22 @@
         "rules": [
           "tripnest-ph.firebasestorage.app"
         ]
+      },
+      "hosting": {
+        "traveler": [
+          "tripnest-ph"
+        ],
+        "admin": [
+          "tripnest-ph-admin"
+        ]
       }
     }
   },
-  "etags": {}
+  "etags": {
+    "tripnest-ph": {
+      "extensionInstances": {
+        "firestore-send-email": "7c74973948e491182e303e7e311c239d10ddb780a7aa2313c37eefe7f9d590d9"
+      }
+    }
+  }
 }

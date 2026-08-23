@@ -7,6 +7,7 @@ import '../../presentation/admin/admin_broadcast_screen.dart';
 import '../../presentation/admin/admin_bulk_import_screen.dart';
 import '../../presentation/admin/admin_bulk_province_content_screen.dart';
 import '../../presentation/admin/admin_business_list_screen.dart';
+import '../../presentation/admin/admin_business_owner_applications_screen.dart';
 import '../../presentation/admin/admin_festival_form_screen.dart';
 import '../../presentation/admin/admin_festival_list_screen.dart';
 import '../../presentation/admin/admin_home_screen.dart';
@@ -22,6 +23,8 @@ import '../../domain/models/festival.dart';
 import '../../presentation/ai_chat/ai_chat_screen.dart';
 import '../../presentation/ai_planner/ai_planner_screen.dart';
 import '../../presentation/ai_planner/generated_itinerary_screen.dart';
+import '../../presentation/ai_planner/manual_itinerary_screen.dart';
+import '../../presentation/auth/business_owner_application_screen.dart';
 import '../../presentation/auth/forgot_password_screen.dart';
 import '../../presentation/auth/login_screen.dart';
 import '../../presentation/auth/register_screen.dart';
@@ -63,6 +66,13 @@ const _authOnlyRoutes = {
   RoutePaths.forgotPassword,
 };
 
+// Reachable while signed in but not yet verified — everything else bounces
+// to verifyEmail (see the redirect logic below).
+const _preVerifyRoutes = {
+  RoutePaths.verifyEmail,
+  RoutePaths.businessOwnerApplication,
+};
+
 /// Builds the app's [GoRouter], wiring [authProvider] in as
 /// `refreshListenable` so navigation reacts live to sign-in/sign-out and
 /// email-verification state — the single place that decides whether a
@@ -84,9 +94,14 @@ GoRouter buildAppRouter(AuthProvider authProvider) {
         return _authOnlyRoutes.contains(location) ? null : RoutePaths.login;
       }
       if (!verified) {
-        return location == RoutePaths.verifyEmail
-            ? null
-            : RoutePaths.verifyEmail;
+        // BusinessOwnerApplicationScreen sits between a successful
+        // register() and Verify Email when "Business Owner" was picked on
+        // the sign-up form itself (see RegisterScreen._submit) — an
+        // unverified account is exactly the state that runs in, so it
+        // needs the same pass-through verifyEmail itself already gets, or
+        // this redirect would bounce straight back to Verify Email before
+        // it ever renders.
+        return _preVerifyRoutes.contains(location) ? null : RoutePaths.verifyEmail;
       }
       if (_authOnlyRoutes.contains(location) ||
           location == RoutePaths.verifyEmail) {
@@ -109,7 +124,7 @@ GoRouter buildAppRouter(AuthProvider authProvider) {
       ),
       GoRoute(
         path: RoutePaths.register,
-        builder: (context, state) => const RegisterScreen(),
+        builder: (context, state) => RegisterScreen(wantsBusinessOwner: state.extra == true),
       ),
       GoRoute(
         path: RoutePaths.forgotPassword,
@@ -118,6 +133,10 @@ GoRouter buildAppRouter(AuthProvider authProvider) {
       GoRoute(
         path: RoutePaths.verifyEmail,
         builder: (context, state) => const VerifyEmailScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.businessOwnerApplication,
+        builder: (context, state) => const BusinessOwnerApplicationScreen(),
       ),
       GoRoute(
         path: RoutePaths.search,
@@ -166,6 +185,10 @@ GoRouter buildAppRouter(AuthProvider authProvider) {
         builder: (context, state) => const AiChatScreen(),
       ),
       GoRoute(
+        path: RoutePaths.manualItinerary,
+        builder: (context, state) => const ManualItineraryScreen(),
+      ),
+      GoRoute(
         path: RoutePaths.generatedItinerary,
         builder: (context, state) {
           final extra = state.extra as Map<String, dynamic>?;
@@ -175,6 +198,39 @@ GoRouter buildAppRouter(AuthProvider authProvider) {
             // instead of silently substituting sample trip data.
             itinerary: extra?['itinerary'] as Itinerary,
             savedItineraryId: extra?['savedId'] as String?,
+          );
+        },
+      ),
+      GoRoute(
+        path: RoutePaths.tripExpenses,
+        builder: (context, state) {
+          final extra = state.extra as Map<String, dynamic>?;
+          return GeneratedItineraryScreen(
+            itinerary: extra?['itinerary'] as Itinerary,
+            savedItineraryId: extra?['savedId'] as String?,
+            initialSection: ItinerarySection.budget,
+          );
+        },
+      ),
+      GoRoute(
+        path: RoutePaths.tripPacking,
+        builder: (context, state) {
+          final extra = state.extra as Map<String, dynamic>?;
+          return GeneratedItineraryScreen(
+            itinerary: extra?['itinerary'] as Itinerary,
+            savedItineraryId: extra?['savedId'] as String?,
+            initialSection: ItinerarySection.packing,
+          );
+        },
+      ),
+      GoRoute(
+        path: RoutePaths.tripPolls,
+        builder: (context, state) {
+          final extra = state.extra as Map<String, dynamic>?;
+          return GeneratedItineraryScreen(
+            itinerary: extra?['itinerary'] as Itinerary,
+            savedItineraryId: extra?['savedId'] as String?,
+            initialSection: ItinerarySection.polls,
           );
         },
       ),
@@ -282,6 +338,10 @@ GoRouter buildAppRouter(AuthProvider authProvider) {
       GoRoute(
         path: RoutePaths.adminBulkProvinceContent,
         builder: (context, state) => const AdminBulkProvinceContentScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.adminBusinessOwnerApplications,
+        builder: (context, state) => const AdminBusinessOwnerApplicationsScreen(),
       ),
       GoRoute(
         path: RoutePaths.adminTeam,

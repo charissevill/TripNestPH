@@ -249,7 +249,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
       priceTier: _priceTier,
       maxDistanceKm: _maxDistanceKm,
       accessibilityTag: _accessibilityTag,
-      onApply: (regionId, provinceId, r, priceTier, maxDistanceKm, accessibilityTag) => setState(() {
+      showCategoryFilter: false,
+      onApply: (regionId, provinceId, r, priceTier, maxDistanceKm, accessibilityTag, _) => setState(() {
         _regionId = regionId;
         _provinceId = provinceId;
         final matches = _provinces.where((p) => p.id == provinceId);
@@ -626,6 +627,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                     ),
                   ),
                 ),
+                const SizedBox(width: AppSpacing.xs),
                 Padding(
                   padding: EdgeInsets.only(right: sidePadding),
                   child: IconButton(

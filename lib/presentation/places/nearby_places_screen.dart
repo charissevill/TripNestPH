@@ -38,7 +38,17 @@ const _categories = [
   _CategoryOption(
     label: 'Attractions',
     searchPhrase: 'tourist attractions',
-    includedTypes: PlaceCategory.attractions,
+    includedTypes: PlaceCategory.sightseeing,
+  ),
+  _CategoryOption(
+    label: 'Landmarks',
+    searchPhrase: 'historical landmarks',
+    includedTypes: PlaceCategory.landmarks,
+  ),
+  _CategoryOption(
+    label: 'Museums',
+    searchPhrase: 'museums',
+    includedTypes: PlaceCategory.museums,
   ),
   _CategoryOption(label: 'Beaches', searchPhrase: 'beaches'),
   _CategoryOption(
@@ -47,9 +57,24 @@ const _categories = [
     includedTypes: PlaceCategory.lodging,
   ),
   _CategoryOption(
-    label: 'Dining',
-    searchPhrase: 'restaurants and cafes',
-    includedTypes: PlaceCategory.dining,
+    label: 'Resorts',
+    searchPhrase: 'resorts',
+    includedTypes: PlaceCategory.resorts,
+  ),
+  _CategoryOption(
+    label: 'Hostels',
+    searchPhrase: 'hostels',
+    includedTypes: PlaceCategory.hostels,
+  ),
+  _CategoryOption(
+    label: 'Restaurants',
+    searchPhrase: 'restaurants',
+    includedTypes: PlaceCategory.restaurants,
+  ),
+  _CategoryOption(
+    label: 'Cafes',
+    searchPhrase: 'cafes',
+    includedTypes: PlaceCategory.cafes,
   ),
   _CategoryOption(
     label: 'Shopping',

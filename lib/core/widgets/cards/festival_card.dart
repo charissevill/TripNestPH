@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:provider/provider.dart';
 
 import '../../../domain/models/festival.dart';
@@ -44,13 +45,14 @@ class FestivalCard extends StatelessWidget {
             TravelImageFrame(
               imageUrl: festival.heroImageUrl,
               height: imageHeight,
+              emptyIcon: Symbols.celebration_rounded,
               topLeft: _DateBadge(month: festival.month, day: day),
               topRight: BookmarkButton(isSaved: isSaved, onTap: () => saved.toggleFestival(festival.id)),
               bottomLeft: festival.isUpcoming ? TagChip(label: 'Upcoming', color: theme.colorScheme.primary) : null,
               bottomRight: RatingBadge(rating: festival.rating),
             ),
             const SizedBox(height: AppSpacing.sm),
-            Text(festival.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: theme.textTheme.titleMedium),
+            Text(festival.name, maxLines: 2, overflow: TextOverflow.ellipsis, style: theme.textTheme.titleMedium),
             const SizedBox(height: 2),
             Text(
               '${festival.provinceName} · ${festival.dateLabel}',

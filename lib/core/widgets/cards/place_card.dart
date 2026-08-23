@@ -46,13 +46,19 @@ class PlaceCard extends StatelessWidget {
             TravelImageFrame(
               imageUrl: imageUrl,
               height: imageHeight,
-              topLeft: TagChip(label: place.categoryLabel, color: theme.colorScheme.primary),
+              topLeft: TagChip(
+                label: place.categoryLabel,
+                color: place.categoryColor,
+              ),
               // Signals "live web result" vs. an in-app catalog listing, same
               // reasoning as `_SearchResultTile`'s globe icon in search_screen.dart.
               topRight: Container(
                 width: 28,
                 height: 28,
-                decoration: const BoxDecoration(color: Colors.black26, shape: BoxShape.circle),
+                decoration: const BoxDecoration(
+                  color: Colors.black26,
+                  shape: BoxShape.circle,
+                ),
                 child: const Icon(
                   Symbols.public_rounded,
                   size: 16,
@@ -63,9 +69,20 @@ class PlaceCard extends StatelessWidget {
                   ? Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Symbols.near_me_rounded, size: 14, color: Colors.white),
+                        const Icon(
+                          Symbols.near_me_rounded,
+                          size: 14,
+                          color: Colors.white,
+                        ),
                         const SizedBox(width: 2),
-                        Text(_distanceLabel(place.distanceMeters!), style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600)),
+                        Text(
+                          _distanceLabel(place.distanceMeters!),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                       ],
                     )
                   : null,
@@ -75,7 +92,12 @@ class PlaceCard extends StatelessWidget {
               ),
             ),
             const SizedBox(height: AppSpacing.sm),
-            Text(place.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: theme.textTheme.titleMedium),
+            Text(
+              place.name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.titleMedium,
+            ),
           ],
         ),
       ),

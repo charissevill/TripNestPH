@@ -20,6 +20,8 @@ class ActiveFilterChips extends StatelessWidget {
     this.onRemoveDistance,
     this.accessibilityTag,
     this.onRemoveAccessibilityTag,
+    this.placeTypeFilter,
+    this.onRemovePlaceTypeFilter,
   });
 
   final String? provinceName;
@@ -33,12 +35,16 @@ class ActiveFilterChips extends StatelessWidget {
   final VoidCallback? onRemoveDistance;
   final String? accessibilityTag;
   final VoidCallback? onRemoveAccessibilityTag;
+  final PlaceTypeFilter? placeTypeFilter;
+  final VoidCallback? onRemovePlaceTypeFilter;
 
   @override
   Widget build(BuildContext context) {
     return Wrap(
       spacing: 8,
       children: [
+        if (placeTypeFilter != null)
+          Chip(label: Text(placeTypeFilter!.label), deleteIcon: const Icon(Symbols.close_rounded, size: 16), onDeleted: onRemovePlaceTypeFilter),
         if (provinceName != null)
           Chip(label: Text(provinceName!), deleteIcon: const Icon(Symbols.close_rounded, size: 16), onDeleted: onRemoveProvince),
         if (minRating != null)

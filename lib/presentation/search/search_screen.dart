@@ -198,12 +198,18 @@ class _SearchScreenState extends State<SearchScreen> {
   PriceTier? _priceTier;
   double? _maxDistanceKm;
   String? _accessibilityTag;
+  PlaceTypeFilter? _placeTypeFilter;
   // Resolved lazily, only once a distance filter is actually applied.
   Position? _userPosition;
   List<Region> _regions = [];
   List<Province> _provinces = [];
   bool get _hasFilters =>
-      _provinceId != null || _minRating != null || _priceTier != null || _maxDistanceKm != null || _accessibilityTag != null;
+      _provinceId != null ||
+      _minRating != null ||
+      _priceTier != null ||
+      _maxDistanceKm != null ||
+      _accessibilityTag != null ||
+      _placeTypeFilter != null;
 
   /// The traveler's own past search queries — real per-device history, not
   /// the four hardcoded strings this used to show every user.
@@ -400,7 +406,31 @@ class _SearchScreenState extends State<SearchScreen> {
   bool _matchesFilters(_SearchResult r) {
     return (_priceTier == null || r.priceTier == null || r.priceTier == _priceTier) &&
         withinDistance(lat: r.latitude, lng: r.longitude, origin: _userPosition, maxKm: _maxDistanceKm) &&
-        matchesAccessibilityTag(r.accessibilityTags, _accessibilityTag);
+        matchesAccessibilityTag(r.accessibilityTags, _accessibilityTag) &&
+        _matchesPlaceTypeFilter(r);
+  }
+
+  /// A curated restaurant is always "dining" and a curated festival is
+  /// always "festival" — only a live Places result ([_SearchResult.place])
+  /// needs its raw `types` checked against the picked bucket.
+  bool _matchesPlaceTypeFilter(_SearchResult r) {
+    final filter = _placeTypeFilter;
+    if (filter == null) return true;
+    switch (r.type) {
+      case _ResultType.restaurant:
+        return filter == PlaceTypeFilter.dining;
+      case _ResultType.festival:
+        return filter == PlaceTypeFilter.festival;
+      case _ResultType.place:
+        final types = r.place?.types ?? const [];
+        final includedTypes = switch (filter) {
+          PlaceTypeFilter.attraction => PlaceCategory.attractions,
+          PlaceTypeFilter.dining => PlaceCategory.dining,
+          PlaceTypeFilter.lodging => PlaceCategory.lodging,
+          PlaceTypeFilter.festival => const <String>[],
+        };
+        return types.any(includedTypes.contains);
+    }
   }
 
   Future<void> _runSearch(String query) async {
@@ -599,7 +629,8 @@ class _SearchScreenState extends State<SearchScreen> {
       priceTier: _priceTier,
       maxDistanceKm: _maxDistanceKm,
       accessibilityTag: _accessibilityTag,
-      onApply: (regionId, provinceId, r, priceTier, maxDistanceKm, accessibilityTag) {
+      placeTypeFilter: _placeTypeFilter,
+      onApply: (regionId, provinceId, r, priceTier, maxDistanceKm, accessibilityTag, placeTypeFilter) {
         setState(() {
           _regionId = regionId;
           _provinceId = provinceId;
@@ -607,6 +638,7 @@ class _SearchScreenState extends State<SearchScreen> {
           _priceTier = priceTier;
           _maxDistanceKm = maxDistanceKm;
           _accessibilityTag = accessibilityTag;
+          _placeTypeFilter = placeTypeFilter;
         });
       },
     );
@@ -658,6 +690,11 @@ class _SearchScreenState extends State<SearchScreen> {
     _rerunAfterFilterChange();
   }
 
+  void _removePlaceTypeFilter() {
+    setState(() => _placeTypeFilter = null);
+    _rerunAfterFilterChange();
+  }
+
   void _clearFilters() {
     setState(() {
       _regionId = null;
@@ -666,6 +703,7 @@ class _SearchScreenState extends State<SearchScreen> {
       _priceTier = null;
       _maxDistanceKm = null;
       _accessibilityTag = null;
+      _placeTypeFilter = null;
     });
     _rerunAfterFilterChange();
   }
@@ -832,6 +870,8 @@ class _SearchScreenState extends State<SearchScreen> {
                   onRemoveDistance: _removeDistanceFilter,
                   accessibilityTag: _accessibilityTag,
                   onRemoveAccessibilityTag: _removeAccessibilityTagFilter,
+                  placeTypeFilter: _placeTypeFilter,
+                  onRemovePlaceTypeFilter: _removePlaceTypeFilter,
                 ),
               ),
             Expanded(

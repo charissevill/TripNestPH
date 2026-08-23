@@ -23,6 +23,12 @@ Future<bool?> showSearchFilterSheet(
   PriceTier? priceTier,
   double? maxDistanceKm,
   String? accessibilityTag,
+  PlaceTypeFilter? placeTypeFilter,
+  // Explore already separates attractions/restaurants/festivals via its own
+  // tabs — showing this too would be a second, disconnected control for the
+  // same thing (Explore doesn't wire the picked value into anything). Search
+  // has no such tabs, so it's the one place this actually does something.
+  bool showCategoryFilter = true,
   required void Function(
     String? regionId,
     String? provinceId,
@@ -30,6 +36,7 @@ Future<bool?> showSearchFilterSheet(
     PriceTier? priceTier,
     double? maxDistanceKm,
     String? accessibilityTag,
+    PlaceTypeFilter? placeTypeFilter,
   )
   onApply,
 }) {
@@ -46,6 +53,8 @@ Future<bool?> showSearchFilterSheet(
       priceTier: priceTier,
       maxDistanceKm: maxDistanceKm,
       accessibilityTag: accessibilityTag,
+      placeTypeFilter: placeTypeFilter,
+      showCategoryFilter: showCategoryFilter,
       onApply: onApply,
     ),
   );
@@ -69,6 +78,8 @@ class SearchFilterSheet extends StatefulWidget {
     this.priceTier,
     this.maxDistanceKm,
     this.accessibilityTag,
+    this.placeTypeFilter,
+    this.showCategoryFilter = true,
     required this.onApply,
   });
 
@@ -80,6 +91,8 @@ class SearchFilterSheet extends StatefulWidget {
   final PriceTier? priceTier;
   final double? maxDistanceKm;
   final String? accessibilityTag;
+  final PlaceTypeFilter? placeTypeFilter;
+  final bool showCategoryFilter;
   final void Function(
     String? regionId,
     String? provinceId,
@@ -87,6 +100,7 @@ class SearchFilterSheet extends StatefulWidget {
     PriceTier? priceTier,
     double? maxDistanceKm,
     String? accessibilityTag,
+    PlaceTypeFilter? placeTypeFilter,
   )
   onApply;
 
@@ -101,6 +115,7 @@ class _SearchFilterSheetState extends State<SearchFilterSheet> {
   late PriceTier? _priceTier = widget.priceTier;
   late double? _maxDistanceKm = widget.maxDistanceKm;
   late String? _accessibilityTag = widget.accessibilityTag;
+  late PlaceTypeFilter? _placeTypeFilter = widget.placeTypeFilter;
 
   void _selectRegion(String regionId, bool selected) {
     setState(() {
@@ -150,7 +165,24 @@ class _SearchFilterSheetState extends State<SearchFilterSheet> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const SizedBox(height: AppSpacing.lg),
+                        if (widget.showCategoryFilter) ...[
+                          const SizedBox(height: AppSpacing.lg),
+                          Text('Category', style: theme.textTheme.titleSmall),
+                          const SizedBox(height: AppSpacing.sm),
+                          Wrap(
+                            spacing: AppSpacing.sm,
+                            runSpacing: AppSpacing.sm,
+                            children: PlaceTypeFilter.values.map((type) {
+                              final selected = _placeTypeFilter == type;
+                              return ChoiceChip(
+                                label: Text(type.label),
+                                selected: selected,
+                                onSelected: (v) => setState(() => _placeTypeFilter = v ? type : null),
+                              );
+                            }).toList(),
+                          ),
+                        ],
+                        const SizedBox(height: AppSpacing.xl),
                         Text('Region', style: theme.textTheme.titleSmall),
                         const SizedBox(height: AppSpacing.sm),
                         if (widget.regions.isEmpty)
@@ -258,6 +290,7 @@ class _SearchFilterSheetState extends State<SearchFilterSheet> {
                           _priceTier = null;
                           _maxDistanceKm = null;
                           _accessibilityTag = null;
+                          _placeTypeFilter = null;
                         }),
                         child: const Text('Reset'),
                       ),
@@ -266,7 +299,7 @@ class _SearchFilterSheetState extends State<SearchFilterSheet> {
                     Expanded(
                       child: FilledButton(
                         onPressed: () {
-                          widget.onApply(_regionId, _provinceId, _minRating, _priceTier, _maxDistanceKm, _accessibilityTag);
+                          widget.onApply(_regionId, _provinceId, _minRating, _priceTier, _maxDistanceKm, _accessibilityTag, _placeTypeFilter);
                           Navigator.of(context).pop(true);
                         },
                         child: const Text('Apply'),

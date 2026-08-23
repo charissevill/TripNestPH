@@ -36,6 +36,27 @@ PriceTier? priceTierFromPesoSigns(String priceRange) {
   return PriceTier.premium;
 }
 
+/// Coarse "what kind of result is this" filter for [SearchFilterSheet] —
+/// lets a traveler narrow a mixed curated+live-Places result list down to
+/// just attractions, just dining, etc., instead of scanning past whatever
+/// they're not looking for. Deliberately coarser than [Place.categoryLabel]'s
+/// Attraction/Landmark/Museum split (that granularity belongs to
+/// `NearbyPlacesScreen`'s dedicated category browser) — here it only needs
+/// to separate the result *kinds* this screen actually mixes together.
+enum PlaceTypeFilter {
+  attraction,
+  dining,
+  lodging,
+  festival;
+
+  String get label => switch (this) {
+    PlaceTypeFilter.attraction => 'Attractions',
+    PlaceTypeFilter.dining => 'Restaurants & Cafes',
+    PlaceTypeFilter.lodging => 'Hotels',
+    PlaceTypeFilter.festival => 'Festivals',
+  };
+}
+
 const List<double> kDistanceFilterOptionsKm = [5, 10, 25, 50];
 
 /// Unlike [withinDistance] or the price-tier helpers above, an item with no

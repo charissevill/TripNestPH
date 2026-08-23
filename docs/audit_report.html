@@ -1,0 +1,622 @@
+<!doctype html>
+<title>TripNest PH Findings</title>
+<style>
+  :root {
+    --bg: #f6f8fb;
+    --surface: #ffffff;
+    --surface-alt: #eef3f8;
+    --border: #d8e0ea;
+    --text: #16202b;
+    --text-muted: #55677a;
+    --accent: #1b7fb8;
+    --accent-soft: #e4f1fa;
+    --high: #c8433f;
+    --high-soft: #fbeaea;
+    --medium: #b5741a;
+    --medium-soft: #fbf1e2;
+    --low: #55677a;
+    --low-soft: #edf1f5;
+    --shadow: 0 1px 2px rgba(22,32,43,.05), 0 8px 24px -12px rgba(22,32,43,.12);
+    --serif: ui-serif, 'Iowan Old Style', 'Palatino Linotype', Georgia, 'Noto Serif', serif;
+    --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    --mono: ui-monospace, 'SF Mono', 'Cascadia Code', Consolas, 'Liberation Mono', monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0d141c;
+      --surface: #141f2b;
+      --surface-alt: #1a2532;
+      --border: #2a3a4a;
+      --text: #e7eef4;
+      --text-muted: #93a4b5;
+      --accent: #6dbeec;
+      --accent-soft: #142434;
+      --high: #ea7d78;
+      --high-soft: #2e1a1a;
+      --medium: #e0ab5f;
+      --medium-soft: #2e2313;
+      --low: #93a4b5;
+      --low-soft: #1a2430;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 12px 28px -12px rgba(0,0,0,.5);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0d141c;
+    --surface: #141f2b;
+    --surface-alt: #1a2532;
+    --border: #2a3a4a;
+    --text: #e7eef4;
+    --text-muted: #93a4b5;
+    --accent: #6dbeec;
+    --accent-soft: #142434;
+    --high: #ea7d78;
+    --high-soft: #2e1a1a;
+    --medium: #e0ab5f;
+    --medium-soft: #2e2313;
+    --low: #93a4b5;
+    --low-soft: #1a2430;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 12px 28px -12px rgba(0,0,0,.5);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 15px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+  h1, h2, h3 { font-family: var(--serif); font-weight: 600; text-wrap: balance; color: var(--text); }
+  code, .mono { font-family: var(--mono); }
+  a { color: var(--accent); }
+
+  /* ---------- header ---------- */
+  header.top {
+    position: sticky; top: 0; z-index: 20;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+  }
+  .top-inner {
+    max-width: 1180px; margin: 0 auto;
+    padding: 18px 28px;
+    display: flex; align-items: center; justify-content: space-between; gap: 24px;
+    flex-wrap: wrap;
+  }
+  .title-block h1 { margin: 0; font-size: 21px; letter-spacing: .1px; }
+  .title-block .eyebrow {
+    font-family: var(--sans); font-size: 11px; font-weight: 700; letter-spacing: .09em;
+    text-transform: uppercase; color: var(--accent); margin-bottom: 4px; display: block;
+  }
+  .stat-row { display: flex; gap: 10px; font-variant-numeric: tabular-nums; }
+  .stat {
+    background: var(--surface-alt); border: 1px solid var(--border); border-radius: 10px;
+    padding: 7px 14px; text-align: center; min-width: 64px;
+  }
+  .stat b { display: block; font-size: 19px; line-height: 1.1; font-family: var(--serif); }
+  .stat span { font-size: 10.5px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .06em; }
+  .stat.high b { color: var(--high); } .stat.medium b { color: var(--medium); } .stat.low b { color: var(--low); }
+
+  /* ---------- layout ---------- */
+  .layout { max-width: 1180px; margin: 0 auto; padding: 28px; display: grid; grid-template-columns: 220px 1fr; gap: 32px; align-items: start; }
+  @media (max-width: 860px) { .layout { grid-template-columns: 1fr; } aside { position: static !important; } }
+
+  aside {
+    position: sticky; top: 84px;
+    display: flex; flex-direction: column; gap: 22px;
+  }
+  .filter-group h3 {
+    font-family: var(--sans); font-size: 11px; font-weight: 700; letter-spacing: .08em;
+    text-transform: uppercase; color: var(--text-muted); margin: 0 0 8px 0;
+  }
+  .chip-list { display: flex; flex-direction: column; gap: 4px; }
+  .chip {
+    display: flex; align-items: center; gap: 8px;
+    border: 1px solid transparent; background: transparent;
+    border-radius: 8px; padding: 6px 8px; cursor: pointer;
+    font-size: 13.5px; color: var(--text); text-align: left; width: 100%;
+    font-family: var(--sans);
+  }
+  .chip:hover { background: var(--surface-alt); }
+  .chip .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+  .chip .count { margin-left: auto; font-variant-numeric: tabular-nums; color: var(--text-muted); font-size: 12px; }
+  .chip[aria-pressed="false"] { opacity: .42; }
+  .chip.sev-high .dot { background: var(--high); }
+  .chip.sev-medium .dot { background: var(--medium); }
+  .chip.sev-low .dot { background: var(--low); }
+  nav.jumplist { display: flex; flex-direction: column; gap: 2px; }
+  nav.jumplist a {
+    text-decoration: none; color: var(--text-muted); font-size: 13.5px; padding: 5px 8px; border-radius: 8px;
+  }
+  nav.jumplist a:hover { background: var(--surface-alt); color: var(--text); }
+
+  /* ---------- main ---------- */
+  main { min-width: 0; }
+  .lede {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+    padding: 20px 24px; margin-bottom: 28px; box-shadow: var(--shadow);
+  }
+  .lede p { margin: 0; color: var(--text-muted); max-width: 68ch; }
+  .lede p + p { margin-top: 8px; }
+
+  section.area { margin-bottom: 36px; scroll-margin-top: 84px; }
+  .area-head {
+    display: flex; align-items: baseline; gap: 10px; margin-bottom: 4px;
+    border-bottom: 2px solid var(--accent); padding-bottom: 8px;
+  }
+  .area-head h2 { margin: 0; font-size: 19px; }
+  .area-head .area-count { font-size: 12.5px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+  .area-scope { font-size: 12.5px; color: var(--text-muted); margin: 6px 0 16px 0; }
+
+  .card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+    padding: 13px 16px 14px 16px; margin-bottom: 10px;
+    border-left: 4px solid var(--low);
+    box-shadow: var(--shadow);
+  }
+  .card.sev-high { border-left-color: var(--high); }
+  .card.sev-medium { border-left-color: var(--medium); }
+  .card.sev-low { border-left-color: var(--low); }
+  .card-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 5px; }
+  .card-title { font-weight: 650; font-size: 14.5px; line-height: 1.35; }
+  .badge {
+    flex: none; font-family: var(--sans); font-size: 10.5px; font-weight: 700; letter-spacing: .05em;
+    text-transform: uppercase; padding: 3px 8px; border-radius: 999px; white-space: nowrap;
+  }
+  .badge.sev-high { background: var(--high-soft); color: var(--high); }
+  .badge.sev-medium { background: var(--medium-soft); color: var(--medium); }
+  .badge.sev-low { background: var(--low-soft); color: var(--low); }
+  .loc { display: inline-block; font-family: var(--mono); font-size: 11.5px; color: var(--accent); background: var(--accent-soft); border-radius: 6px; padding: 1px 7px; margin-bottom: 6px; }
+  .scenario { font-size: 13.3px; color: var(--text-muted); margin: 0; }
+  .scenario b { color: var(--text); font-weight: 600; }
+
+  .solid {
+    background: var(--accent-soft); border: 1px solid var(--border); border-radius: 10px;
+    padding: 12px 16px; font-size: 13px; color: var(--text-muted); margin-top: 6px;
+  }
+  .solid b { color: var(--text); }
+
+  footer { max-width: 1180px; margin: 20px auto 60px; padding: 0 28px; color: var(--text-muted); font-size: 12.5px; }
+</style>
+
+<body>
+
+<header class="top">
+  <div class="top-inner">
+    <div class="title-block">
+      <span class="eyebrow">TripNest PH &middot; Full-App Code Audit</span>
+      <h1>63 things worth fixing</h1>
+    </div>
+    <div class="stat-row">
+      <div class="stat"><b id="count-all">63</b><span>Total</span></div>
+      <div class="stat high"><b id="count-high">21</b><span>High</span></div>
+      <div class="stat medium"><b id="count-medium">32</b><span>Medium</span></div>
+      <div class="stat low"><b id="count-low">10</b><span>Low</span></div>
+    </div>
+  </div>
+</header>
+
+<div class="layout">
+  <aside>
+    <div class="filter-group">
+      <h3>Severity</h3>
+      <div class="chip-list" id="sev-filters">
+        <button class="chip sev-high" data-sev="high" aria-pressed="true"><span class="dot"></span>High<span class="count">21</span></button>
+        <button class="chip sev-medium" data-sev="medium" aria-pressed="true"><span class="dot"></span>Medium<span class="count">32</span></button>
+        <button class="chip sev-low" data-sev="low" aria-pressed="true"><span class="dot"></span>Low<span class="count">10</span></button>
+      </div>
+    </div>
+    <div class="filter-group">
+      <h3>Jump to area</h3>
+      <nav class="jumplist">
+        <a href="#auth">Auth &amp; Onboarding</a>
+        <a href="#home">Home / Explore / Search</a>
+        <a href="#details">Details, Reviews &amp; Favorites</a>
+        <a href="#ai">AI Planner &amp; Itineraries</a>
+        <a href="#profile">Profile, Settings &amp; Weather</a>
+        <a href="#admin">Admin &amp; Business Owner</a>
+      </nav>
+    </div>
+  </aside>
+
+  <main>
+    <div class="lede">
+      <p>Six areas of the app were read end-to-end &mdash; not just grepped &mdash; looking for real bugs, gaps, and inconsistencies: concrete file/line references and a specific failure scenario for each, not general advice. 63 findings survived that bar, sorted High &rarr; Low within each area below.</p>
+      <p>Toggle severities on the left to focus the list, or jump straight to an area.</p>
+    </div>
+
+    <!-- ============ AUTH ============ -->
+    <section class="area" id="auth">
+      <div class="area-head"><h2>Auth &amp; Onboarding</h2><span class="area-count">11 findings</span></div>
+      <p class="area-scope">Login, Register, Forgot Password, Verify Email, splash/onboarding, session &amp; router redirect logic.</p>
+
+      <div class="card sev-high" data-sev="high">
+        <div class="card-top"><div class="card-title">Firestore profile write failure after sign-in is silently swallowed &mdash; app gets stuck</div><span class="badge sev-high">High</span></div>
+        <span class="loc">auth_provider.dart:33,75-113</span>
+        <p class="scenario">The auth-state listener has no <code>onError</code> and the profile-create await isn't try/caught. <b>If it fails while briefly offline</b>, the user is Firebase-authenticated but stuck with a null profile, no error shown, no retry path.</p>
+      </div>
+      <div class="card sev-high" data-sev="high">
+        <div class="card-top"><div class="card-title">Verify Email screen never displays its own error message</div><span class="badge sev-high">High</span></div>
+        <span class="loc">verify_email_screen.dart (whole build)</span>
+        <p class="scenario">Unlike every other auth screen, this one has no <code>errorMessage</code> block. <b>Tapping "Resend Email" while rate-limited or offline</b> just stops the spinner &mdash; zero feedback that anything went wrong.</p>
+      </div>
+      <div class="card sev-high" data-sev="high">
+        <div class="card-top"><div class="card-title">Registration is non-atomic &mdash; a partial failure lies about sending the email</div><span class="badge sev-high">High</span></div>
+        <span class="loc">auth_service.dart:19-28</span>
+        <p class="scenario">Create-account &rarr; set-name &rarr; send-verification run as three sequential awaits. <b>If the network drops after account creation but before the send</b>, the router still redirects to "We sent a verification link to $email" &mdash; no email was ever sent.</p>
+      </div>
+      <div class="card sev-medium" data-sev="medium">
+        <div class="card-top"><div class="card-title">No re-entrancy guard, combined with an unconditional 4s poll timer</div><span class="badge sev-medium">Medium</span></div>
+        <span class="loc">auth_provider.dart:135-150 &middot; verify_email_screen.dart:32</span>
+        <p class="scenario"><b>On a slow connection</b>, the periodic verification check can fire again while the previous call is still in flight, racing a manual "I've verified" tap against the timer's own call.</p>
+      </div>
+      <div class="card sev-medium" data-sev="medium">
+        <div class="card-top"><div class="card-title">Password reset leaks whether an email is registered</div><span class="badge sev-medium">Medium</span></div>
+        <span class="loc">app_exception.dart:28-29 &middot; forgot_password_screen.dart:37</span>
+        <p class="scenario">Firebase's <code>user-not-found</code> is mapped straight to "No account found with that email" with no generic fallback &mdash; <b>an attacker can enumerate registered emails</b> one attempt at a time.</p>
+      </div>
+      <div class="card sev-medium" data-sev="medium">
+        <div class="card-top"><div class="card-title"><code>users</code> collection create-rule barely validates the profile shape</div><span class="badge sev-medium">Medium</span></div>
+        <span class="loc">firestore.rules:172</span>
+        <p class="scenario">Only checks <code>email is string</code> &mdash; no match against the auth token's real email, no length/shape limits. <b>A raw SDK call bypassing the app UI</b> can create a profile with a spoofed email or oversized fields.</p>
+      </div>
+      <div class="card sev-medium" data-sev="medium">
+        <div class="card-top"><div class="card-title">Verify-email polling never stops or backs off</div><span class="badge sev-medium">Medium</span></div>
+        <span class="loc">verify_email_screen.dart:32</span>
+        <p class="scenario"><code>Timer.periodic(4s)</code> runs for the widget's entire lifetime with no cap. <b>A user who leaves the app open on this screen</b> drains battery/network indefinitely with no "still waiting? check spam" escalation.</p>
+      </div>
+      <div class="card sev-medium" data-sev="medium">
+        <div class="card-top"><div class="card-title">Onboarding is marked "seen" before it's actually finished</div><span class="badge sev-medium">Medium</span></div>
+        <span class="loc">splash_screen.dart:42</span>
+        <p class="scenario"><code>setHasSeenOnboarding(true)</code> runs before navigating to onboarding, not after Skip/Get Started. <b>If the app is killed while onboarding is showing</b>, next launch skips straight to Login &mdash; permanently, for a user who never saw it.</p>
+      </div>
+      <div class="card sev-medium" data-sev="medium">
+        <div class="card-top"><div class="card-title">Login and Register enforce different password rules for the same field</div><span class="badge sev-medium">Medium</span></div>
+        <span class="loc">login_screen.dart:103-105 vs register_screen.dart:146</span>
+        <p class="scenario">Login only checks non-empty; Register requires 8+ characters. Undocumented whether intentional &mdash; <b>a future change to the password policy</b> silently won't affect Login at all.</p>
+      </div>
+      <div class="card sev-low" data-sev="low">
+        <div class="card-top"><div class="card-title">Email regex accepts malformed addresses</div><span class="badge sev-low">Low</span></div>
+        <span class="loc">validators.dart:6</span>
+        <p class="scenario">Matches things like <code>a@b.com.</code> or <code>a@b..com</code>. Not exploitable (Firebase rejects server-side) but lets obviously-broken input through the form first.</p>
+      </div>
+      <div class="card sev-low" data-sev="low">
+        <div class="card-top"><div class="card-title">Google sign-in only catches <code>FirebaseAuthException</code></div><span class="badge sev-low">Low</span></div>
+        <span class="loc">auth_service.dart:39-55</span>
+        <p class="scenario">A <code>PlatformException</code> (Play Services unavailable, network) falls through to a generic "Something went wrong" instead of an actionable message.</p>
+      </div>
+
+      <div class="solid"><b>Held up well:</b> the router's redirect logic is a clean single-source-of-truth state machine, and live account-suspension force-signs-out a user mid-session the instant an admin flips <code>isSuspended</code> &mdash; a defensive touch most apps skip.</div>
+    </section>
+
+    <!-- ============ HOME/EXPLORE/SEARCH ============ -->
+    <section class="area" id="home">
+      <div class="area-head"><h2>Home / Explore / Search / Nearby You</h2><span class="area-count">11 findings</span></div>
+      <p class="area-scope">Live Google Places integration, category filters, distance/relevance sorting, curated-vs-live dedup.</p>
+
+      <div class="card sev-high" data-sev="high">
+        <div class="card-top"><div class="card-title">Explore's "Food"/"Festivals" chip silently does nothing on the Destinations tab</div><span class="badge sev-high">High</span></div>
+        <span class="loc">explore_screen.dart:54-59,143-146</span>
+        <p class="scenario">The category-to-search-phrase map only covers 4 of 6 categories. <b>Tapping "Food" or "Festivals"</b> highlights the chip as selected and reloads &mdash; but falls back to the generic "top tourist attractions" phrase, so results silently don't change.</p>
+      </div>
+      <div class="card sev-high" data-sev="high">
+        <div class="card-top"><div class="card-title">"See all" from Home's Nearby carousel loses the distance sort</div><span class="badge sev-high">High</span></div>
+        <span class="loc">nearby_places_screen.dart:122,201-220 vs home_screen.dart:178-186</span>
+        <p class="scenario">Home's carousel correctly sorts nearest-first. <b>Tapping "See all"</b> opens a screen defaulting to popularity order &mdash; the closest attraction on Home is no longer first one tap later. The exact bug this app already fixed once, reappearing on a sibling screen.</p>
+      </div>
+      <div class="card sev-high" data-sev="high">
+        <div class="card-top"><div class="card-title">Category/filter change during an in-flight load drops the new request and gets stuck on stale data</div><span class="badge sev-high">High</span></div>
+        <span class="loc">explore_screen.dart:246-258,300-330,332-396,398-444</span>
+        <p class="scenario">Each load guards on its own "already loading" flag. <b>On a slow connection</b>, applying a filter while the initial load is still in flight gets silently blocked; when the stale request later completes it overwrites the fresh reset with results for the old filter &mdash; with nothing to re-trigger a correction.</p>
+      </div>
+      <div class="card sev-high" data-sev="high">
+        <div class="card-top"><div class="card-title">Search: a stale slow response can overwrite a newer filtered one</div><span class="badge sev-high">High</span></div>
+        <span class="loc">search_screen.dart:328-458,554-562</span>
+        <p class="scenario">Applying a filter bypasses the debounce and fires a second search with no request-sequencing token. <b>Type a slow query, then quickly apply a filter</b> &mdash; if the first (unfiltered) response lands after the second, it silently replaces the filtered results.</p>
+      </div>
+      <div class="card sev-medium" data-sev="medium">
+        <div class="card-top"><div class="card-title">"Distance" sort is a silent no-op in area/text-search mode</div><span class="badge sev-medium">Medium</span></div>
+        <span class="loc">nearby_places_screen.dart:160-174,206-211</span>
+        <p class="scenario">When reached via a text-search (no bias coordinates), every result's distance is <code>infinity</code>. The Distance option is still offered and does nothing useful &mdash; or can even reorder unpredictably &mdash; with no indication it's meaningless here.</p>
+      </div>
+      <div class="card sev-medium" data-sev="medium">
+        <div class="card-top"><div class="card-title">Curated/live dedup uses loose substring matching, can hide real unrelated places</div><span class="badge sev-medium">Medium</span></div>
+        <span class="loc">place_dedup.dart:14-26</span>
+        <p class="scenario">Any live Places name containing (or contained by) a curated name &ge;4 characters is treated as a duplicate. <b>A curated business named "Cafe" or "Kusina"</b> silently drops every unrelated live result that merely shares that word.</p>
+      </div>
+      <div class="card sev-medium" data-sev="medium">
+        <div class="card-top"><div class="card-title">Explore Restaurants dedup only runs once &mdash; later pages can duplicate</div><span class="badge sev-medium">Medium</span></div>
+        <span class="loc">explore_screen.dart:332-396,372-379</span>
+        <p class="scenario">Dedup runs against only the first Firestore page of curated names. <b>Clicking "Load More"</b> through further curated pages never re-checks the live results shown up top, so a live entry can end up duplicating a curated one that only appears later.</p>
+      </div>
+      <div class="card sev-medium" data-sev="medium">
+        <div class="card-top"><div class="card-title">Nearby-search cache almost never hits due to raw GPS float precision in the cache key</div><span class="badge sev-medium">Medium</span></div>
+        <span class="loc">places_service.dart:60-61</span>
+        <p class="scenario">The 24h cache key embeds full-precision lat/lng, but GPS returns slightly different coordinates almost every call. <b>A stationary user refreshing seconds apart</b> effectively never gets a cache hit, defeating the cache's own purpose (avoiding billed API calls).</p>
+      </div>
+      <div class="card sev-medium" data-sev="medium">
+        <div class="card-top"><div class="card-title">Places API failures are indistinguishable from "zero results" &mdash; no retry surfaced</div><span class="badge sev-medium">Medium</span></div>
+        <span class="loc">places_service.dart:79-81,116-118</span>
+        <p class="scenario">Every failure (network error, rate limit, quota) is swallowed into an empty list. <b>During a real Places outage</b>, Explore/Home/Nearby show the generic "Nothing here yet" with no Retry, while Firestore-backed sections get a proper error+Retry UI for the same class of problem.</p>
+      </div>
+      <div class="card sev-medium" data-sev="medium">
+        <div class="card-top"><div class="card-title">Search's province filter doesn't apply to the live "More places" section</div><span class="badge sev-medium">Medium</span></div>
+        <span class="loc">search_screen.dart:344-349,421-430</span>
+        <p class="scenario">Filters narrow curated results but the live-Places section stays nationwide. <b>Filtering to "Palawan"</b> still shows live results from anywhere in the Philippines in that section, with no indication the filter didn't apply there.</p>
+      </div>
+      <div class="card sev-low" data-sev="low">
+        <div class="card-top"><div class="card-title">Recent/trending searches get polluted by incomplete in-progress queries</div><span class="badge sev-low">Low</span></div>
+        <span class="loc">search_screen.dart:330-335</span>
+        <p class="scenario">Recording fires on every debounce tick, not on deliberate submit. <b>Pausing mid-typing</b> ("Pala" for 350ms) records it as its own recent/trending entry, separate from the finished "Palawan".</p>
+      </div>
+
+      <div class="solid"><b>Held up well:</b> Cloud Functions rate-limiting is a real per-uid rolling-window Firestore transaction, photo URLs are HMAC-signed against open-relay abuse, and the location-permission state matrix (denied/permanently-denied/service-off/granted, including "went to Settings and came back") is handled thoroughly.</div>
+    </section>
+
+    <!-- ============ DETAILS/REVIEWS/FAVORITES ============ -->
+    <section class="area" id="details">
+      <div class="area-head"><h2>Details Screens, Reviews &amp; Favorites</h2><span class="area-count">10 findings</span></div>
+      <p class="area-scope">Tourist/restaurant/festival/province details, the review CRUD flow, favoriting.</p>
+
+      <div class="card sev-high" data-sev="high">
+        <div class="card-top"><div class="card-title">Aggregate rating recalculation is a read-then-write with no transaction &mdash; not race-safe</div><span class="badge sev-high">High</span></div>
+        <span class="loc">review_repository.dart:130-149</span>
+        <p class="scenario"><b>Two reviews submitted for the same listing within milliseconds of each other</b> can have their recalculation writes land out of order, permanently undercounting a review that's genuinely still in the collection until an unrelated future edit happens to correct it.</p>
+      </div>
+      <div class="card sev-high" data-sev="high">
+        <div class="card-top"><div class="card-title">Editing a review silently discards any newly-added photos</div><span class="badge sev-high">High</span></div>
+        <span class="loc">review_repository.dart:92-103 &middot; review_section.dart:52-66</span>
+        <p class="scenario"><code>updateReview</code> takes no photos parameter and the edit sheet never receives the review's existing photo URLs either. <b>Editing a review and adding 2 new photos, then submitting</b> &mdash; they're never uploaded or referenced, with no error shown.</p>
+      </div>
+      <div class="card sev-high" data-sev="high">
+        <div class="card-top"><div class="card-title">No uniqueness constraint &mdash; a user can post unlimited reviews for the same listing</div><span class="badge sev-high">High</span></div>
+        <span class="loc">review_repository.dart:75-90 &middot; firestore.rules:413-422</span>
+        <p class="scenario">Unlike Favorites' deterministic doc-ID scheme, reviews use Firestore auto-IDs. <b>The "Write a Review" button is never replaced by "Edit"</b> &mdash; tapping it twice creates two independent, fully-editable review docs for the same target.</p>
+      </div>
+      <div class="card sev-medium" data-sev="medium">
+        <div class="card-top"><div class="card-title">Reviews header count is a stale snapshot sitting right above a live stream</div><span class="badge sev-medium">Medium</span></div>
+        <span class="loc">review_section.dart:21-25,143,152-179</span>
+        <p class="scenario">The "Reviews (N)" heading comes from a one-time load; the list below it is a live stream. <b>Submitting a review</b> updates the list instantly while the heading count above it stays stale until a pull-to-refresh.</p>
+      </div>
+      <div class="card sev-medium" data-sev="medium">
+        <div class="card-top"><div class="card-title">Orphaned Storage photos if the Firestore write fails after the upload succeeds</div><span class="badge sev-medium">Medium</span></div>
+        <span class="loc">review_repository.dart:75-90 &middot; storage_service.dart:69-79</span>
+        <p class="scenario">Photos upload before the Firestore doc is created, with no compensating delete on failure. <b>Network drops between upload and the doc write</b> &mdash; the file stays permanently orphaned in Storage.</p>
+      </div>
+      <div class="card sev-medium" data-sev="medium">
+        <div class="card-top"><div class="card-title">Reporting the same review twice shows a confusing generic error</div><span class="badge sev-medium">Medium</span></div>
+        <span class="loc">review_report_repository.dart:16-29 &middot; app_exception.dart:56-57</span>
+        <p class="scenario">The rules layer correctly blocks a second report, but the client shows "You don't have permission to do that" instead of "You've already reported this" &mdash; reads like an app bug, not confirmation.</p>
+      </div>
+      <div class="card sev-medium" data-sev="medium">
+        <div class="card-top"><div class="card-title">Tourist/restaurant/festival galleries have no empty-photo fallback, unlike province</div><span class="badge sev-medium">Medium</span></div>
+        <span class="loc">details_gallery_app_bar.dart:83-90 vs province_details_screen.dart:502-532</span>
+        <p class="scenario">Province's gallery falls back to a tinted placeholder or a live Places photo when empty &mdash; a fix never carried over to the other three screens sharing the same widget. <b>A newly-added destination with no photos yet</b> shows a blank hero header.</p>
+      </div>
+      <div class="card sev-medium" data-sev="medium">
+        <div class="card-top"><div class="card-title">Deleting a listing mid-review-submission produces a misleading error and an orphaned review</div><span class="badge sev-medium">Medium</span></div>
+        <span class="loc">review_repository.dart:130-149 &middot; destination_repository.dart:157-166</span>
+        <p class="scenario"><b>An admin deletes a destination just as a traveler submits a review for it</b> &mdash; the review doc is actually created successfully, but the follow-up aggregate-update throws "not-found," so the traveler sees a generic failure and believes nothing was saved.</p>
+      </div>
+      <div class="card sev-medium" data-sev="medium">
+        <div class="card-top"><div class="card-title">Favorites' optimistic toggle has no rollback on non-offline failures</div><span class="badge sev-medium">Medium</span></div>
+        <span class="loc">favorites_provider.dart:75-93</span>
+        <p class="scenario">Every error is swallowed under the assumption it's an offline queue-for-later. <b>A real <code>permission-denied</code> (stale auth token, rules regression)</b> gets swallowed the same way &mdash; the icon shows "saved" when Firestore never got the write.</p>
+      </div>
+      <div class="card sev-low" data-sev="low">
+        <div class="card-top"><div class="card-title">Rapid double-tap on a favorite icon can transiently desync</div><span class="badge sev-low">Low</span></div>
+        <span class="loc">favorites_provider.dart:75-93</span>
+        <p class="scenario">Save/unsave fire as independent unordered writes to the same doc. Self-heals on the next snapshot, but visibly wrong in between.</p>
+      </div>
+
+      <div class="solid"><b>Held up well:</b> Favorites' deterministic doc-ID scheme genuinely prevents duplicates, the report flow's deterministic ID genuinely blocks repeat reports at the data layer, and all four details screens consistently show a clean empty state (not a crash) for a deleted/missing target.</div>
+    </section>
+
+    <!-- ============ AI PLANNER ============ -->
+    <section class="area" id="ai">
+      <div class="area-head"><h2>AI Planner, AI Chat &amp; Saved Itineraries</h2><span class="area-count">10 findings</span></div>
+      <p class="area-scope">Trip generation, chat-to-itinerary, My Trips, Budget Tracker, Packing Checklist, trip sharing.</p>
+
+      <div class="card sev-high" data-sev="high">
+        <div class="card-top"><div class="card-title">"Join a Shared Trip" is broken by Firestore's own read rule</div><span class="badge sev-high">High</span></div>
+        <span class="loc">firestore.rules:335-336 &middot; itinerary_repository.dart:87-95</span>
+        <p class="scenario">A non-collaborator has no read access to the trip doc, so the very first step of joining &mdash; looking it up by share code &mdash; throws <code>permission-denied</code> before the join can ever happen. <b>The whole invite feature cannot work as written.</b></p>
+      </div>
+      <div class="card sev-high" data-sev="high">
+        <div class="card-top"><div class="card-title">Regenerating a saved trip orphans it instead of updating it</div><span class="badge sev-high">High</span></div>
+        <span class="loc">generated_itinerary_screen.dart:399-481,464-467</span>
+        <p class="scenario">No repository method exists to update a saved trip's itinerary content. <b>Tapping Regenerate on a saved trip with collaborators/expenses</b> lands on a new unsaved screen; saving it creates a duplicate doc with none of the original's collaborators or history.</p>
+      </div>
+      <div class="card sev-high" data-sev="high">
+        <div class="card-top"><div class="card-title">Any collaborator can edit or delete anyone else's expense entries &mdash; no server-side check</div><span class="badge sev-high">High</span></div>
+        <span class="loc">firestore.rules:365-373</span>
+        <p class="scenario">The expenses subcollection rule grants any collaborator full write with no <code>loggedBy</code> ownership check and no field-shape validation. <b>A raw write with a negative amount or forged <code>loggedBy</code></b> silently corrupts everyone's balance split, client-only <code>Validators.amount</code> notwithstanding.</p>
+      </div>
+      <div class="card sev-high" data-sev="high">
+        <div class="card-top"><div class="card-title">A malformed/truncated AI response gets cached and permanently blocks retry</div><span class="badge sev-high">High</span></div>
+        <span class="loc">ai_repository.dart:163-196,434-540</span>
+        <p class="scenario">The raw response is cached before it's validated. <b>A truncated JSON response (hits the token cap mid-object)</b> parses as broken &mdash; every retry with the identical form returns the exact same cached broken text for up to 6 hours.</p>
+      </div>
+      <div class="card sev-high" data-sev="high">
+        <div class="card-top"><div class="card-title">Packing checklist writes are a blind full-array overwrite &mdash; lost updates between collaborators</div><span class="badge sev-high">High</span></div>
+        <span class="loc">generated_itinerary_screen.dart:766-851 &middot; itinerary_repository.dart:201-212</span>
+        <p class="scenario">The list is loaded once (not a live stream) and every edit replaces the whole array. <b>Owner checks off "Passport" while a collaborator on a stale copy adds "Sunscreen" moments later</b> &mdash; the collaborator's write silently reverts the owner's checkmark.</p>
+      </div>
+      <div class="card sev-medium" data-sev="medium">
+        <div class="card-top"><div class="card-title">Weather Outlook never refreshes for a saved trip's already-set start date</div><span class="badge sev-medium">Medium</span></div>
+        <span class="loc">generated_itinerary_screen.dart:97-98,358-385</span>
+        <p class="scenario">The refresh only fires from the date-editing action, never on load for a trip that already has a date. <b>Reopening a trip saved 10 days ago for a trip 10 days out</b> silently shows the forecast from generation day, not the actual travel dates.</p>
+      </div>
+      <div class="card sev-medium" data-sev="medium">
+        <div class="card-top"><div class="card-title">Reminders aren't rescheduled or cancelled when the start date changes</div><span class="badge sev-medium">Medium</span></div>
+        <span class="loc">generated_itinerary_screen.dart:328-349</span>
+        <p class="scenario">Editing the date updates Firestore and weather but never touches <code>NotificationService</code>. <b>Moving a trip from Aug 20 to Sep 5</b> &mdash; the old Aug 20 reminder still fires; nothing is scheduled for the real new date.</p>
+      </div>
+      <div class="card sev-medium" data-sev="medium">
+        <div class="card-top"><div class="card-title">Reminder IDs collide across different trips to the same destination</div><span class="badge sev-medium">Medium</span></div>
+        <span class="loc">generated_itinerary_screen.dart:563-564</span>
+        <p class="scenario">The reminder id is keyed by destination name, not trip id. <b>Two separate saved "Boracay" trips</b> &mdash; scheduling a reminder on the second silently cancels the first trip's reminder.</p>
+      </div>
+      <div class="card sev-medium" data-sev="medium">
+        <div class="card-top"><div class="card-title">Offline "download" is a one-time snapshot with no staleness detection</div><span class="badge sev-medium">Medium</span></div>
+        <span class="loc">itinerary_offline_service.dart:49-68</span>
+        <p class="scenario">Only a plain boolean flag is stored, no timestamp/version. <b>A collaborator edits packing items after the trip was downloaded offline</b> &mdash; reopening offline shows the stale snapshot, "Downloaded" badge and all, with no staleness cue.</p>
+      </div>
+      <div class="card sev-low" data-sev="low">
+        <div class="card-top"><div class="card-title">A chat error message gets fed back to the AI as a fake prior reply</div><span class="badge sev-low">Low</span></div>
+        <span class="loc">ai_chat_provider.dart:207-227</span>
+        <p class="scenario">Error bubbles aren't filtered out of the conversation history sent to the model, so "Something went wrong" is treated as the AI's own previous turn for the rest of that session's context window.</p>
+      </div>
+
+      <div class="solid"><b>Held up well:</b> concurrent trip-joins via <code>arrayUnion</code> are genuinely race-safe (unlike packing items), the expense-split math correctly guards divide-by-zero on an empty member list, and both AI providers have solid retry/backoff plus request-cancellation so a stale response can't clobber a newer one.</div>
+    </section>
+
+    <!-- ============ PROFILE ============ -->
+    <section class="area" id="profile">
+      <div class="area-head"><h2>Profile, Settings, Photos &amp; Weather</h2><span class="area-count">12 findings</span></div>
+      <p class="area-scope">Edit Profile, My Photos, Notifications, account deletion, app preferences, the weather card.</p>
+
+      <div class="card sev-high" data-sev="high">
+        <div class="card-top"><div class="card-title">Changing email leaves the Firestore profile permanently stale</div><span class="badge sev-high">High</span></div>
+        <span class="loc">auth_provider.dart:84-89,198-201</span>
+        <p class="scenario">The confirmed new email only updates Firebase Auth &mdash; nothing writes it back to the Firestore <code>users</code> doc, which only gets an email on first creation. <b>After confirming an email change</b>, Firebase Auth shows the new address forever while Profile keeps showing the old one.</p>
+      </div>
+      <div class="card sev-high" data-sev="high">
+        <div class="card-top"><div class="card-title">Account deletion leaves trip photos and their Storage files permanently orphaned</div><span class="badge sev-high">High</span></div>
+        <span class="loc">auth_provider.dart:214-226</span>
+        <p class="scenario"><code>trip_photos</code> has no bulk-delete method and isn't in the deletion flow at all. Since Firestore rules require matching the (now-deleted) owner uid to delete, <b>these become permanently unreachable</b> &mdash; contradicting the deletion dialog's own promise to remove everything.</p>
+      </div>
+      <div class="card sev-high" data-sev="high">
+        <div class="card-top"><div class="card-title">Account deletion leaves personal notifications orphaned too</div><span class="badge sev-high">High</span></div>
+        <span class="loc">auth_provider.dart:214-226</span>
+        <p class="scenario">Same deletion flow never touches the <code>notifications</code> collection for that uid &mdash; another category of "permanently deleted" data that isn't.</p>
+      </div>
+      <div class="card sev-high" data-sev="high">
+        <div class="card-top"><div class="card-title"><code>GeneratedItineraryScreen</code> still uses the old "stuck stale client" weather pattern</div><span class="badge sev-high">High</span></div>
+        <span class="loc">generated_itinerary_screen.dart:78,358</span>
+        <p class="scenario">Holds one long-lived <code>WeatherService</code> for the widget's whole life, instead of the fresh-client-per-request pattern <code>CurrentWeatherCard</code> was fixed to use for exactly this reason. <b>A network blip during one date change</b> can get this client stuck, silently returning empty/stale forecasts on every date edit after that until the screen is reopened.</p>
+      </div>
+      <div class="card sev-medium" data-sev="medium">
+        <div class="card-top"><div class="card-title">Same stale-client risk in <code>AiRepository</code>, held for the app's lifetime</div><span class="badge sev-medium">Medium</span></div>
+        <span class="loc">ai_repository.dart:37</span>
+        <p class="scenario">Constructed once inside app-lifetime providers, so every itinerary generation's weather fetch reuses the same underlying client &mdash; the same bug class, just rarer to trigger.</p>
+      </div>
+      <div class="card sev-medium" data-sev="medium">
+        <div class="card-top"><div class="card-title">Changing your profile photo orphans the previous one in Storage</div><span class="badge sev-medium">Medium</span></div>
+        <span class="loc">edit_profile_screen.dart:84-90</span>
+        <p class="scenario">The new photo uploads and overwrites the URL field; the old file is never deleted. <b>A user who changes their avatar 20 times</b> accumulates 20 orphaned files forever, real Storage cost included.</p>
+      </div>
+      <div class="card sev-medium" data-sev="medium">
+        <div class="card-top"><div class="card-title">Marking a broadcast notification "read" marks it read for everyone</div><span class="badge sev-medium">Medium</span></div>
+        <span class="loc">notification_repository.dart:37-43</span>
+        <p class="scenario">Broadcasts are one shared document across all recipients. <b>The first traveler who taps a festival announcement</b> makes it show as already-read for every other traveler too.</p>
+      </div>
+      <div class="card sev-medium" data-sev="medium">
+        <div class="card-top"><div class="card-title">Storage-delete failures after a successful Firestore delete are silently swallowed</div><span class="badge sev-medium">Medium</span></div>
+        <span class="loc">my_photos_screen.dart:206-225 &middot; storage_service.dart:81-87</span>
+        <p class="scenario">The photo vanishes from the grid (no undo) even if the underlying Storage blob's delete then fails on a network blip &mdash; permanently orphaned, with zero error shown anywhere.</p>
+      </div>
+      <div class="card sev-medium" data-sev="medium">
+        <div class="card-top"><div class="card-title">Photo upload can leave an orphaned Storage file if the Firestore write fails</div><span class="badge sev-medium">Medium</span></div>
+        <span class="loc">my_photos_screen.dart:102-122</span>
+        <p class="scenario">Upload-then-create, no compensating cleanup on the create failing &mdash; same orphan pattern as the review-photo bug in a different screen.</p>
+      </div>
+      <div class="card sev-low" data-sev="low">
+        <div class="card-top"><div class="card-title">"Recently Viewed" grows unbounded, and its Places stat can silently undercount</div><span class="badge sev-low">Low</span></div>
+        <span class="loc">user_repository.dart:151-161 &middot; profile_screen.dart:59-67</span>
+        <p class="scenario">Nothing prunes old entries, and the Profile "Places" stat counts the post-filter (published-only) length &mdash; a viewed destination later unpublished silently drops the count even though the user genuinely viewed it.</p>
+      </div>
+      <div class="card sev-low" data-sev="low">
+        <div class="card-top"><div class="card-title">Name field has no upper bound</div><span class="badge sev-low">Low</span></div>
+        <span class="loc">validators.dart:27-32 &middot; edit_profile_screen.dart:215-222</span>
+        <p class="scenario">No max-length check or field cap &mdash; an arbitrarily long name will overflow/wrap badly in the profile header and anywhere else names are shown.</p>
+      </div>
+      <div class="card sev-low" data-sev="low">
+        <div class="card-top"><div class="card-title">Notification category preferences are client-side only, never synced</div><span class="badge sev-low">Low</span></div>
+        <span class="loc">local_preferences_service.dart:117-127</span>
+        <p class="scenario">Stored per-device in <code>SharedPreferences</code> only. Muting a category on one device doesn't apply to another signed-in device, and reinstalling silently resets every category back to enabled.</p>
+      </div>
+
+      <div class="solid"><b>Held up well:</b> dark mode, accent color, typography scale and location toggles are all genuinely wired end-to-end (not stubs), and the email-change flow correctly requires confirmation via the new inbox before Firebase Auth itself changes &mdash; only the Firestore mirror of it goes stale.</div>
+    </section>
+
+    <!-- ============ ADMIN ============ -->
+    <section class="area" id="admin">
+      <div class="area-head"><h2>Admin Portal &amp; Business Owner</h2><span class="area-count">9 findings</span></div>
+      <p class="area-scope">User management, content moderation, analytics, curated-listing CRUD, business-owner listings.</p>
+
+      <div class="card sev-high" data-sev="high">
+        <div class="card-top"><div class="card-title">A suspended admin or business owner keeps Storage write access for up to ~1 hour</div><span class="badge sev-high">High</span></div>
+        <span class="loc">admin_repository.dart:48-70 &middot; storage.rules:28-34</span>
+        <p class="scenario">Suspension only writes the target's Firestore doc, never their Auth custom claims &mdash; the thing Storage rules actually check &mdash; and nothing forces a resync or sign-out (unlike traveler suspension, which does). <b>An admin suspends a business owner mid-session</b> &mdash; that owner can keep uploading gallery photos for the rest of their cached token's life.</p>
+      </div>
+      <div class="card sev-high" data-sev="high">
+        <div class="card-top"><div class="card-title">Tourist-spot and festival forms have no latitude/longitude fields at all</div><span class="badge sev-high">High</span></div>
+        <span class="loc">admin_tourist_spot_form_screen.dart:218-219 &middot; admin_festival_form_screen.dart:224-225</span>
+        <p class="scenario">A brand-new listing always saves with null coordinates &mdash; there's no input for them anywhere in the everyday single-listing form (only the separate CSV bulk-import path sets them). <b>Every admin-created listing</b> silently breaks its own weather card, map, "Get Directions," and Nearby sections on the traveler-facing details screen.</p>
+      </div>
+      <div class="card sev-medium" data-sev="medium">
+        <div class="card-top"><div class="card-title">Last-admin self-lockout is only prevented by the UI, not the security rules</div><span class="badge sev-medium">Medium</span></div>
+        <span class="loc">firestore.rules:149-150 &middot; admin_team_screen.dart:319,338-341</span>
+        <p class="scenario">The rule allowing an admin to suspend/demote other admins has no carve-out against targeting themselves &mdash; the only guard is the menu being hidden in the UI. <b>If that client-side guard is ever bypassed</b>, a sole remaining admin can lock the platform out of admin access with only an out-of-band seed script as recovery.</p>
+      </div>
+      <div class="card sev-medium" data-sev="medium">
+        <div class="card-top"><div class="card-title">Hiding a review gives its author zero indication</div><span class="badge sev-medium">Medium</span></div>
+        <span class="loc">review_repository.dart:109-116</span>
+        <p class="scenario">The rating recalculation is correctly triggered, but no notification goes to the author and no "My Reviews" view ever surfaces the hidden flag back to them &mdash; the review just vanishes from the target's list with no trace to the person who wrote it.</p>
+      </div>
+      <div class="card sev-medium" data-sev="medium">
+        <div class="card-top"><div class="card-title">Analytics' "Saved Trips" count inflates permanently from orphaned data</div><span class="badge sev-medium">Medium</span></div>
+        <span class="loc">user_repository.dart:249-265 &middot; itinerary_repository.dart:26-33</span>
+        <p class="scenario">Account deletion never removes <code>saved_itineraries</code>/<code>favorites</code>/<code>reviews</code>/<code>trip_photos</code>. The analytics count-query counts every leftover itinerary from since-deleted accounts forever &mdash; a metric that only ever grows and increasingly overstates real engagement.</p>
+      </div>
+      <div class="card sev-medium" data-sev="medium">
+        <div class="card-top"><div class="card-title">LGU province dashboard silently caps every stat at 500</div><span class="badge sev-medium">Medium</span></div>
+        <span class="loc">admin_analytics_screen.dart:109-111</span>
+        <p class="scenario">Each stat query has a hard <code>limit: 500</code>. Once a province passes that many published listings of one type, the number freezes with no indicator it's a cap rather than the true total.</p>
+      </div>
+      <div class="card sev-medium" data-sev="medium">
+        <div class="card-top"><div class="card-title">Several admin list screens fetch their entire collection unbounded</div><span class="badge sev-medium">Medium</span></div>
+        <span class="loc">admin_team_screen.dart:299-300 &middot; admin_business_list_screen.dart:241 &middot; admin_reported_reviews_screen.dart:90 &middot; admin_festival_list_screen.dart:73</span>
+        <p class="scenario">No pagination on any of these. Compounding it: business owners live in the same collection as internal staff (required by the current role model), so the "Team" screen meant for admins will progressively fill with every approved business owner as the marketplace grows.</p>
+      </div>
+      <div class="card sev-low" data-sev="low">
+        <div class="card-top"><div class="card-title">User Management search only searches rows already paged in</div><span class="badge sev-low">Low</span></div>
+        <span class="loc">admin_user_management_screen.dart:84-94</span>
+        <p class="scenario">Filters the locally-loaded 20-at-a-time list, not the full collection. Searching for a traveler beyond the first page returns "No matches" even though the account exists.</p>
+      </div>
+      <div class="card sev-low" data-sev="low">
+        <div class="card-top"><div class="card-title">Deleting a business orphans its reviews and favorites</div><span class="badge sev-low">Low</span></div>
+        <span class="loc">admin_business_list_screen.dart (delete handler)</span>
+        <p class="scenario">The business and restaurant docs are deleted outright, but nothing cleans up reviews/favorites targeting that id &mdash; they become permanently dangling references, surfaced only defensively elsewhere ("This review no longer exists").</p>
+      </div>
+
+      <div class="solid"><b>Held up well:</b> business/restaurant ownership is enforced consistently on both client and rules, admin invites can't be replayed (the invite doc is deleted atomically on claim), and the review-hiding aggregate recalculation is correctly wired end-to-end.</div>
+    </section>
+
+  </main>
+</div>
+
+<footer>TripNest PH &middot; internal engineering audit &middot; every finding above cites a real file and line for follow-up.</footer>
+
+<script>
+  const state = { high: true, medium: true, low: true };
+  const chips = document.querySelectorAll('#sev-filters .chip');
+  const cards = document.querySelectorAll('.card');
+  function apply() {
+    cards.forEach(c => {
+      const sev = c.dataset.sev;
+      c.style.display = state[sev] ? '' : 'none';
+    });
+  }
+  chips.forEach(chip => {
+    chip.addEventListener('click', () => {
+      const sev = chip.dataset.sev;
+      state[sev] = !state[sev];
+      chip.setAttribute('aria-pressed', String(state[sev]));
+      apply();
+    });
+  });
+</script>
+</body>

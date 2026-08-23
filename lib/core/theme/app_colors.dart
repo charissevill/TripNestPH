@@ -30,6 +30,39 @@ class AppColors {
   static const Color success = Color(0xFF27AE60);
   static const Color warning = Color(0xFFF2C94C);
 
+  // ---- Explore category badges (e.g. `PlaceCard`'s "Attraction"/
+  // "Restaurant" tag) — one hue per category family so different kinds of
+  // places read as visually distinct at a glance, not all the same blue.
+  // Chosen from a validated colorblind-safe categorical set (`dataviz`
+  // skill's reference palette); each badge also always carries a text
+  // label, so identity never depends on hue alone.
+  static const Color categorySightseeing = Color(0xFF2A78D6);
+  static const Color categoryNature = Color(0xFF1BAF7A);
+  static const Color categoryFoodDrink = Color(0xFFEDA100);
+  static const Color categoryShopping = Color(0xFFE87BA4);
+  static const Color categoryLodging = Color(0xFF4A3AA7);
+  static const Color categoryTransport = Color(0xFF008300);
+
+  /// Split out from [categorySightseeing] so "Attraction", "Historical
+  /// Landmark" and "Museum" read as distinct badges instead of three
+  /// identically-blue tags — re-validated against the full 8-color set via
+  /// `validate_palette.js --pairs all` (scatter-safe, not just adjacent)
+  /// since Explore/search can show any two place-category badges side by
+  /// side, not just neighbors in a fixed stack order.
+  static const Color categoryLandmark = Color(0xFFD2482D);
+  static const Color categoryMuseum = Color(0xFFC3228E);
+
+  /// Split out from [categoryFoodDrink] so "Restaurant" reads distinct from
+  /// "Café" — same re-validation approach as [categoryLandmark]/
+  /// [categoryMuseum] above.
+  static const Color categoryDining = Color(0xFF931F1F);
+
+  /// Split out from [categoryLodging] so "Resort" and "Hostel" read distinct
+  /// from the plain "Hotel" badge — same re-validation approach as
+  /// [categoryLandmark]/[categoryMuseum] above.
+  static const Color categoryResort = Color(0xFF0606F9);
+  static const Color categoryHostel = Color(0xFFC038FA);
+
   static const Color border = Color(0xFFE5E9F0);
   static const Color divider = Color(0xFFEFF2F6);
   static const Color shimmerBase = Color(0xFFE9EDF3);
@@ -63,10 +96,7 @@ class AppColors {
     Color(0xFF2D9CDB),
   ];
 
-  static const List<Color> skyGradient = [
-    Color(0xFF6DBEEC),
-    Color(0xFFB8E1F5),
-  ];
+  static const List<Color> skyGradient = [Color(0xFF6DBEEC), Color(0xFFB8E1F5)];
 
   static const List<Color> goldenHourGradient = [
     Color(0xFFF2C94C),
@@ -94,10 +124,7 @@ class AppColors {
 
   /// Standard dark-to-transparent overlay used at the bottom of hero images
   /// so white text/badges stay legible over any photo.
-  static const List<Color> imageScrim = [
-    Color(0x00000000),
-    Color(0x99000000),
-  ];
+  static const List<Color> imageScrim = [Color(0x00000000), Color(0x99000000)];
 
   /// Every key [byKey] resolves to a real, distinct color for — single
   /// source of truth for anything that needs to enumerate the allowed set
@@ -105,7 +132,13 @@ class AppColors {
   /// 'primary' is [byKey]'s fallback for an unrecognized key too, but is
   /// still listed here as a real, pickable color in its own right.
   static const List<String> paletteKeys = [
-    'primary', 'primaryDark', 'secondary', 'secondaryDark', 'accent', 'accentDark', 'error',
+    'primary',
+    'primaryDark',
+    'secondary',
+    'secondaryDark',
+    'accent',
+    'accentDark',
+    'error',
   ];
 
   /// Resolves a semantic color key (e.g. from Firestore-persisted content)
@@ -132,7 +165,8 @@ class AppColors {
     }
   }
 
-  static LinearGradient gradient(List<Color> colors, {
+  static LinearGradient gradient(
+    List<Color> colors, {
     AlignmentGeometry begin = Alignment.topLeft,
     AlignmentGeometry end = Alignment.bottomRight,
   }) {

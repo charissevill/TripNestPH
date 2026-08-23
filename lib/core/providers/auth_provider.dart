@@ -12,6 +12,7 @@ import '../../data/repositories/user_repository.dart';
 import '../../domain/models/admin_user.dart';
 import '../../domain/models/app_user.dart';
 import '../services/auth_service.dart';
+import '../services/otp_service.dart';
 import '../utils/app_exception.dart';
 import '../utils/view_status.dart';
 
@@ -21,6 +22,7 @@ import '../utils/view_status.dart';
 class AuthProvider extends ChangeNotifier {
   AuthProvider({
     AuthService? authService,
+    OtpService? otpService,
     UserRepository? userRepository,
     FavoritesRepository? favoritesRepository,
     ItineraryRepository? itineraryRepository,
@@ -28,6 +30,7 @@ class AuthProvider extends ChangeNotifier {
     AdminRepository? adminRepository,
     NotificationRepository? notificationRepository,
   })  : _authService = authService ?? AuthService(),
+        _otpService = otpService ?? OtpService(),
         _userRepository = userRepository ?? UserRepository(),
         _favoritesRepositoryOverride = favoritesRepository,
         _itineraryRepositoryOverride = itineraryRepository,
@@ -49,6 +52,7 @@ class AuthProvider extends ChangeNotifier {
   }
 
   final AuthService _authService;
+  final OtpService _otpService;
   final UserRepository _userRepository;
 
   // Only needed by the rare account-deletion path, so these are built
@@ -229,6 +233,33 @@ class AuthProvider extends ChangeNotifier {
   Future<bool> sendPasswordResetEmail(String email) => _run(() => _authService.sendPasswordResetEmail(email));
 
   Future<bool> resendVerificationEmail() => _run(_authService.sendEmailVerification);
+
+  /// Numeric-code replacement for [sendPasswordResetEmail] — see
+  /// `OtpService`/`requestPasswordResetCode` in `functions/index.js`.
+  Future<bool> requestPasswordResetCode(String email) =>
+      _run(() => _otpService.requestPasswordResetCode(email));
+
+  Future<bool> verifyPasswordResetCode({
+    required String email,
+    required String code,
+    required String newPassword,
+  }) =>
+      _run(() => _otpService.verifyPasswordResetCode(email: email, code: code, newPassword: newPassword));
+
+  /// True when the account turned out to already be verified (nothing was
+  /// sent) — set by the most recent [requestEmailVerificationCode] call.
+  bool emailAlreadyVerified = false;
+
+  /// Numeric-code replacement for [resendVerificationEmail].
+  Future<bool> requestEmailVerificationCode() => _run(() async {
+        emailAlreadyVerified = await _otpService.requestEmailVerificationCode();
+      });
+
+  Future<bool> verifyEmailVerificationCode(String code) async {
+    final ok = await _run(() => _otpService.verifyEmailVerificationCode(code));
+    if (ok) await refreshEmailVerified();
+    return ok;
+  }
 
   Future<bool> refreshEmailVerified() async {
     final ok = await _run(_authService.reloadCurrentUser);

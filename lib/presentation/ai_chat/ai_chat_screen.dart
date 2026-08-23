@@ -534,6 +534,19 @@ class _AiChatScreenState extends State<AiChatScreen> {
     return (destination == null || destination.isEmpty) ? null : destination;
   }
 
+  /// The province half of a `<place>, <province>` stated destination (see
+  /// [_extractStatedDestination]) — the part after the last comma, so a
+  /// place name that itself contains a comma-free "City, Province" shape
+  /// still yields just the province. Null when there's no stated
+  /// destination, or it never named a province at all.
+  String? _statedProvinceName(String? statedDestination) {
+    if (statedDestination == null) return null;
+    final lastComma = statedDestination.lastIndexOf(',');
+    if (lastComma == -1) return null;
+    final province = statedDestination.substring(lastComma + 1).trim();
+    return province.isEmpty ? null : province;
+  }
+
   /// Real places/restaurants the reply actually named — see
   /// [extractBoldNames]'s doc comment for how the names themselves are
   /// found; this just resolves each against [_knownPlacesByName]/
@@ -642,6 +655,26 @@ class _AiChatScreenState extends State<AiChatScreen> {
         if (!mounted) return;
         _closeGeneratingDialog();
         _fallbackToPlanner('Couldn\'t match "${place.name}" to a province — pick your destination below.');
+        return;
+      }
+
+      // The AI states its province alongside the place name (e.g. "El Nido,
+      // Palawan"), but the Places search above can still resolve to a
+      // same-named place in a different one (there's more than one "San
+      // Fernando" in the Philippines) — Places picks the top result by
+      // relevance, not by matching that stated province. Silently
+      // generating for whichever province Places happened to return would
+      // build a trip for a place the traveler never actually discussed, so
+      // a mismatch here falls back instead of guessing.
+      final statedProvince = _statedProvinceName(statedDestination);
+      if (statedProvince != null &&
+          !province.name.toLowerCase().contains(statedProvince.toLowerCase()) &&
+          !statedProvince.toLowerCase().contains(province.name.toLowerCase())) {
+        if (!mounted) return;
+        _closeGeneratingDialog();
+        _fallbackToPlanner(
+          'Found "${place.name}" in ${province.name}, not $statedProvince as discussed — pick your destination below to be sure.',
+        );
         return;
       }
 

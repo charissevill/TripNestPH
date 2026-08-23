@@ -55,7 +55,11 @@ class _CurrentWeatherCardState extends State<CurrentWeatherCard> {
     }
   }
 
-  void _retry() => setState(() => _future = _load());
+  void _retry() {
+    setState(() {
+      _future = _load();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -65,7 +69,9 @@ class _CurrentWeatherCardState extends State<CurrentWeatherCard> {
       decoration: BoxDecoration(
         color: theme.colorScheme.primary.withValues(alpha: 0.06),
         borderRadius: BorderRadius.circular(AppRadius.lg),
-        border: Border.all(color: theme.colorScheme.primary.withValues(alpha: 0.15)),
+        border: Border.all(
+          color: theme.colorScheme.primary.withValues(alpha: 0.15),
+        ),
       ),
       child: FutureBuilder<CurrentWeather>(
         future: _future,
@@ -73,18 +79,30 @@ class _CurrentWeatherCardState extends State<CurrentWeatherCard> {
           if (snapshot.connectionState != ConnectionState.done) {
             return const SizedBox(
               height: 56,
-              child: Center(child: SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2))),
+              child: Center(
+                child: SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
             );
           }
           if (snapshot.hasError) {
             return Row(
               children: [
-                Icon(Symbols.cloud_off_rounded, color: theme.colorScheme.error, size: 22),
+                Icon(
+                  Symbols.cloud_off_rounded,
+                  color: theme.colorScheme.error,
+                  size: 22,
+                ),
                 const SizedBox(width: AppSpacing.sm),
                 Expanded(
                   child: Text(
                     'Couldn\'t load current weather.',
-                    style: theme.textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
                   ),
                 ),
                 TextButton(onPressed: _retry, child: const Text('Retry')),
@@ -95,7 +113,11 @@ class _CurrentWeatherCardState extends State<CurrentWeatherCard> {
           final weather = snapshot.data!;
           return Row(
             children: [
-              Icon(IconRegistry.resolve(weather.iconKey), size: 36, color: theme.colorScheme.primary),
+              Icon(
+                IconRegistry.resolve(weather.iconKey),
+                size: 36,
+                color: theme.colorScheme.primary,
+              ),
               const SizedBox(width: AppSpacing.md),
               Expanded(
                 child: Column(
@@ -105,7 +127,9 @@ class _CurrentWeatherCardState extends State<CurrentWeatherCard> {
                       widget.locationLabel,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.labelMedium?.copyWith(color: AppColors.textSecondary),
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
                     ),
                     Text(
                       '${weather.temperature.round()}°C · ${weather.condition}',
@@ -113,7 +137,9 @@ class _CurrentWeatherCardState extends State<CurrentWeatherCard> {
                     ),
                     Text(
                       'Humidity: ${weather.humidity}%',
-                      style: theme.textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
                     ),
                   ],
                 ),

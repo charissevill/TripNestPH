@@ -111,7 +111,24 @@ class _DetailsGalleryAppBarState extends State<DetailsGalleryAppBar> with AutoAd
                 controller: _pageController,
                 itemCount: widget.imageUrls.length,
                 itemBuilder: (context, index) {
-                  final image = CachedNetworkImage(imageUrl: widget.imageUrls[index], fit: BoxFit.cover);
+                  final image = CachedNetworkImage(
+                    imageUrl: widget.imageUrls[index],
+                    fit: BoxFit.cover,
+                    // A source photo can fail to load for reasons that have
+                    // nothing to do with this app (a dead link, a host
+                    // rate-limiting a burst of requests) — same tinted-icon
+                    // fallback as the "no photos at all" case above, rather
+                    // than surfacing the raw exception.
+                    errorWidget: (context, url, error) => Container(
+                      color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.15),
+                      alignment: Alignment.center,
+                      child: Icon(
+                        Symbols.image_rounded,
+                        size: 48,
+                        color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.4),
+                      ),
+                    ),
+                  );
                   return index == 0 && widget.heroTag != null ? Hero(tag: widget.heroTag!, child: image) : image;
                 },
               ),

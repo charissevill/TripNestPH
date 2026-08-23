@@ -104,7 +104,9 @@ class _TouristDetailsScreenState extends State<TouristDetailsScreen> {
 
   Future<void> _refresh() async {
     final future = _load();
-    setState(() => _future = future);
+    setState(() {
+      _future = future;
+    });
     try {
       await future;
     } catch (_) {
@@ -282,7 +284,8 @@ class _TouristDetailsBody extends StatelessWidget {
                   runSpacing: AppSpacing.sm,
                   children: destination.highlights
                       .map(
-                        (h) => TagChip(label: h, color: theme.colorScheme.primary),
+                        (h) =>
+                            TagChip(label: h, color: theme.colorScheme.primary),
                       )
                       .toList(),
                 ),
@@ -297,8 +300,15 @@ class _TouristDetailsBody extends StatelessWidget {
                 Align(
                   alignment: Alignment.centerLeft,
                   child: TextButton.icon(
-                    style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: const Size(0, 32)),
-                    onPressed: () => reportContent(context, targetId: destination.id, targetType: ContentTargetType.destination),
+                    style: TextButton.styleFrom(
+                      padding: EdgeInsets.zero,
+                      minimumSize: const Size(0, 32),
+                    ),
+                    onPressed: () => reportContent(
+                      context,
+                      targetId: destination.id,
+                      targetType: ContentTargetType.destination,
+                    ),
                     icon: const Icon(Symbols.flag_rounded, size: 15),
                     label: const Text('Report incorrect info'),
                   ),

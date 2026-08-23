@@ -10,6 +10,11 @@ import 'places_cache_service.dart';
 class PlaceCategory {
   PlaceCategory._();
 
+  /// Broad "anything sightseeing-ish" bucket — AI itinerary candidates and
+  /// most carousels want the widest net, not one narrow subtype. Left
+  /// unchanged so those call sites keep considering landmarks/museums as
+  /// attractions; [sightseeing]/[landmarks]/[museums] below are the finer
+  /// split used where a traveler is filtering by exactly one of them.
   static const attractions = ['tourist_attraction', 'historical_landmark', 'museum', 'park'];
   static const lodging = ['lodging'];
   static const dining = ['restaurant', 'cafe'];
@@ -19,6 +24,19 @@ class PlaceCategory {
   static const hospitals = ['hospital'];
   static const atms = ['atm'];
   static const transportTerminals = ['bus_station', 'train_station', 'airport'];
+
+  // ---- Finer-grained splits for [NearbyPlacesScreen]'s category filter —
+  // same [Place.categoryLabel]/[Place.categoryColor] families as the badge
+  // shown on each result card, so picking the "Landmarks" chip and seeing a
+  // "Historical Landmark" badge on every card actually agree with each
+  // other.
+  static const sightseeing = ['tourist_attraction', 'visitor_center', 'amusement_park', 'zoo'];
+  static const landmarks = ['historical_landmark', 'cultural_landmark', 'historical_place', 'monument', 'castle'];
+  static const museums = ['museum', 'art_museum', 'history_museum', 'art_gallery'];
+  static const restaurants = ['restaurant'];
+  static const cafes = ['cafe', 'coffee_shop'];
+  static const resorts = ['resort_hotel'];
+  static const hostels = ['hostel'];
 }
 
 /// Thin wrapper around the `placesSearchNearby`/`placesSearchText`/

@@ -91,7 +91,11 @@ class _RestaurantDetailsScreenState extends State<RestaurantDetailsScreen> {
     // legacy admin-seeded restaurant (empty businessId) has no `businesses`
     // doc to track this on.
     if (restaurant.businessId.isNotEmpty) {
-      unawaited(_businessRepository.incrementViewCount(restaurant.businessId).catchError((_) {}));
+      unawaited(
+        _businessRepository
+            .incrementViewCount(restaurant.businessId)
+            .catchError((_) {}),
+      );
     }
 
     return _RestaurantDetailsData(
@@ -102,7 +106,9 @@ class _RestaurantDetailsScreenState extends State<RestaurantDetailsScreen> {
 
   Future<void> _refresh() async {
     final future = _load();
-    setState(() => _future = future);
+    setState(() {
+      _future = future;
+    });
     try {
       await future;
     } catch (_) {
@@ -281,8 +287,15 @@ class _RestaurantDetailsBody extends StatelessWidget {
                 Align(
                   alignment: Alignment.centerLeft,
                   child: TextButton.icon(
-                    style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: const Size(0, 32)),
-                    onPressed: () => reportContent(context, targetId: restaurant.id, targetType: ContentTargetType.restaurant),
+                    style: TextButton.styleFrom(
+                      padding: EdgeInsets.zero,
+                      minimumSize: const Size(0, 32),
+                    ),
+                    onPressed: () => reportContent(
+                      context,
+                      targetId: restaurant.id,
+                      targetType: ContentTargetType.restaurant,
+                    ),
                     icon: const Icon(Symbols.flag_rounded, size: 15),
                     label: const Text('Report incorrect info'),
                   ),
@@ -295,7 +308,10 @@ class _RestaurantDetailsBody extends StatelessWidget {
                     spacing: AppSpacing.sm,
                     runSpacing: AppSpacing.sm,
                     children: restaurant.accessibilityTags
-                        .map((tag) => TagChip(label: tag, color: AppColors.success))
+                        .map(
+                          (tag) =>
+                              TagChip(label: tag, color: AppColors.success),
+                        )
                         .toList(),
                   ),
                 ],
@@ -385,23 +401,39 @@ class _RestaurantDetailsBody extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: theme.colorScheme.primary.withValues(alpha: 0.06),
                       borderRadius: BorderRadius.circular(AppRadius.lg),
-                      border: Border.all(color: theme.colorScheme.primary.withValues(alpha: 0.15)),
+                      border: Border.all(
+                        color: theme.colorScheme.primary.withValues(
+                          alpha: 0.15,
+                        ),
+                      ),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
                           children: [
-                            Icon(Symbols.auto_awesome_rounded, size: 16, color: theme.colorScheme.primary),
+                            Icon(
+                              Symbols.auto_awesome_rounded,
+                              size: 16,
+                              color: theme.colorScheme.primary,
+                            ),
                             const SizedBox(width: 6),
                             Text(
                               'Travelers say',
-                              style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.primary, fontWeight: FontWeight.w700),
+                              style: theme.textTheme.labelLarge?.copyWith(
+                                color: theme.colorScheme.primary,
+                                fontWeight: FontWeight.w700,
+                              ),
                             ),
                           ],
                         ),
                         const SizedBox(height: 6),
-                        Text(restaurant.reviewDigest!.summary, style: theme.textTheme.bodyMedium?.copyWith(height: 1.5)),
+                        Text(
+                          restaurant.reviewDigest!.summary,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            height: 1.5,
+                          ),
+                        ),
                       ],
                     ),
                   ),

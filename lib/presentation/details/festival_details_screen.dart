@@ -93,7 +93,9 @@ class _FestivalDetailsScreenState extends State<FestivalDetailsScreen> {
 
   Future<void> _refresh() async {
     final future = _load();
-    setState(() => _future = future);
+    setState(() {
+      _future = future;
+    });
     try {
       await future;
     } catch (_) {
@@ -293,8 +295,15 @@ class _FestivalDetailsBody extends StatelessWidget {
                 Align(
                   alignment: Alignment.centerLeft,
                   child: TextButton.icon(
-                    style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: const Size(0, 32)),
-                    onPressed: () => reportContent(context, targetId: festival.id, targetType: ContentTargetType.festival),
+                    style: TextButton.styleFrom(
+                      padding: EdgeInsets.zero,
+                      minimumSize: const Size(0, 32),
+                    ),
+                    onPressed: () => reportContent(
+                      context,
+                      targetId: festival.id,
+                      targetType: ContentTargetType.festival,
+                    ),
                     icon: const Icon(Symbols.flag_rounded, size: 15),
                     label: const Text('Report incorrect info'),
                   ),

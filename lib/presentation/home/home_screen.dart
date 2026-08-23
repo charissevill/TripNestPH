@@ -35,6 +35,9 @@ import '../../domain/models/place.dart';
 import '../../domain/models/travel_tip.dart';
 import 'widgets/home_header.dart';
 import 'widgets/location_prompt_card.dart';
+import 'widgets/post_trip_review_card.dart';
+import 'widgets/today_weather_chip.dart';
+import 'widgets/home_highlights_row.dart';
 
 class _HomeData {
   const _HomeData({
@@ -280,7 +283,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   Future<void> _refresh() async {
     final future = _load();
-    setState(() => _future = future);
+    setState(() {
+      _future = future;
+    });
     if (_lastData != null) await _refreshNearby();
     try {
       await future;
@@ -295,7 +300,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final user = context.watch<AuthProvider>().currentUser;
     final uid = context.watch<AuthProvider>().firebaseUser?.uid;
 
-    final headerSidePadding = MaxWidthContainer.sidePadding(context, maxWidth: 1200);
+    final headerSidePadding = MaxWidthContainer.sidePadding(
+      context,
+      maxWidth: 1200,
+    );
 
     return Scaffold(
       body: SafeArea(
@@ -334,13 +342,26 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                           );
                         },
                       ),
-                      const SizedBox(height: AppSpacing.lg),
+                      const SizedBox(height: AppSpacing.sm),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: TodayWeatherChip(
+                          latitude: _travelerLat,
+                          longitude: _travelerLng,
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.md),
                       SearchBarWidget(
                         readOnly: true,
                         onTap: () => context.push(RoutePaths.search),
                         onFilterTap: () =>
                             context.push(RoutePaths.search, extra: true),
                       ),
+                      HomeHighlightsRow(
+                        uid: uid,
+                        festivalRepository: _festivalRepository,
+                      ),
+                      PostTripReviewSection(uid: uid),
                     ],
                   ),
                 ),
@@ -446,8 +467,14 @@ class _HomeContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final sidePadding = MaxWidthContainer.sidePadding(context, maxWidth: 1200);
-    final featuredPlaces = rankByFavoriteCategories(data.featuredPlaces, favoriteCategories);
-    final popularRestaurants = rankByFavoriteCategories(data.popularRestaurants, favoriteCategories);
+    final featuredPlaces = rankByFavoriteCategories(
+      data.featuredPlaces,
+      favoriteCategories,
+    );
+    final popularRestaurants = rankByFavoriteCategories(
+      data.popularRestaurants,
+      favoriteCategories,
+    );
     return SliverList.list(
       children: [
         HeroBanner(
@@ -459,7 +486,11 @@ class _HomeContent extends StatelessWidget {
                   title: p.name,
                   subtitle: p.address.isNotEmpty ? p.address : p.categoryLabel,
                   ctaLabel: 'Explore now',
-                  onTap: () => showPlaceDetailsSheet(context, place: p, placesService: places),
+                  onTap: () => showPlaceDetailsSheet(
+                    context,
+                    place: p,
+                    placesService: places,
+                  ),
                 ),
               )
               .toList(),
@@ -502,7 +533,11 @@ class _HomeContent extends StatelessWidget {
             itemBuilder: (context, i) => PlaceCard(
               place: nearby[i],
               imageUrl: _photoUrl(nearby[i]),
-              onTap: () => showPlaceDetailsSheet(context, place: nearby[i], placesService: places),
+              onTap: () => showPlaceDetailsSheet(
+                context,
+                place: nearby[i],
+                placesService: places,
+              ),
             ),
           )
         else if (!locationPromptDismissed &&
@@ -533,7 +568,11 @@ class _HomeContent extends StatelessWidget {
           itemBuilder: (context, i) => PlaceCard(
             place: nearbyRestaurants[i],
             imageUrl: _photoUrl(nearbyRestaurants[i]),
-            onTap: () => showPlaceDetailsSheet(context, place: nearbyRestaurants[i], placesService: places),
+            onTap: () => showPlaceDetailsSheet(
+              context,
+              place: nearbyRestaurants[i],
+              placesService: places,
+            ),
           ),
         ),
         ..._carouselSection(
@@ -546,7 +585,11 @@ class _HomeContent extends StatelessWidget {
           itemBuilder: (context, i) => PlaceCard(
             place: featuredPlaces[i],
             imageUrl: _photoUrl(featuredPlaces[i]),
-            onTap: () => showPlaceDetailsSheet(context, place: featuredPlaces[i], placesService: places),
+            onTap: () => showPlaceDetailsSheet(
+              context,
+              place: featuredPlaces[i],
+              placesService: places,
+            ),
           ),
         ),
         ..._carouselSection(
@@ -559,7 +602,11 @@ class _HomeContent extends StatelessWidget {
           itemBuilder: (context, i) => PlaceCard(
             place: popularRestaurants[i],
             imageUrl: _photoUrl(popularRestaurants[i]),
-            onTap: () => showPlaceDetailsSheet(context, place: popularRestaurants[i], placesService: places),
+            onTap: () => showPlaceDetailsSheet(
+              context,
+              place: popularRestaurants[i],
+              placesService: places,
+            ),
           ),
         ),
         ..._carouselSection(

@@ -53,6 +53,12 @@ import '../../domain/models/province.dart';
 import '../../domain/models/restaurant.dart';
 import '../../domain/models/saved_itinerary.dart';
 
+/// A specific section of [GeneratedItineraryScreen] that a deep link
+/// (`RoutePaths.tripExpenses`/`tripPacking`/`tripPolls`) can open directly
+/// to, instead of landing on the top of the trip like a plain
+/// [RoutePaths.generatedItinerary] link does.
+enum ItinerarySection { budget, packing, polls }
+
 /// The trip-planner result: a day-by-day timeline, budget breakdown, weather
 /// outlook, recommendations and travel tips. Can either show a freshly
 /// AI-generated [Itinerary] or a previously [SavedItinerary] opened from
@@ -62,6 +68,7 @@ class GeneratedItineraryScreen extends StatefulWidget {
     super.key,
     required this.itinerary,
     this.savedItineraryId,
+    this.initialSection,
   });
 
   final Itinerary itinerary;
@@ -69,6 +76,11 @@ class GeneratedItineraryScreen extends StatefulWidget {
   /// Non-null when opened from the Saved Trips list — swaps the "Save"
   /// action for "Remove from Saved".
   final String? savedItineraryId;
+
+  /// Set when opened via one of the section-specific routes — scrolls to
+  /// that section once it's mounted (see [_GeneratedItineraryScreenState
+  /// ._scrollToInitialSection]) instead of leaving the traveler at the top.
+  final ItinerarySection? initialSection;
 
   @override
   State<GeneratedItineraryScreen> createState() =>
@@ -115,6 +127,13 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
   /// Discard in [_handleUnsavedPopAttempt]) so that second, self-triggered
   /// pop attempt isn't intercepted all over again.
   bool _readyToPop = false;
+
+  /// Anchors for [ItinerarySection] deep links — see
+  /// [_scrollToInitialSection].
+  final _budgetSectionKey = GlobalKey();
+  final _packingSectionKey = GlobalKey();
+  final _pollsSectionKey = GlobalKey();
+  bool _hasScrolledToInitialSection = false;
 
   bool get _isSaved => widget.savedItineraryId != null;
 
@@ -172,6 +191,37 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
       _loadSavedItinerary();
       _loadOfflineStatus();
     }
+    if (widget.initialSection != null) {
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => _scrollToInitialSection(),
+      );
+    }
+  }
+
+  /// Scrolls to the section named by [GeneratedItineraryScreen.
+  /// initialSection], for a traveler who arrived via one of the
+  /// section-specific routes (`RoutePaths.tripExpenses`/`tripPacking`/
+  /// `tripPolls`) rather than the plain itinerary link. The Budget/Polls
+  /// sections mount as soon as the trip is saved, but Packing also needs
+  /// [_savedItinerary] to have loaded — so this is called again once that
+  /// finishes, and no-ops once it's already scrolled (or the target section
+  /// isn't mounted yet).
+  void _scrollToInitialSection() {
+    if (_hasScrolledToInitialSection || widget.initialSection == null) return;
+    final key = switch (widget.initialSection!) {
+      ItinerarySection.budget => _budgetSectionKey,
+      ItinerarySection.packing => _packingSectionKey,
+      ItinerarySection.polls => _pollsSectionKey,
+    };
+    final targetContext = key.currentContext;
+    if (targetContext == null) return;
+    _hasScrolledToInitialSection = true;
+    Scrollable.ensureVisible(
+      targetContext,
+      duration: const Duration(milliseconds: 400),
+      curve: Curves.easeInOut,
+      alignment: 0.05,
+    );
   }
 
   Future<void> _loadOfflineStatus() async {
@@ -189,7 +239,11 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
     if (isAvailable && mounted) {
       unawaited(
         _offlineService
-            .makeAvailableOffline(context: context, itineraryId: widget.savedItineraryId!, itinerary: widget.itinerary)
+            .makeAvailableOffline(
+              context: context,
+              itineraryId: widget.savedItineraryId!,
+              itinerary: widget.itinerary,
+            )
             .catchError((_) {}),
       );
     }
@@ -223,6 +277,11 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
     try {
       final trip = await _repository.getById(widget.savedItineraryId!);
       if (mounted) setState(() => _savedItinerary = trip);
+      if (widget.initialSection == ItinerarySection.packing && mounted) {
+        WidgetsBinding.instance.addPostFrameCallback(
+          (_) => _scrollToInitialSection(),
+        );
+      }
       // Otherwise the Weather Outlook silently kept showing the forecast
       // fetched back on the day this trip was first generated, forever —
       // _refreshWeatherForDate was only ever wired to the date *picker*
@@ -420,8 +479,12 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
     // than leaving it to silently fire on a date that's no longer this
     // trip's start is the safer failure mode. NotificationService.
     // cancelReminder is a no-op if nothing was ever scheduled for that id.
-    await NotificationService.instance.cancelReminder(_reminderId(isTravelDay: true));
-    await NotificationService.instance.cancelReminder(_reminderId(isTravelDay: false));
+    await NotificationService.instance.cancelReminder(
+      _reminderId(isTravelDay: true),
+    );
+    await NotificationService.instance.cancelReminder(
+      _reminderId(isTravelDay: false),
+    );
     await _refreshWeatherForDate(picked);
   }
 
@@ -535,10 +598,13 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
       context.push(RoutePaths.restaurantDetails(restaurantMatch.id));
       return;
     }
-    final placeMatch = [
-      ...widget.itinerary.recommendedPlaceAttractions,
-      ...widget.itinerary.recommendedAccommodations,
-    ].where((p) => p.name.toLowerCase() == line.place.toLowerCase()).firstOrNull;
+    final placeMatch =
+        [
+              ...widget.itinerary.recommendedPlaceAttractions,
+              ...widget.itinerary.recommendedAccommodations,
+            ]
+            .where((p) => p.name.toLowerCase() == line.place.toLowerCase())
+            .firstOrNull;
     if (placeMatch != null) {
       _openPlaceRecommendation(placeMatch);
       return;
@@ -656,7 +722,8 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
           final confirmed = await showConfirmationDialog(
             context,
             title: 'Replace your saved itinerary?',
-            message: 'This swaps in the new plan and can\'t be undone. Your current saved itinerary will be gone.',
+            message:
+                'This swaps in the new plan and can\'t be undone. Your current saved itinerary will be gone.',
             confirmLabel: 'Replace',
             isDestructive: true,
           );
@@ -665,7 +732,11 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
           // leaving it stale/orphaned while this pushes a second, separate
           // unsaved copy (see updateItinerary's doc comment).
           try {
-            await _repository.updateItinerary(savedId, title: itinerary.destinationName, itinerary: itinerary);
+            await _repository.updateItinerary(
+              savedId,
+              title: itinerary.destinationName,
+              itinerary: itinerary,
+            );
           } catch (e) {
             if (!mounted) return;
             _showRegenerateError(AppException.from(e).message);
@@ -675,7 +746,10 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
         if (!mounted) return;
         context.pushReplacement(
           RoutePaths.generatedItinerary,
-          extra: {'itinerary': itinerary, if (savedId != null) 'savedId': savedId},
+          extra: {
+            'itinerary': itinerary,
+            if (savedId != null) 'savedId': savedId,
+          },
         );
       } else {
         _showRegenerateError(
@@ -981,7 +1055,10 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
                     labelText: 'Question',
                     hintText: 'e.g. Which restaurant for Day 2?',
                     errorText: errorText,
-                    prefixIcon: const Icon(Symbols.how_to_vote_rounded, size: 20),
+                    prefixIcon: const Icon(
+                      Symbols.how_to_vote_rounded,
+                      size: 20,
+                    ),
                   ),
                 ),
                 for (var i = 0; i < optionControllers.length; i++)
@@ -995,9 +1072,13 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
                         counterText: '',
                         suffixIcon: optionControllers.length > 2
                             ? IconButton(
-                                icon: const Icon(Symbols.close_rounded, size: 18),
+                                icon: const Icon(
+                                  Symbols.close_rounded,
+                                  size: 18,
+                                ),
                                 onPressed: () => setDialogState(() {
-                                  optionControllers = [...optionControllers]..removeAt(i);
+                                  optionControllers = [...optionControllers]
+                                    ..removeAt(i);
                                 }),
                               )
                             : null,
@@ -1009,7 +1090,10 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
                     alignment: Alignment.centerLeft,
                     child: TextButton.icon(
                       onPressed: () => setDialogState(
-                        () => optionControllers = [...optionControllers, TextEditingController()],
+                        () => optionControllers = [
+                          ...optionControllers,
+                          TextEditingController(),
+                        ],
                       ),
                       icon: const Icon(Symbols.add_rounded, size: 18),
                       label: const Text('Add option'),
@@ -1022,8 +1106,9 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
                       alignment: Alignment.centerLeft,
                       child: Text(
                         optionsErrorText!,
-                        style: Theme.of(context).textTheme.bodySmall
-                            ?.copyWith(color: Theme.of(context).colorScheme.error),
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.error,
+                        ),
                       ),
                     ),
                   ),
@@ -1062,7 +1147,8 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
                 if (distinct.length != filled.length) {
                   setDialogState(() {
                     errorText = null;
-                    optionsErrorText = 'Options must be different from each other.';
+                    optionsErrorText =
+                        'Options must be different from each other.';
                   });
                   return;
                 }
@@ -1112,6 +1198,167 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
     }
   }
 
+  /// Editing clears the poll's existing votes — matches firestore.rules'
+  /// `polls` update rule, which requires the same reset, since a shifted or
+  /// removed option would leave existing votes pointing at the wrong index.
+  /// Only reachable when `canDelete` is true (creator or trip owner) in
+  /// `_PollCard` — the same people the update rule permits.
+  Future<void> _editPoll(Poll poll) async {
+    final questionController = TextEditingController(text: poll.question);
+    var optionControllers = poll.options
+        .map((o) => TextEditingController(text: o))
+        .toList();
+    String? errorText;
+    String? optionsErrorText;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Edit Poll'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (poll.totalVotes > 0)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                    child: Text(
+                      'Saving will clear the ${poll.totalVotes} existing vote${poll.totalVotes == 1 ? '' : 's'} on this poll.',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                    ),
+                  ),
+                TextField(
+                  controller: questionController,
+                  maxLength: 200,
+                  decoration: InputDecoration(
+                    labelText: 'Question',
+                    hintText: 'e.g. Which restaurant for Day 2?',
+                    errorText: errorText,
+                    prefixIcon: const Icon(
+                      Symbols.how_to_vote_rounded,
+                      size: 20,
+                    ),
+                  ),
+                ),
+                for (var i = 0; i < optionControllers.length; i++)
+                  Padding(
+                    padding: const EdgeInsets.only(top: AppSpacing.sm),
+                    child: TextField(
+                      controller: optionControllers[i],
+                      maxLength: 100,
+                      decoration: InputDecoration(
+                        labelText: 'Option ${i + 1}',
+                        counterText: '',
+                        suffixIcon: optionControllers.length > 2
+                            ? IconButton(
+                                icon: const Icon(
+                                  Symbols.close_rounded,
+                                  size: 18,
+                                ),
+                                onPressed: () => setDialogState(() {
+                                  optionControllers = [...optionControllers]
+                                    ..removeAt(i);
+                                }),
+                              )
+                            : null,
+                      ),
+                    ),
+                  ),
+                if (optionControllers.length < 6)
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton.icon(
+                      onPressed: () => setDialogState(
+                        () => optionControllers = [
+                          ...optionControllers,
+                          TextEditingController(),
+                        ],
+                      ),
+                      icon: const Icon(Symbols.add_rounded, size: 18),
+                      label: const Text('Add option'),
+                    ),
+                  ),
+                if (optionsErrorText != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: AppSpacing.xs),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        optionsErrorText!,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.error,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () {
+                if (questionController.text.trim().isEmpty) {
+                  setDialogState(() {
+                    errorText = 'Enter a question';
+                    optionsErrorText = null;
+                  });
+                  return;
+                }
+                final filled = optionControllers
+                    .map((c) => c.text.trim())
+                    .where((t) => t.isNotEmpty)
+                    .toList();
+                if (filled.length < 2) {
+                  setDialogState(() {
+                    errorText = null;
+                    optionsErrorText = 'Add at least 2 options.';
+                  });
+                  return;
+                }
+                final distinct = filled.map((t) => t.toLowerCase()).toSet();
+                if (distinct.length != filled.length) {
+                  setDialogState(() {
+                    errorText = null;
+                    optionsErrorText =
+                        'Options must be different from each other.';
+                  });
+                  return;
+                }
+                Navigator.of(context).pop(true);
+              },
+              child: const Text('Save'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+    try {
+      await _pollRepository.update(
+        itineraryId: widget.savedItineraryId!,
+        pollId: poll.id,
+        question: questionController.text.trim(),
+        options: optionControllers
+            .map((c) => c.text.trim())
+            .where((t) => t.isNotEmpty)
+            .toList(),
+      );
+    } catch (e) {
+      if (mounted)
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(AppException.from(e).message)));
+    }
+  }
+
   Future<void> _deletePoll(Poll poll) async {
     final confirmed = await showConfirmationDialog(
       context,
@@ -1125,6 +1372,172 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
       await _pollRepository.delete(
         itineraryId: widget.savedItineraryId!,
         pollId: poll.id,
+      );
+    } catch (e) {
+      if (mounted)
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(AppException.from(e).message)));
+    }
+  }
+
+  /// Only reachable for an expense the current user logged themselves —
+  /// firestore.rules' `expenses` update rule only lets an edit through when
+  /// the resulting doc's `loggedBy` still equals the caller's own uid, so an
+  /// owner editing someone else's entry would fail server-side even though
+  /// they're allowed to delete it. See `_BudgetTrackerCard`'s edit gating.
+  Future<void> _editExpense(Expense expense) async {
+    final categories = [
+      ...widget.itinerary.budgetBreakdown.map((b) => b.label),
+      'Other',
+    ];
+    var selectedCategory = categories.contains(expense.category)
+        ? expense.category
+        : categories.last;
+    final amountController = TextEditingController(
+      text: expense.amount.toStringAsFixed(2),
+    );
+    final noteController = TextEditingController(text: expense.note);
+    String? errorText;
+
+    final uid = _uid;
+    final memberIds =
+        _savedItinerary?.memberIds ?? (uid != null ? [uid] : const <String>[]);
+    final memberNames =
+        _savedItinerary?.memberNames ?? const <String, String>{};
+    String nameFor(String id) =>
+        id == uid ? 'You' : (memberNames[id] ?? 'Traveler');
+    final splitWith = expense.splitBetween.isEmpty
+        ? memberIds.toSet()
+        : expense.splitBetween.toSet();
+    String? splitErrorText;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Edit Expense'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                DropdownButtonFormField<String>(
+                  initialValue: selectedCategory,
+                  decoration: const InputDecoration(labelText: 'Category'),
+                  items: categories
+                      .map((c) => DropdownMenuItem(value: c, child: Text(c)))
+                      .toList(),
+                  onChanged: (v) => setDialogState(
+                    () => selectedCategory = v ?? selectedCategory,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                TextField(
+                  controller: amountController,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  decoration: InputDecoration(
+                    labelText: 'Amount (₱)',
+                    errorText: errorText,
+                    prefixIcon: const Icon(Symbols.payments_rounded, size: 20),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                TextField(
+                  controller: noteController,
+                  decoration: const InputDecoration(
+                    labelText: 'Note (optional)',
+                    prefixIcon: Icon(Symbols.edit_note_rounded, size: 20),
+                  ),
+                ),
+                if (memberIds.length > 1) ...[
+                  const SizedBox(height: AppSpacing.md),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'Split between',
+                      style: Theme.of(context).textTheme.labelMedium,
+                    ),
+                  ),
+                  ...memberIds.map(
+                    (id) => CheckboxListTile(
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                      controlAffinity: ListTileControlAffinity.leading,
+                      title: Text(nameFor(id)),
+                      value: splitWith.contains(id),
+                      onChanged: (checked) => setDialogState(() {
+                        if (checked ?? false) {
+                          splitWith.add(id);
+                          splitErrorText = null;
+                        } else {
+                          splitWith.remove(id);
+                        }
+                      }),
+                    ),
+                  ),
+                  if (splitErrorText != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: AppSpacing.xs),
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          splitErrorText!,
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
+                                color: Theme.of(context).colorScheme.error,
+                              ),
+                        ),
+                      ),
+                    ),
+                ],
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () {
+                final amountError = Validators.amount(
+                  amountController.text,
+                  required: true,
+                  maxAmount: 500000,
+                );
+                if (amountError != null) {
+                  setDialogState(() => errorText = amountError);
+                  return;
+                }
+                if (splitWith.isEmpty) {
+                  setDialogState(
+                    () => splitErrorText =
+                        'Select at least one person to split with',
+                  );
+                  return;
+                }
+                Navigator.of(context).pop(true);
+              },
+              child: const Text('Save'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+    try {
+      await _expenseRepository.update(
+        itineraryId: widget.savedItineraryId!,
+        expenseId: expense.id,
+        category: selectedCategory,
+        amount: double.parse(amountController.text.trim()),
+        splitBetween: splitWith.length == memberIds.length
+            ? const []
+            : splitWith.toList(),
+        note: noteController.text.trim(),
       );
     } catch (e) {
       if (mounted)
@@ -1268,14 +1681,19 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
       // what's actually saved, rather than showing an edit that silently
       // failed to persist.
       setState(() => _days = widget.itinerary.days);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(AppException.from(e).message)));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(AppException.from(e).message)));
     }
   }
 
   /// Same whole-document overwrite + optimistic-then-revert pattern as
   /// [_persistDays] — see that method's doc comment for why a race isn't a
   /// concern here either (owner-only, see [_canEditBudget]).
-  Future<void> _persistBudget(List<BudgetItem> updatedBreakdown, double updatedTotal) async {
+  Future<void> _persistBudget(
+    List<BudgetItem> updatedBreakdown,
+    double updatedTotal,
+  ) async {
     final savedId = widget.savedItineraryId;
     if (savedId == null) return;
     final previousBreakdown = _budgetBreakdown;
@@ -1326,9 +1744,7 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
           content: TextField(
             controller: priceController,
             autofocus: true,
-            keyboardType: const TextInputType.numberWithOptions(
-              decimal: true,
-            ),
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
             decoration: InputDecoration(
               labelText: 'Price (₱)',
               errorText: errorText,
@@ -1374,7 +1790,11 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
         items: cat.items
             .map(
               (i) => i == line
-                  ? BudgetLineItem(name: line.name, price: newPrice, place: line.place)
+                  ? BudgetLineItem(
+                      name: line.name,
+                      price: newPrice,
+                      place: line.place,
+                    )
                   : i,
             )
             .toList(),
@@ -1392,12 +1812,23 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
     );
     if (result == null || !mounted) return;
     final updated = _days
-        .map((d) => d.dayNumber == dayNumber ? ItineraryDay(dayNumber: d.dayNumber, dateLabel: d.dateLabel, activities: [...d.activities, result]) : d)
+        .map(
+          (d) => d.dayNumber == dayNumber
+              ? ItineraryDay(
+                  dayNumber: d.dayNumber,
+                  dateLabel: d.dateLabel,
+                  activities: [...d.activities, result],
+                )
+              : d,
+        )
         .toList();
     await _persistDays(updated);
   }
 
-  Future<void> _removeActivity(int dayNumber, ItineraryActivity activity) async {
+  Future<void> _removeActivity(
+    int dayNumber,
+    ItineraryActivity activity,
+  ) async {
     final confirmed = await showConfirmationDialog(
       context,
       title: 'Remove this activity?',
@@ -1409,7 +1840,11 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
     final updated = _days
         .map(
           (d) => d.dayNumber == dayNumber
-              ? ItineraryDay(dayNumber: d.dayNumber, dateLabel: d.dateLabel, activities: d.activities.where((a) => a != activity).toList())
+              ? ItineraryDay(
+                  dayNumber: d.dayNumber,
+                  dateLabel: d.dateLabel,
+                  activities: d.activities.where((a) => a != activity).toList(),
+                )
               : d,
         )
         .toList();
@@ -1427,7 +1862,11 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
       final activities = [...d.activities];
       final moved = activities.removeAt(index);
       activities.insert(newIndex, moved);
-      return ItineraryDay(dayNumber: d.dayNumber, dateLabel: d.dateLabel, activities: activities);
+      return ItineraryDay(
+        dayNumber: d.dayNumber,
+        dateLabel: d.dateLabel,
+        activities: activities,
+      );
     }).toList();
     await _persistDays(updated);
   }
@@ -1703,6 +2142,7 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
                         if (widget.savedItineraryId != null) ...[
                           const SizedBox(height: AppSpacing.xxl),
                           Row(
+                            key: _budgetSectionKey,
                             children: [
                               Expanded(
                                 child: Text(
@@ -1713,7 +2153,10 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
                               if (_isTripMember)
                                 TextButton.icon(
                                   onPressed: _addExpense,
-                                  icon: const Icon(Symbols.add_rounded, size: 18),
+                                  icon: const Icon(
+                                    Symbols.add_rounded,
+                                    size: 18,
+                                  ),
                                   label: const Text('Add Expense'),
                                 ),
                             ],
@@ -1740,6 +2183,7 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
                                     currentUid: _uid,
                                     isOwner: _isOwner,
                                     onDelete: _deleteExpense,
+                                    onEdit: _editExpense,
                                   ),
                                   if (expenses.isNotEmpty)
                                     _ExpenseBreakdownChart(
@@ -1763,6 +2207,7 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
                             _savedItinerary != null) ...[
                           const SizedBox(height: AppSpacing.xxl),
                           Row(
+                            key: _packingSectionKey,
                             children: [
                               Expanded(
                                 child: Text(
@@ -1773,7 +2218,10 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
                               if (_isTripMember)
                                 TextButton.icon(
                                   onPressed: _addPackingItem,
-                                  icon: const Icon(Symbols.add_rounded, size: 18),
+                                  icon: const Icon(
+                                    Symbols.add_rounded,
+                                    size: 18,
+                                  ),
                                   label: const Text('Add Item'),
                                 ),
                             ],
@@ -1788,6 +2236,7 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
                         if (widget.savedItineraryId != null) ...[
                           const SizedBox(height: AppSpacing.xxl),
                           Row(
+                            key: _pollsSectionKey,
                             children: [
                               Expanded(
                                 child: Text(
@@ -1798,7 +2247,10 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
                               if (_isTripMember)
                                 TextButton.icon(
                                   onPressed: _createPoll,
-                                  icon: const Icon(Symbols.add_rounded, size: 18),
+                                  icon: const Icon(
+                                    Symbols.add_rounded,
+                                    size: 18,
+                                  ),
                                   label: const Text('New Poll'),
                                 ),
                             ],
@@ -1839,6 +2291,7 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
                                         onVote: (optionIndex) =>
                                             _votePoll(poll, optionIndex),
                                         onDelete: () => _deletePoll(poll),
+                                        onEdit: () => _editPoll(poll),
                                       ),
                                     )
                                     .toList(),
@@ -1888,9 +2341,20 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen> {
                                   itinerary.destinationLatitude,
                               mainDestinationLongitude:
                                   itinerary.destinationLongitude,
-                              onAddActivity: _canEditActivities ? () => _addActivity(day.dayNumber) : null,
-                              onRemoveActivity: _canEditActivities ? (activity) => _removeActivity(day.dayNumber, activity) : null,
-                              onMoveActivity: _canEditActivities ? (index, delta) => _moveActivity(day.dayNumber, index, delta) : null,
+                              onAddActivity: _canEditActivities
+                                  ? () => _addActivity(day.dayNumber)
+                                  : null,
+                              onRemoveActivity: _canEditActivities
+                                  ? (activity) =>
+                                        _removeActivity(day.dayNumber, activity)
+                                  : null,
+                              onMoveActivity: _canEditActivities
+                                  ? (index, delta) => _moveActivity(
+                                      day.dayNumber,
+                                      index,
+                                      delta,
+                                    )
+                                  : null,
                             ),
                           ),
                         ),
@@ -2183,7 +2647,8 @@ class _RefineInstructionDialog extends StatefulWidget {
   const _RefineInstructionDialog();
 
   @override
-  State<_RefineInstructionDialog> createState() => _RefineInstructionDialogState();
+  State<_RefineInstructionDialog> createState() =>
+      _RefineInstructionDialogState();
 }
 
 class _RefineInstructionDialogState extends State<_RefineInstructionDialog> {
@@ -2238,7 +2703,9 @@ class _RefineInstructionDialogState extends State<_RefineInstructionDialog> {
             autofocus: true,
             maxLines: 3,
             maxLength: 300,
-            decoration: const InputDecoration(hintText: 'e.g. "Make Day 2 cheaper"'),
+            decoration: const InputDecoration(
+              hintText: 'e.g. "Make Day 2 cheaper"',
+            ),
             onSubmitted: (_) => _submit(),
           ),
           Wrap(
@@ -2256,7 +2723,10 @@ class _RefineInstructionDialogState extends State<_RefineInstructionDialog> {
         ],
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cancel')),
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
         FilledButton(
           onPressed: _hasInstruction ? _submit : null,
           child: const Text('Refine'),
@@ -2284,7 +2754,9 @@ class _AddActivityDialogState extends State<_AddActivityDialog> {
   final _descriptionController = TextEditingController();
   final _locationController = TextEditingController();
 
-  bool get _isValid => _timeController.text.trim().isNotEmpty && _titleController.text.trim().isNotEmpty;
+  bool get _isValid =>
+      _timeController.text.trim().isNotEmpty &&
+      _titleController.text.trim().isNotEmpty;
 
   @override
   void initState() {
@@ -2327,7 +2799,10 @@ class _AddActivityDialogState extends State<_AddActivityDialog> {
             TextField(
               controller: _timeController,
               autofocus: true,
-              decoration: const InputDecoration(labelText: 'Time', hintText: 'e.g. "Morning" or "2:00 PM"'),
+              decoration: const InputDecoration(
+                labelText: 'Time',
+                hintText: 'e.g. "Morning" or "2:00 PM"',
+              ),
             ),
             const SizedBox(height: AppSpacing.sm),
             TextField(
@@ -2338,19 +2813,29 @@ class _AddActivityDialogState extends State<_AddActivityDialog> {
             TextField(
               controller: _descriptionController,
               maxLines: 2,
-              decoration: const InputDecoration(labelText: 'Description (optional)'),
+              decoration: const InputDecoration(
+                labelText: 'Description (optional)',
+              ),
             ),
             const SizedBox(height: AppSpacing.sm),
             TextField(
               controller: _locationController,
-              decoration: const InputDecoration(labelText: 'Location (optional)'),
+              decoration: const InputDecoration(
+                labelText: 'Location (optional)',
+              ),
             ),
           ],
         ),
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cancel')),
-        FilledButton(onPressed: _isValid ? _submit : null, child: const Text('Add')),
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: _isValid ? _submit : null,
+          child: const Text('Add'),
+        ),
       ],
     );
   }
@@ -2477,7 +2962,11 @@ class _WeatherTile extends StatelessWidget {
 }
 
 class _BudgetSummaryCard extends StatelessWidget {
-  const _BudgetSummaryCard({required this.itinerary, this.onTapItem, this.onEditItem});
+  const _BudgetSummaryCard({
+    required this.itinerary,
+    this.onTapItem,
+    this.onEditItem,
+  });
 
   final Itinerary itinerary;
 
@@ -2594,12 +3083,10 @@ class _BudgetSummaryCard extends StatelessWidget {
                                                       ? theme
                                                             .colorScheme
                                                             .primary
-                                                      : AppColors
-                                                            .textTertiary,
+                                                      : AppColors.textTertiary,
                                                   decoration:
                                                       line.place.isNotEmpty
-                                                      ? TextDecoration
-                                                            .underline
+                                                      ? TextDecoration.underline
                                                       : null,
                                                 ),
                                           ),
@@ -2608,8 +3095,8 @@ class _BudgetSummaryCard extends StatelessWidget {
                                               'at ${line.place}',
                                               style: theme.textTheme.labelSmall
                                                   ?.copyWith(
-                                                    color: AppColors
-                                                        .textTertiary,
+                                                    color:
+                                                        AppColors.textTertiary,
                                                   ),
                                             ),
                                         ],
@@ -2618,10 +3105,9 @@ class _BudgetSummaryCard extends StatelessWidget {
                                   ),
                                   Text(
                                     '~₱${line.price.toStringAsFixed(0)}',
-                                    style: theme.textTheme.bodySmall
-                                        ?.copyWith(
-                                          color: AppColors.textTertiary,
-                                        ),
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      color: AppColors.textTertiary,
+                                    ),
                                   ),
                                   if (onEditItem != null)
                                     InkWell(
@@ -2685,6 +3171,7 @@ class _BudgetTrackerCard extends StatelessWidget {
     required this.currentUid,
     required this.isOwner,
     required this.onDelete,
+    required this.onEdit,
   });
 
   final Itinerary itinerary;
@@ -2699,6 +3186,12 @@ class _BudgetTrackerCard extends StatelessWidget {
   /// permission error the traveler had no way to predict.
   final bool isOwner;
   final ValueChanged<Expense> onDelete;
+
+  /// Narrower than [onDelete]'s gating: only offered for an expense the
+  /// viewer logged themselves, even for the trip owner, since
+  /// firestore.rules' update rule only lets an edit through when the
+  /// resulting doc's `loggedBy` still matches the caller's own uid.
+  final ValueChanged<Expense> onEdit;
 
   String _nameFor(String uid) =>
       uid == currentUid ? 'You' : (memberNames[uid] ?? 'Traveler');
@@ -2814,6 +3307,15 @@ class _BudgetTrackerCard extends StatelessWidget {
                       '₱${expense.amount.toStringAsFixed(0)}',
                       style: theme.textTheme.labelMedium,
                     ),
+                    if (expense.loggedBy == currentUid)
+                      IconButton(
+                        icon: Icon(
+                          Symbols.edit_rounded,
+                          size: 18,
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                        onPressed: () => onEdit(expense),
+                      ),
                     if (isOwner || expense.loggedBy == currentUid)
                       IconButton(
                         icon: Icon(
@@ -3099,6 +3601,7 @@ class _PollCard extends StatelessWidget {
     required this.canDelete,
     required this.onVote,
     required this.onDelete,
+    required this.onEdit,
   });
 
   final Poll poll;
@@ -3107,9 +3610,12 @@ class _PollCard extends StatelessWidget {
   /// The poll's creator can remove it; a collaborator can only remove one
   /// they created — matches the server-side rule (firestore.rules' `polls`
   /// match block), same reasoning as `_BudgetTrackerCard`'s delete gating.
+  /// Editing the question/options follows this same rule, so [onEdit] is
+  /// offered under the same condition.
   final bool canDelete;
   final void Function(int optionIndex) onVote;
   final VoidCallback onDelete;
+  final VoidCallback onEdit;
 
   @override
   Widget build(BuildContext context) {
@@ -3141,7 +3647,15 @@ class _PollCard extends StatelessWidget {
               Expanded(
                 child: Text(poll.question, style: theme.textTheme.titleSmall),
               ),
-              if (canDelete)
+              if (canDelete) ...[
+                InkWell(
+                  onTap: onEdit,
+                  borderRadius: BorderRadius.circular(AppRadius.pill),
+                  child: const Padding(
+                    padding: EdgeInsets.all(2),
+                    child: Icon(Symbols.edit_rounded, size: 18),
+                  ),
+                ),
                 InkWell(
                   onTap: onDelete,
                   borderRadius: BorderRadius.circular(AppRadius.pill),
@@ -3150,6 +3664,7 @@ class _PollCard extends StatelessWidget {
                     child: Icon(Symbols.close_rounded, size: 18),
                   ),
                 ),
+              ],
             ],
           ),
           const SizedBox(height: AppSpacing.sm),
@@ -3210,9 +3725,7 @@ class _PollOptionBar extends StatelessWidget {
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(AppRadius.md),
           border: Border.all(
-            color: selected
-                ? theme.colorScheme.primary
-                : AppColors.border,
+            color: selected ? theme.colorScheme.primary : AppColors.border,
             width: selected ? 1.5 : 1,
           ),
         ),
@@ -3228,9 +3741,7 @@ class _PollOptionBar extends StatelessWidget {
                     color: theme.colorScheme.primary,
                   ),
                 if (selected) const SizedBox(width: 4),
-                Expanded(
-                  child: Text(label, style: theme.textTheme.bodyMedium),
-                ),
+                Expanded(child: Text(label, style: theme.textTheme.bodyMedium)),
                 Text(
                   count == 0 ? '' : '$count',
                   style: theme.textTheme.labelMedium?.copyWith(
@@ -3500,9 +4011,16 @@ class _DayCard extends StatelessWidget {
             return _TimelineActivity(
               activity: activity,
               isLast: isLast,
-              onRemove: onRemoveActivity == null ? null : () => onRemoveActivity!(activity),
-              onMoveUp: onMoveActivity == null || i == 0 ? null : () => onMoveActivity!(i, -1),
-              onMoveDown: onMoveActivity == null || i == day.activities.length - 1 ? null : () => onMoveActivity!(i, 1),
+              onRemove: onRemoveActivity == null
+                  ? null
+                  : () => onRemoveActivity!(activity),
+              onMoveUp: onMoveActivity == null || i == 0
+                  ? null
+                  : () => onMoveActivity!(i, -1),
+              onMoveDown:
+                  onMoveActivity == null || i == day.activities.length - 1
+                  ? null
+                  : () => onMoveActivity!(i, 1),
             );
           }),
           if (onAddActivity != null)
@@ -3608,7 +4126,9 @@ class _TimelineActivity extends StatelessWidget {
                           child: Icon(
                             Symbols.arrow_upward_rounded,
                             size: 15,
-                            color: onMoveUp != null ? theme.colorScheme.onSurfaceVariant : theme.colorScheme.outlineVariant,
+                            color: onMoveUp != null
+                                ? theme.colorScheme.onSurfaceVariant
+                                : theme.colorScheme.outlineVariant,
                           ),
                         ),
                         const SizedBox(width: 6),
@@ -3617,13 +4137,19 @@ class _TimelineActivity extends StatelessWidget {
                           child: Icon(
                             Symbols.arrow_downward_rounded,
                             size: 15,
-                            color: onMoveDown != null ? theme.colorScheme.onSurfaceVariant : theme.colorScheme.outlineVariant,
+                            color: onMoveDown != null
+                                ? theme.colorScheme.onSurfaceVariant
+                                : theme.colorScheme.outlineVariant,
                           ),
                         ),
                         const SizedBox(width: 6),
                         InkWell(
                           onTap: onRemove,
-                          child: Icon(Symbols.close_rounded, size: 15, color: theme.colorScheme.error),
+                          child: Icon(
+                            Symbols.close_rounded,
+                            size: 15,
+                            color: theme.colorScheme.error,
+                          ),
                         ),
                       ],
                     ],

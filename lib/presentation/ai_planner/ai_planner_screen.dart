@@ -690,6 +690,11 @@ class _AiPlannerScreenState extends State<AiPlannerScreen> {
                     : _generate,
                 height: 60,
               ),
+              if (!planner.isGenerating)
+                TextButton(
+                  onPressed: () => context.push(RoutePaths.manualItinerary),
+                  child: const Text('Prefer to build it yourself? Create manually'),
+                ),
             ],
           ),
         ),

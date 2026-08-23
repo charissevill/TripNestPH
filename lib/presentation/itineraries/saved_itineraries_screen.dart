@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
@@ -14,7 +15,10 @@ import '../../core/widgets/banners/offline_banner.dart';
 import '../../core/widgets/dialogs/confirmation_dialog.dart';
 import '../../core/widgets/states/empty_state_widget.dart';
 import '../../core/widgets/states/loading_widget.dart';
+import '../../data/repositories/expense_repository.dart';
 import '../../data/repositories/itinerary_repository.dart';
+import '../../domain/models/expense.dart';
+import '../../domain/models/packing_item.dart';
 import '../../domain/models/saved_itinerary.dart';
 
 /// Every trip the signed-in traveler has saved from the trip planner, plus
@@ -48,53 +52,79 @@ class _SavedItinerariesScreenState extends State<SavedItinerariesScreen> {
   Future<void> _saveOffline(SavedItinerary trip) async {
     setState(() => _downloadingIds.add(trip.id));
     try {
-      await _offlineService.makeAvailableOffline(context: context, itineraryId: trip.id, itinerary: trip.itinerary);
+      await _offlineService.makeAvailableOffline(
+        context: context,
+        itineraryId: trip.id,
+        itinerary: trip.itinerary,
+      );
       if (!mounted) return;
       setState(() => _offlineIds = {..._offlineIds, trip.id});
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('"${trip.title}" is now available offline.')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('"${trip.title}" is now available offline.')),
+      );
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(AppException.from(e).message)));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(AppException.from(e).message)));
       }
     } finally {
       if (mounted) setState(() => _downloadingIds.remove(trip.id));
     }
   }
 
-  Future<void> _confirmDelete(ItineraryRepository repository, SavedItinerary trip) async {
+  Future<void> _confirmDelete(
+    ItineraryRepository repository,
+    SavedItinerary trip,
+  ) async {
     final confirmed = await showConfirmationDialog(
       context,
       title: 'Remove this trip?',
-      message: '"${trip.title}" will be permanently removed from your saved trips.',
+      message:
+          '"${trip.title}" will be permanently removed from your saved trips.',
       confirmLabel: 'Remove',
       isDestructive: true,
     );
     if (confirmed) await repository.delete(trip.id);
   }
 
-  Future<void> _duplicateTrip(ItineraryRepository repository, SavedItinerary trip, String uid) async {
+  Future<void> _duplicateTrip(
+    ItineraryRepository repository,
+    SavedItinerary trip,
+    String uid,
+  ) async {
     try {
       final ownerName = context.read<AuthProvider>().currentUser?.name ?? '';
       await repository.duplicate(trip.id, uid, ownerName: ownerName);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('"${trip.title}" duplicated.')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('"${trip.title}" duplicated.')));
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(AppException.from(e).message)));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(AppException.from(e).message)));
       }
     }
   }
 
-  Future<void> _confirmLeave(ItineraryRepository repository, SavedItinerary trip, String uid) async {
+  Future<void> _confirmLeave(
+    ItineraryRepository repository,
+    SavedItinerary trip,
+    String uid,
+  ) async {
     final confirmed = await showConfirmationDialog(
       context,
       title: 'Leave this trip?',
-      message: 'You\'ll lose access to "${trip.title}" unless someone invites you again.',
+      message:
+          'You\'ll lose access to "${trip.title}" unless someone invites you again.',
       confirmLabel: 'Leave',
       isDestructive: true,
     );
-    if (confirmed) await repository.leaveTrip(itineraryId: trip.id, userId: uid);
+    if (confirmed)
+      await repository.leaveTrip(itineraryId: trip.id, userId: uid);
   }
 
   Future<void> _joinTrip(ItineraryRepository repository, String uid) async {
@@ -113,8 +143,14 @@ class _SavedItinerariesScreenState extends State<SavedItinerariesScreen> {
           autofocus: true,
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.of(context).pop(controller.text.trim()), child: const Text('Join')),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(controller.text.trim()),
+            child: const Text('Join'),
+          ),
         ],
       ),
     );
@@ -124,25 +160,39 @@ class _SavedItinerariesScreenState extends State<SavedItinerariesScreen> {
       final trip = await repository.getById(code);
       if (trip == null) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No trip found with that code.')));
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('No trip found with that code.')),
+          );
         }
         return;
       }
       if (trip.userId == uid || trip.collaboratorIds.contains(uid)) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('You already have access to this trip.')));
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('You already have access to this trip.'),
+            ),
+          );
         }
         return;
       }
       if (!mounted) return;
       final userName = context.read<AuthProvider>().currentUser?.name ?? '';
-      await repository.joinAsCollaborator(itineraryId: code, userId: uid, userName: userName);
+      await repository.joinAsCollaborator(
+        itineraryId: code,
+        userId: uid,
+        userName: userName,
+      );
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Joined "${trip.title}".')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Joined "${trip.title}".')));
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(AppException.from(e).message)));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(AppException.from(e).message)));
       }
     }
   }
@@ -154,7 +204,10 @@ class _SavedItinerariesScreenState extends State<SavedItinerariesScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(icon: const Icon(Symbols.arrow_back_rounded), onPressed: () => context.pop()),
+        leading: IconButton(
+          icon: const Icon(Symbols.arrow_back_rounded),
+          onPressed: () => context.pop(),
+        ),
         title: const Text('Saved Trips'),
         actions: [
           if (uid != null) ...[
@@ -185,20 +238,27 @@ class _SavedItinerariesScreenState extends State<SavedItinerariesScreen> {
                     stream: repository.streamForUser(uid),
                     builder: (context, snapshot) {
                       if (snapshot.connectionState == ConnectionState.waiting) {
-                        return ListView(children: List.generate(4, (_) => LoadingWidget.listRow()));
+                        return ListView(
+                          children: List.generate(
+                            4,
+                            (_) => LoadingWidget.listRow(),
+                          ),
+                        );
                       }
                       final trips = snapshot.data ?? const [];
                       if (trips.isEmpty) {
                         return const EmptyStateWidget(
                           icon: Symbols.map_rounded,
                           title: 'No saved trips yet',
-                          message: 'Generate an itinerary from the AI Planner and save it to see it here.',
+                          message:
+                              'Generate an itinerary from the AI Planner and save it to see it here.',
                         );
                       }
                       return ListView.separated(
                         padding: const EdgeInsets.all(AppSpacing.lg),
                         itemCount: trips.length,
-                        separatorBuilder: (_, _) => const SizedBox(height: AppSpacing.md),
+                        separatorBuilder: (_, _) =>
+                            const SizedBox(height: AppSpacing.md),
                         itemBuilder: (context, i) {
                           final trip = trips[i];
                           final isOwner = trip.userId == uid;
@@ -209,12 +269,24 @@ class _SavedItinerariesScreenState extends State<SavedItinerariesScreen> {
                             isDownloading: _downloadingIds.contains(trip.id),
                             onTap: () => context.push(
                               RoutePaths.generatedItinerary,
-                              extra: {'itinerary': trip.itinerary, 'savedId': trip.id},
+                              extra: {
+                                'itinerary': trip.itinerary,
+                                'savedId': trip.id,
+                              },
                             ),
-                            onDelete: isOwner ? () => _confirmDelete(repository, trip) : null,
-                            onDuplicate: isOwner ? () => _duplicateTrip(repository, trip, uid) : null,
-                            onSaveOffline: isOwner && !_offlineIds.contains(trip.id) ? () => _saveOffline(trip) : null,
-                            onLeave: isOwner ? null : () => _confirmLeave(repository, trip, uid),
+                            onDelete: isOwner
+                                ? () => _confirmDelete(repository, trip)
+                                : null,
+                            onDuplicate: isOwner
+                                ? () => _duplicateTrip(repository, trip, uid)
+                                : null,
+                            onSaveOffline:
+                                isOwner && !_offlineIds.contains(trip.id)
+                                ? () => _saveOffline(trip)
+                                : null,
+                            onLeave: isOwner
+                                ? null
+                                : () => _confirmLeave(repository, trip, uid),
                           );
                         },
                       );
@@ -261,19 +333,32 @@ class _SavedItineraryTile extends StatelessWidget {
         decoration: BoxDecoration(
           color: theme.colorScheme.surface,
           borderRadius: BorderRadius.circular(AppRadius.lg),
-          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 12, offset: const Offset(0, 6))],
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 12,
+              offset: const Offset(0, 6),
+            ),
+          ],
         ),
         child: Row(
           children: [
-            Container(
-              width: 52,
-              height: 52,
-              decoration: BoxDecoration(
-                color: theme.colorScheme.primary.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(AppRadius.md),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(AppRadius.md),
+              child: SizedBox(
+                width: 52,
+                height: 52,
+                child: trip.itinerary.coverImageUrl.isNotEmpty
+                    ? CachedNetworkImage(
+                        imageUrl: trip.itinerary.coverImageUrl,
+                        fit: BoxFit.cover,
+                        placeholder: (context, url) =>
+                            _TripThumbFallback(isOwner: isOwner),
+                        errorWidget: (context, url, error) =>
+                            _TripThumbFallback(isOwner: isOwner),
+                      )
+                    : _TripThumbFallback(isOwner: isOwner),
               ),
-              alignment: Alignment.center,
-              child: Icon(isOwner ? Symbols.map_rounded : Symbols.group_rounded, color: theme.colorScheme.primary),
             ),
             const SizedBox(width: AppSpacing.md),
             Expanded(
@@ -288,16 +373,36 @@ class _SavedItineraryTile extends StatelessWidget {
                         : '${trip.itinerary.destinationName} · Shared with you',
                     style: theme.textTheme.bodySmall,
                   ),
+                  if (trip.itinerary.totalBudget > 0 ||
+                      trip.packingItems.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Wrap(
+                      spacing: AppSpacing.sm,
+                      runSpacing: 4,
+                      children: [
+                        if (trip.itinerary.totalBudget > 0)
+                          _BudgetProgressPill(trip: trip),
+                        if (trip.packingItems.isNotEmpty)
+                          _PackingProgressPill(items: trip.packingItems),
+                      ],
+                    ),
+                  ],
                   if (isAvailableOffline) ...[
                     const SizedBox(height: 2),
                     Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Symbols.offline_pin_rounded, size: 14, color: theme.colorScheme.primary),
+                        Icon(
+                          Symbols.offline_pin_rounded,
+                          size: 14,
+                          color: theme.colorScheme.primary,
+                        ),
                         const SizedBox(width: 2),
                         Text(
                           'Available offline',
-                          style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.primary),
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: theme.colorScheme.primary,
+                          ),
                         ),
                       ],
                     ),
@@ -308,11 +413,18 @@ class _SavedItineraryTile extends StatelessWidget {
             if (isDownloading)
               const Padding(
                 padding: EdgeInsets.all(AppSpacing.sm),
-                child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)),
+                child: SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
               )
             else if (isOwner)
               PopupMenuButton<VoidCallback?>(
-                icon: const Icon(Symbols.more_vert_rounded, color: AppColors.textSecondary),
+                icon: const Icon(
+                  Symbols.more_vert_rounded,
+                  color: AppColors.textSecondary,
+                ),
                 onSelected: (action) => action?.call(),
                 itemBuilder: (context) => [
                   if (onSaveOffline != null)
@@ -320,17 +432,76 @@ class _SavedItineraryTile extends StatelessWidget {
                       value: onSaveOffline,
                       child: Row(
                         children: [
-                          Icon(Symbols.download_for_offline_rounded, size: 18, color: theme.colorScheme.primary),
+                          Icon(
+                            Symbols.download_for_offline_rounded,
+                            size: 18,
+                            color: theme.colorScheme.primary,
+                          ),
                           const SizedBox(width: AppSpacing.sm),
                           const Text('Save for Offline'),
                         ],
                       ),
                     ),
                   PopupMenuItem(
+                    value: () => context.push(
+                      RoutePaths.tripExpenses,
+                      extra: {'itinerary': trip.itinerary, 'savedId': trip.id},
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(
+                          Symbols.payments_rounded,
+                          size: 18,
+                          color: AppColors.textSecondary,
+                        ),
+                        SizedBox(width: AppSpacing.sm),
+                        Text('Expenses'),
+                      ],
+                    ),
+                  ),
+                  PopupMenuItem(
+                    value: () => context.push(
+                      RoutePaths.tripPacking,
+                      extra: {'itinerary': trip.itinerary, 'savedId': trip.id},
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(
+                          Symbols.checklist_rounded,
+                          size: 18,
+                          color: AppColors.textSecondary,
+                        ),
+                        SizedBox(width: AppSpacing.sm),
+                        Text('Packing List'),
+                      ],
+                    ),
+                  ),
+                  PopupMenuItem(
+                    value: () => context.push(
+                      RoutePaths.tripPolls,
+                      extra: {'itinerary': trip.itinerary, 'savedId': trip.id},
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(
+                          Symbols.how_to_vote_rounded,
+                          size: 18,
+                          color: AppColors.textSecondary,
+                        ),
+                        SizedBox(width: AppSpacing.sm),
+                        Text('Group Polls'),
+                      ],
+                    ),
+                  ),
+                  PopupMenuItem(
                     value: onDuplicate,
                     child: const Row(
                       children: [
-                        Icon(Symbols.content_copy_rounded, size: 18, color: AppColors.textSecondary),
+                        Icon(
+                          Symbols.content_copy_rounded,
+                          size: 18,
+                          color: AppColors.textSecondary,
+                        ),
                         SizedBox(width: AppSpacing.sm),
                         Text('Duplicate'),
                       ],
@@ -340,19 +511,143 @@ class _SavedItineraryTile extends StatelessWidget {
                     value: onDelete,
                     child: const Row(
                       children: [
-                        Icon(Symbols.delete_outline_rounded, size: 18, color: AppColors.error),
+                        Icon(
+                          Symbols.delete_outline_rounded,
+                          size: 18,
+                          color: AppColors.error,
+                        ),
                         SizedBox(width: AppSpacing.sm),
-                        Text('Remove', style: TextStyle(color: AppColors.error)),
+                        Text(
+                          'Remove',
+                          style: TextStyle(color: AppColors.error),
+                        ),
                       ],
                     ),
                   ),
                 ],
               )
             else
-              IconButton(icon: const Icon(Symbols.logout_rounded, color: AppColors.error), onPressed: onLeave),
+              IconButton(
+                icon: const Icon(
+                  Symbols.logout_rounded,
+                  color: AppColors.error,
+                ),
+                onPressed: onLeave,
+              ),
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Shown in place of the destination's cover photo when a trip has none
+/// (an older itinerary saved before `coverImageUrl` was captured) or the
+/// image fails to load — same map/group icon the tile always used before.
+class _TripThumbFallback extends StatelessWidget {
+  const _TripThumbFallback({required this.isOwner});
+
+  final bool isOwner;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      color: theme.colorScheme.primary.withValues(alpha: 0.1),
+      alignment: Alignment.center,
+      child: Icon(
+        isOwner ? Symbols.map_rounded : Symbols.group_rounded,
+        color: theme.colorScheme.primary,
+      ),
+    );
+  }
+}
+
+/// Shared pill chrome for the small metric badges on a trip tile — a tinted
+/// rounded label, same shape whether it's showing budget or packing
+/// progress so the two read as one family at a glance.
+class _MetricPill extends StatelessWidget {
+  const _MetricPill({
+    required this.icon,
+    required this.label,
+    required this.color,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(AppRadius.pill),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12, color: color),
+          const SizedBox(width: 3),
+          Text(
+            label,
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: color,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Actual spend against [SavedItinerary.itinerary]'s AI-estimated budget —
+/// streamed live so logging an expense elsewhere updates this the moment it
+/// happens, same reasoning as the Budget Tracker it summarizes.
+class _BudgetProgressPill extends StatelessWidget {
+  const _BudgetProgressPill({required this.trip});
+
+  final SavedItinerary trip;
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<List<Expense>>(
+      stream: ExpenseRepository().streamForItinerary(trip.id),
+      builder: (context, snapshot) {
+        final expenses = snapshot.data;
+        if (expenses == null) return const SizedBox.shrink();
+        final spent = expenses.fold<double>(0, (sum, e) => sum + e.amount);
+        final overBudget = spent > trip.itinerary.totalBudget;
+        return _MetricPill(
+          icon: Symbols.payments_rounded,
+          label:
+              '₱${spent.toStringAsFixed(0)} / ₱${trip.itinerary.totalBudget.toStringAsFixed(0)}',
+          color: overBudget ? AppColors.error : AppColors.textSecondary,
+        );
+      },
+    );
+  }
+}
+
+/// How much of the packing checklist is checked off — [SavedItinerary.
+/// packingItems] is already part of the trip doc this tile was built from,
+/// so no extra fetch is needed here, unlike the budget pill.
+class _PackingProgressPill extends StatelessWidget {
+  const _PackingProgressPill({required this.items});
+
+  final List<PackingItem> items;
+
+  @override
+  Widget build(BuildContext context) {
+    final checked = items.where((i) => i.checked).length;
+    final allPacked = checked == items.length;
+    return _MetricPill(
+      icon: Symbols.checklist_rounded,
+      label: '$checked/${items.length} packed',
+      color: allPacked ? AppColors.success : AppColors.textSecondary,
     );
   }
 }

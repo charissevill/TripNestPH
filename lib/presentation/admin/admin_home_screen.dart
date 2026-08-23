@@ -7,6 +7,7 @@ import '../../core/providers/auth_provider.dart';
 import '../../core/routes/route_paths.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
+import '../../core/theme/breakpoints.dart';
 import '../../core/widgets/states/empty_state_widget.dart';
 import '../../core/widgets/states/loading_widget.dart';
 import '../../data/repositories/admin_repository.dart';
@@ -19,6 +20,14 @@ import '../../domain/models/admin_user.dart';
 /// rather than trusting the caller, so a mid-session suspension or role
 /// change (see `firestore.rules`'s "enforced live" comments) takes effect
 /// immediately even if someone is already sitting on this screen.
+///
+/// On the dedicated Admin Portal site's desktop width, `AdminSidebarShell`
+/// already lists every one of these same destinations in a persistent left
+/// sidebar — repeating the full tile grid here too would just be the same
+/// nav twice, so that width gets a plain welcome message instead. Below
+/// that breakpoint (including the traveler app's in-app Admin Portal,
+/// which never gets the sidebar), the full tile grid is still how
+/// navigation happens at all.
 class AdminHomeScreen extends StatelessWidget {
   const AdminHomeScreen({super.key});
 
@@ -135,6 +144,13 @@ class AdminHomeScreen extends StatelessWidget {
               ),
             if (isAdmin)
               _AdminModuleTile(
+                icon: Symbols.how_to_reg_rounded,
+                label: 'Business Applications',
+                subtitle: 'Review requests to become a Business Owner',
+                onTap: () => context.push(RoutePaths.adminBusinessOwnerApplications),
+              ),
+            if (isAdmin)
+              _AdminModuleTile(
                 icon: Symbols.flag_rounded,
                 label: 'Reported Reviews',
                 subtitle: 'Moderate reviews travelers have flagged',
@@ -161,6 +177,10 @@ class AdminHomeScreen extends StatelessWidget {
                 ),
               ),
           ];
+
+          if (context.windowSize == WindowSize.expanded) {
+            return _WelcomePanel(admin: admin, moduleCount: tiles.length);
+          }
 
           return SafeArea(
             child: ListView(
@@ -197,6 +217,55 @@ class AdminHomeScreen extends StatelessWidget {
             ),
           );
         },
+      ),
+    );
+  }
+}
+
+/// Desktop-width replacement for the tile grid — the sidebar already lists
+/// every one of [moduleCount]'s destinations, so this just orients someone
+/// who's just signed in rather than repeating that list a second time.
+class _WelcomePanel extends StatelessWidget {
+  const _WelcomePanel({required this.admin, required this.moduleCount});
+
+  final AdminUser admin;
+  final int moduleCount;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.xxl),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(AppRadius.lg),
+              ),
+              alignment: Alignment.center,
+              child: const Icon(Symbols.shield_person_rounded, color: AppColors.primary, size: 32),
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            Text(
+              'Welcome, ${admin.name.isNotEmpty ? admin.name : admin.email}',
+              style: theme.textTheme.titleLarge,
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              moduleCount > 0
+                  ? 'Pick a module from the sidebar to get started.'
+                  : 'The ${admin.role} workflow hasn\'t been built in this Admin Portal yet.',
+              style: theme.textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
       ),
     );
   }

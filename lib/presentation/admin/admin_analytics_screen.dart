@@ -72,9 +72,8 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
   late final ReviewReportRepository _reportRepository = ReviewReportRepository(
     firestore: widget.firestore,
   );
-  late final AnalyticsSnapshotRepository _analyticsSnapshotRepository = AnalyticsSnapshotRepository(
-    firestore: widget.firestore,
-  );
+  late final AnalyticsSnapshotRepository _analyticsSnapshotRepository =
+      AnalyticsSnapshotRepository(firestore: widget.firestore);
 
   late final AdminRepository _adminRepository = AdminRepository();
 
@@ -110,7 +109,10 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
     return _loadGlobal();
   }
 
-  Future<_DashboardStats> _loadForProvince(String provinceId, String provinceName) async {
+  Future<_DashboardStats> _loadForProvince(
+    String provinceId,
+    String provinceName,
+  ) async {
     final results = await Future.wait([
       _provinceRepository.getById(provinceId),
       _destinationRepository.filter(provinceId: provinceId, limit: 500),
@@ -139,7 +141,10 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
       savedTripCount: 0,
       pendingReportCount: 0,
       popularDestinations: popular.take(5).toList(),
-      provinceStatsCapped: destinations.length >= 500 || restaurants.length >= 500 || festivals.length >= 500,
+      provinceStatsCapped:
+          destinations.length >= 500 ||
+          restaurants.length >= 500 ||
+          festivals.length >= 500,
     );
   }
 
@@ -158,7 +163,9 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
       // Best-effort — a brand-new deployment with no snapshots yet (or a
       // transient read failure) should never break the rest of the
       // dashboard, just leave the trend chart section hidden.
-      _analyticsSnapshotRepository.getRecent().catchError((_) => const <AnalyticsSnapshot>[]),
+      _analyticsSnapshotRepository.getRecent().catchError(
+        (_) => const <AnalyticsSnapshot>[],
+      ),
     ]);
 
     final provinces = results[5] as List;
@@ -190,7 +197,9 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
 
   Future<void> _refresh() async {
     final future = _load();
-    setState(() => _future = future);
+    setState(() {
+      _future = future;
+    });
     await future;
   }
 
@@ -236,7 +245,9 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
                     const SizedBox(height: 2),
                     Text(
                       'Content coverage for your province',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textTertiary),
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppColors.textTertiary,
+                      ),
                     ),
                     const SizedBox(height: AppSpacing.lg),
                   ] else ...[
@@ -301,7 +312,8 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
                           child: _StatCard(
                             icon: Symbols.place_rounded,
                             label: 'Tourist Spots',
-                            value: '${stats.publishedDestinationCount}${stats.provinceStatsCapped ? '+' : ''}',
+                            value:
+                                '${stats.publishedDestinationCount}${stats.provinceStatsCapped ? '+' : ''}',
                           ),
                         ),
                         const SizedBox(width: AppSpacing.sm),
@@ -309,7 +321,8 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
                           child: _StatCard(
                             icon: Symbols.restaurant_rounded,
                             label: 'Restaurants',
-                            value: '${stats.publishedRestaurantCount}${stats.provinceStatsCapped ? '+' : ''}',
+                            value:
+                                '${stats.publishedRestaurantCount}${stats.provinceStatsCapped ? '+' : ''}',
                           ),
                         ),
                       ],
@@ -318,7 +331,8 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
                     _StatCard(
                       icon: Symbols.celebration_rounded,
                       label: 'Festivals',
-                      value: '${stats.publishedFestivalCount}${stats.provinceStatsCapped ? '+' : ''}',
+                      value:
+                          '${stats.publishedFestivalCount}${stats.provinceStatsCapped ? '+' : ''}',
                     ),
                   ] else ...[
                     const SizedBox(height: AppSpacing.sm),
@@ -545,7 +559,8 @@ class _TrendChart extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final spots = [
-      for (var i = 0; i < snapshots.length; i++) FlSpot(i.toDouble(), snapshots[i].travelerCount.toDouble()),
+      for (var i = 0; i < snapshots.length; i++)
+        FlSpot(i.toDouble(), snapshots[i].travelerCount.toDouble()),
     ];
     final counts = snapshots.map((s) => s.travelerCount);
     final maxCount = counts.reduce((a, b) => a > b ? a : b).toDouble();
@@ -556,7 +571,11 @@ class _TrendChart extends StatelessWidget {
         color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(AppRadius.lg),
         boxShadow: [
-          BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 12, offset: const Offset(0, 6)),
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 12,
+            offset: const Offset(0, 6),
+          ),
         ],
       ),
       child: Column(
@@ -565,7 +584,9 @@ class _TrendChart extends StatelessWidget {
           Text('Traveler Growth', style: theme.textTheme.titleMedium),
           Text(
             'Total signed-up travelers, last ${snapshots.length} days',
-            style: theme.textTheme.bodySmall?.copyWith(color: AppColors.textTertiary),
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: AppColors.textTertiary,
+            ),
           ),
           const SizedBox(height: AppSpacing.md),
           SizedBox(
@@ -585,7 +606,11 @@ class _TrendChart extends StatelessWidget {
                       final snap = snapshots[spot.x.toInt()];
                       return LineTooltipItem(
                         '${snap.travelerCount}\n${DateFormat.MMMd().format(snap.date)}',
-                        const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12),
+                        const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 12,
+                        ),
                       );
                     }).toList(),
                   ),
@@ -597,7 +622,10 @@ class _TrendChart extends StatelessWidget {
                     color: theme.colorScheme.primary,
                     barWidth: 2.5,
                     dotData: const FlDotData(show: false),
-                    belowBarData: BarAreaData(show: true, color: theme.colorScheme.primary.withValues(alpha: 0.12)),
+                    belowBarData: BarAreaData(
+                      show: true,
+                      color: theme.colorScheme.primary.withValues(alpha: 0.12),
+                    ),
                   ),
                 ],
               ),

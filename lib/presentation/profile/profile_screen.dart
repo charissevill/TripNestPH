@@ -77,7 +77,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final uid = _statsUid;
     if (uid == null) return;
     final future = _loadStats(uid);
-    setState(() => _statsFuture = future);
+    setState(() {
+      _statsFuture = future;
+    });
     try {
       await future;
     } catch (_) {

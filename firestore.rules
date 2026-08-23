@@ -523,11 +523,19 @@ service cloud.firestore {
             && isValidOptionAt(list, 3) && isValidOptionAt(list, 4) && isValidOptionAt(list, 5);
         }
 
-        function isValidPoll() {
-          return request.resource.data.createdBy == request.auth.uid
-            && request.resource.data.question is string && request.resource.data.question.size() > 0 && request.resource.data.question.size() <= 200
+        // Shape-only check, reused by both create (where createdBy must be
+        // the caller) and edit (where createdBy is the original creator,
+        // already pinned immutable by the update rule below) — an edit by
+        // the trip owner of a poll they didn't create must not be rejected
+        // just because request.auth.uid != createdBy.
+        function isValidPollShape() {
+          return request.resource.data.question is string && request.resource.data.question.size() > 0 && request.resource.data.question.size() <= 200
             && request.resource.data.options is list && request.resource.data.options.size() >= 2 && request.resource.data.options.size() <= 6
             && allOptionsValid(request.resource.data.options);
+        }
+
+        function isValidPoll() {
+          return request.resource.data.createdBy == request.auth.uid && isValidPollShape();
         }
 
         function oldVotes() {
@@ -542,11 +550,22 @@ service cloud.firestore {
 
         allow read: if isSignedIn() && (isTripOwner() || isTripCollaborator());
         allow create: if isSignedIn() && (isTripOwner() || isTripCollaborator()) && isValidPoll();
-        // Voting: any trip member, but only their own `votes` entry — the
-        // question/options/createdBy stay whatever the creator set.
-        allow update: if isSignedIn() && (isTripOwner() || isTripCollaborator())
-                      && onlyChangedFields(['votes'])
-                      && onlyOwnVoteChanged();
+        allow update: if isSignedIn() && (
+          // Voting: any trip member, but only their own `votes` entry — the
+          // question/options/createdBy stay whatever the creator set.
+          ((isTripOwner() || isTripCollaborator())
+            && onlyChangedFields(['votes'])
+            && onlyOwnVoteChanged())
+          // Editing the question/options: only the creator or the trip
+          // owner, same as delete — and votes must be cleared in the same
+          // write, since edited options can shift what an existing vote's
+          // stored index actually points to.
+          || ((isTripOwner() || resource.data.createdBy == request.auth.uid)
+            && onlyChangedFields(['question', 'options', 'votes'])
+            && request.resource.data.createdBy == resource.data.createdBy
+            && request.resource.data.votes == {}
+            && isValidPollShape())
+        );
         allow delete: if isSignedIn() && (isTripOwner() || resource.data.createdBy == request.auth.uid);
       }
     }
@@ -574,7 +593,13 @@ service cloud.firestore {
       // themselves to a restaurant doc (that's admin/system-managed —
       // see RestaurantRepository.createFromBusiness).
       allow update: if (hasAdminRole(['businessOwner']) && resource.data.ownerId == request.auth.uid
-                      && request.resource.data.ownerId == request.auth.uid && (
+                      && request.resource.data.ownerId == request.auth.uid
+                      // permitUrl/permitOcrText never belong on this doc —
+                      // see the businesses/{id}/private/permit block below,
+                      // which any signed-in traveler *cannot* read once this
+                      // listing is approved (unlike this doc itself).
+                      && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['permitUrl', 'permitOcrText'])
+                      && (
                         !request.resource.data.diff(resource.data).affectedKeys().hasAny(['status', 'rejectionReason', 'ownerId', 'restaurantId'])
                         || (resource.data.status == 'rejected' && request.resource.data.status == 'pending' && request.resource.data.rejectionReason == '')
                       ))
@@ -588,6 +613,29 @@ service cloud.firestore {
                     // path, which goes through toInfoMap() and never
                     // includes viewCount.
                     || (isSignedIn() && onlyChangedFields(['viewCount']) && isValidViewCountIncrement());
+      allow delete: if hasAdminRole(['admin']);
+    }
+
+    // ---- businesses/{id}/private/permit — the uploaded permit photo URL
+    // and its OCR'd text, split out of the parent doc specifically so they
+    // are NEVER exposed by the parent's `resource.data.status == 'approved'`
+    // public-read branch above (a permit can carry a home address, ID
+    // number, TIN — real PII, unlike everything else on a business
+    // listing). Only the owner and an admin can ever read this.
+    // `permitOcrText` is deliberately absent from every allow-write branch
+    // here — the extractPermitText Cloud Function is the only writer (Admin
+    // SDK bypasses these rules), so a client can never fabricate OCR output
+    // that wasn't actually produced by Vision.
+    match /businesses/{businessId}/private/{docId} {
+      function ownsParentBusiness() {
+        return isSignedIn()
+          && get(/databases/$(database)/documents/businesses/$(businessId)).data.ownerId == request.auth.uid;
+      }
+      allow read: if ownsParentBusiness() || hasAdminRole(['admin']);
+      allow create: if hasAdminRole(['businessOwner']) && ownsParentBusiness()
+                    && request.resource.data.keys().hasOnly(['permitUrl']);
+      allow update: if hasAdminRole(['businessOwner']) && ownsParentBusiness()
+                    && onlyChangedFields(['permitUrl']);
       allow delete: if hasAdminRole(['admin']);
     }
 
@@ -656,6 +704,37 @@ service cloud.firestore {
       allow delete: if hasAdminRole(['admin']);
     }
 
+    // ---- business_owner_applications/{id} — self-service "I own a
+    // business" application, offered right after registration
+    // (RoleSelectionScreen). Deliberately NOT instant self-service: granting
+    // the actual `businessOwner` role happens only through the existing
+    // admin_invites staging + self-claim flow (AdminRepository.createInvite/
+    // claimInvite, the same mechanism a manually-invited admin already
+    // uses) once an admin approves this application — letting a traveler
+    // self-grant businessOwner directly here would bypass that entirely and
+    // let anyone immediately satisfy businesses.create's role check below.
+    function isValidBusinessOwnerApplication() {
+      return request.resource.data.businessName is string && request.resource.data.businessName.size() > 0 && request.resource.data.businessName.size() <= 100
+        && request.resource.data.category in ['accommodation', 'foodAndDining', 'tourOperator', 'shop', 'transport', 'other']
+        && request.resource.data.description is string && request.resource.data.description.size() <= 1000
+        && request.resource.data.applicantEmail is string && request.resource.data.applicantEmail.size() > 0;
+    }
+
+    match /business_owner_applications/{id} {
+      allow read: if hasAdminRole(['admin']) || (isSignedIn() && resource.data.userId == request.auth.uid);
+      allow create: if isSignedIn()
+                    && request.resource.data.userId == request.auth.uid
+                    && request.resource.data.status == 'pending'
+                    && isValidBusinessOwnerApplication();
+      // Only an admin resolves an application, and only by flipping its
+      // status/reason — never touching the applicant's own submitted
+      // fields after the fact.
+      allow update: if hasAdminRole(['admin']) && onlyChangedFields(['status', 'rejectionReason']);
+      // An admin can clear a resolved application; the applicant can
+      // withdraw their own (still-pending or already-resolved) one.
+      allow delete: if hasAdminRole(['admin']) || (isSignedIn() && resource.data.userId == request.auth.uid);
+    }
+
     // ---- notifications/{id} ----------------------------------------------
     // A doc with an empty userId is a broadcast sent to every traveler.
     // Marking a broadcast notification "read" is a simplification for this
@@ -689,6 +768,27 @@ service cloud.firestore {
     // (not even a signed-in one) can read its own counter to figure out how
     // close it is to a cap, or write to it directly to reset one.
     match /rate_limits/{id} {
+      allow read, write: if false;
+    }
+
+    // ---- otp_codes/{id} ------------------------------------------------------
+    // Password-reset / email-verification codes (see
+    // requestPasswordResetCode/verifyPasswordResetCode and their
+    // email-verify counterparts in functions/index.js) — written and read
+    // only by Cloud Functions via the Admin SDK, same explicit-deny posture
+    // as rate_limits above. Only a hash of the code is ever stored, but a
+    // client still has no business reading or writing this collection
+    // directly regardless.
+    match /otp_codes/{id} {
+      allow read, write: if false;
+    }
+
+    // ---- mail/{id} -------------------------------------------------------
+    // The Trigger Email extension's own send queue — requestPasswordResetCode/
+    // requestEmailVerificationCode write here (Admin SDK, bypasses this rule)
+    // and the extension itself sends and deletes each doc. No client
+    // involvement at any point.
+    match /mail/{id} {
       allow read, write: if false;
     }
 

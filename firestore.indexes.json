@@ -341,6 +341,14 @@
       ]
     },
     {
+      "collectionGroup": "business_owner_applications",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "favorite_collections",
       "queryScope": "COLLECTION",
       "fields": [

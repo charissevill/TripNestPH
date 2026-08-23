@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../core/constants/firestore_paths.dart';
 import '../../core/utils/app_exception.dart';
 import '../../domain/models/business.dart';
+import '../../domain/models/business_permit.dart';
 
 /// Firestore access for the `businesses` collection — a `businessOwner`
 /// account's own self-service listing(s), separate from the curated
@@ -19,6 +20,40 @@ class BusinessRepository {
 
   Business _fromDoc(QueryDocumentSnapshot<Map<String, dynamic>> doc) =>
       Business.fromMap(doc.id, doc.data());
+
+  /// `businesses/{id}/private/permit` — see [BusinessPermit]'s doc comment
+  /// for why this lives outside the main doc.
+  DocumentReference<Map<String, dynamic>> _permitDoc(String id) => _collection
+      .doc(id)
+      .collection(FirestorePaths.businessPrivate)
+      .doc('permit');
+
+  Future<BusinessPermit?> getPermit(String id) async {
+    try {
+      final doc = await _permitDoc(id).get();
+      return doc.data() == null ? null : BusinessPermit.fromMap(doc.data()!);
+    } catch (e) {
+      throw AppException.from(e);
+    }
+  }
+
+  Stream<BusinessPermit?> streamPermit(String id) {
+    return _permitDoc(id).snapshots().map(
+      (doc) => doc.data() == null ? null : BusinessPermit.fromMap(doc.data()!),
+    );
+  }
+
+  /// The only field a client may ever write here — see firestore.rules,
+  /// which forbids `permitOcrText` from every client write branch on this
+  /// doc (only the `extractPermitText` Cloud Function sets that, via the
+  /// Admin SDK).
+  Future<void> setPermitUrl(String id, String url) async {
+    try {
+      await _permitDoc(id).set({'permitUrl': url}, SetOptions(merge: true));
+    } catch (e) {
+      throw AppException.from(e);
+    }
+  }
 
   /// Every listing owned by [uid] — a business owner can have more than one.
   Stream<List<Business>> streamForOwner(String uid) {
@@ -120,6 +155,10 @@ class BusinessRepository {
   Future<void> delete(String id) async {
     try {
       await _collection.doc(id).delete();
+      // Best-effort — an admin-only delete right, same as the parent doc's;
+      // leaving this orphaned isn't a leak (its rules gate on the now-gone
+      // parent's ownerId), just clutter.
+      await _permitDoc(id).delete().catchError((_) {});
     } catch (e) {
       throw AppException.from(e);
     }

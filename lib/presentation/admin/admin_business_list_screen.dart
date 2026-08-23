@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
@@ -14,6 +15,7 @@ import '../../data/repositories/restaurant_repository.dart';
 import '../../data/repositories/review_repository.dart';
 import '../../domain/models/app_notification.dart';
 import '../../domain/models/business.dart';
+import '../../domain/models/business_permit.dart';
 import '../../domain/models/review.dart';
 
 /// Admin-only approval queue for `businessOwner` self-service listings —
@@ -113,11 +115,16 @@ class _AdminBusinessListScreenState extends State<AdminBusinessListScreen> {
   }
 
   Future<void> _approve(Business business) async {
+    final permit = await _repository.getPermit(business.id);
+    final hasPermit = permit != null && permit.permitUrl.isNotEmpty;
+    if (!mounted) return;
     final confirmed = await showConfirmationDialog(
       context,
       title: 'Approve this listing?',
-      message:
-          '"${business.name}" will become visible to travelers on its province page.',
+      message: hasPermit
+          ? '"${business.name}" will become visible to travelers on its province page.'
+          : '"${business.name}" will become visible to travelers on its province page.\n\n'
+                'No permit photo was submitted for this listing.',
       confirmLabel: 'Approve',
     );
     if (!confirmed || !mounted) return;
@@ -336,6 +343,7 @@ class _AdminBusinessListScreenState extends State<AdminBusinessListScreen> {
                             ),
                           ),
                         ],
+                        _PermitSection(businessId: business.id),
                         const SizedBox(height: AppSpacing.sm),
                         Wrap(
                           spacing: AppSpacing.sm,
@@ -378,6 +386,99 @@ class _AdminBusinessListScreenState extends State<AdminBusinessListScreen> {
           },
         ),
       ),
+    );
+  }
+}
+
+/// The "View submitted permit" link + its OCR'd text, if any — both live
+/// on `businesses/{id}/private/permit` (see [BusinessPermit]'s doc
+/// comment), not on [Business] itself, so this streams that subdoc
+/// directly rather than reading fields off the [Business] passed to the
+/// parent tile.
+class _PermitSection extends StatelessWidget {
+  const _PermitSection({required this.businessId});
+
+  final String businessId;
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<BusinessPermit?>(
+      stream: BusinessRepository().streamPermit(businessId),
+      builder: (context, snapshot) {
+        // Still loading — say nothing rather than briefly flashing "No
+        // permit submitted" before the real state arrives.
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const SizedBox.shrink();
+        }
+        final permit = snapshot.data;
+        if (permit == null || permit.permitUrl.isEmpty) {
+          return Padding(
+            padding: const EdgeInsets.only(top: AppSpacing.sm),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Symbols.info_rounded, size: 16, color: AppColors.textTertiary),
+                const SizedBox(width: 4),
+                Text(
+                  'No permit submitted',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textTertiary),
+                ),
+              ],
+            ),
+          );
+        }
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: AppSpacing.sm),
+            InkWell(
+              onTap: () => launchUrl(
+                Uri.parse(permit.permitUrl),
+                webOnlyWindowName: '_blank',
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Symbols.description_rounded, size: 16, color: AppColors.primary),
+                  const SizedBox(width: 4),
+                  Text(
+                    'View submitted permit',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: AppColors.primary,
+                      decoration: TextDecoration.underline,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (permit.permitOcrText.isNotEmpty) ...[
+              const SizedBox(height: AppSpacing.sm),
+              Text(
+                'Extracted text (OCR) — verify against the actual photo',
+                style: Theme.of(context).textTheme.labelSmall
+                    ?.copyWith(color: AppColors.textTertiary),
+              ),
+              const SizedBox(height: 4),
+              Container(
+                width: double.infinity,
+                constraints: const BoxConstraints(maxHeight: 120),
+                padding: const EdgeInsets.all(AppSpacing.sm),
+                decoration: BoxDecoration(
+                  color: AppColors.background,
+                  borderRadius: BorderRadius.circular(AppRadius.sm),
+                  border: Border.all(color: AppColors.border),
+                ),
+                child: SingleChildScrollView(
+                  child: Text(
+                    permit.permitOcrText,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ),
+              ),
+            ],
+          ],
+        );
+      },
     );
   }
 }

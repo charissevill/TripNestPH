@@ -114,6 +114,255 @@ exports.syncMyAdminClaims = onCall({ region: 'asia-southeast1' }, async (request
   return claims;
 });
 
+// ---- Numeric-code password reset / email verification -------------------
+// Replaces Firebase Auth's default link-based emails, which were landing in
+// spam (generic `noreply@<project>.firebaseapp.com` sender, no branding)
+// and whose one-time links kept coming back "expired or already used" —
+// partly because each new request invalidates the previous link, partly
+// because some inboxes' link-safety scanners pre-fetch (and so pre-consume)
+// the link before a traveler manually clicks it. A 6-digit code typed by
+// hand has neither failure mode, and sending our own HTML email means it
+// can actually look like it's from TripNest PH.
+//
+// Delivery: writing to the `mail` collection here is picked up by the
+// Firebase Extension `firebase/firestore-send-email` (Trigger Email),
+// configured separately with the project owner's own Gmail SMTP app
+// password — this function only ever writes the trigger doc, never talks
+// to SMTP directly.
+const OTP_TTL_MS = 10 * 60 * 1000;
+// 6 digits is ~1M combinations — trivially brute-forceable with no attempt
+// cap, so a wrong guess is capped well before that space could be searched.
+const OTP_MAX_ATTEMPTS = 5;
+
+function generateOtpCode() {
+  return String(crypto.randomInt(0, 1000000)).padStart(6, '0');
+}
+
+// Only the hash is ever stored — a stray Firestore read (a bug, a console
+// click) can't hand out a directly-usable code, same "trust the shape,
+// protect the data" posture as the rest of this file's secrets handling.
+function hashOtp(code) {
+  return crypto.createHash('sha256').update(code).digest('hex');
+}
+
+// Deterministic per (purpose, email): a fresh request naturally overwrites
+// whatever code was issued before, matching how Firebase's own link flow
+// already invalidates a prior link once a new one is requested — a
+// traveler never ends up with two simultaneously-valid codes.
+function otpDocId(purpose, email) {
+  return crypto.createHash('sha256').update(`${purpose}:${email.toLowerCase().trim()}`).digest('hex');
+}
+
+// Colors match AppLogo's own artwork (assets/images/logo.png — the pin
+// mark's blue gradient is exactly AppColors.oceanGradient, its "TRIP"
+// wordmark a dark navy, its tagline underline a warm gold) rather than the
+// separate teal palette the in-app auth screens use, so this email reads as
+// visibly the same brand as the logo a traveler already recognizes.
+const LOGO_URL = 'https://tripnest-ph.web.app/assets/assets/images/logo.png';
+
+// Individual bordered digit boxes (a `<table>`, not flex/grid — the one
+// concession to old email clients like Outlook, which silently drop those)
+// read as a more deliberately-designed code than one spaced-out string.
+function codeDigitBoxes(code) {
+  const digitCell = (digit) =>
+    `<td style="width:44px;height:54px;text-align:center;vertical-align:middle;background:#E8F4FC;border:1.5px solid #BFE0F5;border-radius:10px;font-family:'Courier New',monospace;font-size:26px;font-weight:700;color:#0F6FA6;">${digit}</td>`;
+  const gapCell = '<td style="width:6px;"></td>';
+  return code.split('').map(digitCell).join(gapCell);
+}
+
+function otpEmailHtml({ heading, intro, code }) {
+  return `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#F1F6FA;padding:40px 16px;">
+  <div style="max-width:480px;margin:0 auto;background:#FFFFFF;border-radius:20px;overflow:hidden;box-shadow:0 8px 28px rgba(15,111,166,0.14);">
+    <div style="background:linear-gradient(135deg,#2D9CDB,#0F6FA6);padding:36px 32px 30px;text-align:center;">
+      <img src="${LOGO_URL}" alt="TripNest PH" width="100" height="100" style="display:block;margin:0 auto 14px;background:transparent;">
+      <div style="color:#FFFFFF;font-size:12.5px;font-weight:700;letter-spacing:0.2em;text-transform:uppercase;">TripNest PH</div>
+    </div>
+    <div style="padding:36px 32px 32px;">
+      <h1 style="margin:0 0 10px;font-size:23px;font-weight:700;color:#173A5E;letter-spacing:-0.01em;">${heading}</h1>
+      <p style="margin:0 0 28px;font-size:15px;color:#5B7085;line-height:1.6;">${intro}</p>
+      <table role="presentation" align="center" cellpadding="0" cellspacing="0" style="margin:0 auto;">
+        <tr>${codeDigitBoxes(code)}</tr>
+      </table>
+      <p style="text-align:center;margin:16px 0 28px;font-size:13px;color:#8CA3B5;">Expires in 10 minutes</p>
+      <div style="background:#F7FAFD;border:1px solid #E3EEF5;border-radius:12px;padding:16px 18px;">
+        <p style="margin:0;font-size:13px;color:#5B7085;line-height:1.5;">Didn't request this? You can safely ignore this email — your account is still secure.</p>
+      </div>
+      <div style="height:3px;width:56px;background:#F2C94C;border-radius:2px;margin-top:28px;"></div>
+    </div>
+  </div>
+  <p style="text-align:center;font-size:12px;color:#8CA3B5;margin-top:20px;letter-spacing:0.02em;">TripNest PH &middot; Discover the Philippines, one destination at a time.</p>
+</div>`;
+}
+
+/**
+ * Requests a password-reset code for [email]. Deliberately returns success
+ * whether or not an account exists for that email — an `invalid-argument`/
+ * `not-found` split here would let a caller enumerate registered emails one
+ * attempt at a time, the same reasoning `AuthService.sendPasswordResetEmail`
+ * already applies to Firebase's own link-based send.
+ */
+exports.requestPasswordResetCode = onCall({ region: 'asia-southeast1' }, async (request) => {
+  const email = typeof request.data?.email === 'string' ? request.data.email.trim().toLowerCase() : '';
+  if (!email) throw new HttpsError('invalid-argument', 'A valid email is required.');
+
+  await enforceRateLimit(email, 'passwordResetRequest', 5);
+
+  let userRecord;
+  try {
+    userRecord = await auth.getUserByEmail(email);
+  } catch (e) {
+    return { success: true };
+  }
+
+  const code = generateOtpCode();
+  await db.collection('otp_codes').doc(otpDocId('password_reset', email)).set({
+    email,
+    purpose: 'password_reset',
+    codeHash: hashOtp(code),
+    attempts: 0,
+    expiresAt: Date.now() + OTP_TTL_MS,
+  });
+
+  await db.collection('mail').add({
+    to: email,
+    message: {
+      subject: 'Your TripNest PH password reset code',
+      html: otpEmailHtml({
+        heading: 'Reset your password',
+        intro: `Hi ${userRecord.displayName || 'there'}, use the code below to reset your TripNest PH password.`,
+        code,
+      }),
+    },
+  });
+
+  return { success: true };
+});
+
+/**
+ * Verifies a password-reset code and, on success, sets the account's new
+ * password directly via the Admin SDK — the one operation here that
+ * genuinely requires it, since the client SDK can only ever change the
+ * password of the session it's currently signed into, never an arbitrary
+ * account by email.
+ */
+exports.verifyPasswordResetCode = onCall({ region: 'asia-southeast1' }, async (request) => {
+  const email = typeof request.data?.email === 'string' ? request.data.email.trim().toLowerCase() : '';
+  const code = typeof request.data?.code === 'string' ? request.data.code.trim() : '';
+  const newPassword = typeof request.data?.newPassword === 'string' ? request.data.newPassword : '';
+  if (!email || !code) throw new HttpsError('invalid-argument', 'Email and code are required.');
+  // Mirrors Validators.password's own 8-character minimum client-side —
+  // defense in depth, same as every other isValid*() check in this project.
+  if (newPassword.length < 8) throw new HttpsError('invalid-argument', 'Password must be at least 8 characters.');
+
+  const ref = db.collection('otp_codes').doc(otpDocId('password_reset', email));
+  const snap = await ref.get();
+  if (!snap.exists) throw new HttpsError('invalid-argument', 'Invalid or expired code. Please request a new one.');
+  const data = snap.data();
+
+  if (Date.now() > data.expiresAt) {
+    await ref.delete();
+    throw new HttpsError('invalid-argument', 'This code has expired. Please request a new one.');
+  }
+  if ((data.attempts ?? 0) >= OTP_MAX_ATTEMPTS) {
+    await ref.delete();
+    throw new HttpsError('resource-exhausted', 'Too many incorrect attempts. Please request a new code.');
+  }
+  if (hashOtp(code) !== data.codeHash) {
+    await ref.update({ attempts: FieldValue.increment(1) });
+    throw new HttpsError('invalid-argument', 'Incorrect code. Please try again.');
+  }
+
+  let userRecord;
+  try {
+    userRecord = await auth.getUserByEmail(email);
+  } catch (e) {
+    await ref.delete();
+    throw new HttpsError('invalid-argument', 'Invalid or expired code. Please request a new one.');
+  }
+
+  await auth.updateUser(userRecord.uid, { password: newPassword });
+  await ref.delete();
+  return { success: true };
+});
+
+/**
+ * Requests an email-verification code for the caller's own account —
+ * authenticated (unlike the password-reset pair above) since a traveler
+ * already has a session at this point in the sign-up flow.
+ */
+exports.requestEmailVerificationCode = onCall({ region: 'asia-southeast1' }, async (request) => {
+  const uid = request.auth?.uid;
+  if (!uid) throw new HttpsError('unauthenticated', 'Sign in required.');
+  await enforceRateLimit(uid, 'emailVerifyRequest', 5);
+
+  const userRecord = await auth.getUser(uid);
+  if (!userRecord.email) throw new HttpsError('failed-precondition', 'This account has no email on file.');
+  if (userRecord.emailVerified) return { success: true, alreadyVerified: true };
+
+  const code = generateOtpCode();
+  await db.collection('otp_codes').doc(otpDocId('email_verify', userRecord.email)).set({
+    email: userRecord.email,
+    uid,
+    purpose: 'email_verify',
+    codeHash: hashOtp(code),
+    attempts: 0,
+    expiresAt: Date.now() + OTP_TTL_MS,
+  });
+
+  await db.collection('mail').add({
+    to: userRecord.email,
+    message: {
+      subject: 'Verify your TripNest PH email',
+      html: otpEmailHtml({
+        heading: 'Verify your email',
+        intro: `Hi ${userRecord.displayName || 'there'}, use the code below to verify your TripNest PH account.`,
+        code,
+      }),
+    },
+  });
+
+  return { success: true };
+});
+
+/**
+ * Verifies an email-verification code and flips `emailVerified` on the
+ * caller's own Auth record via the Admin SDK (the client SDK has no way to
+ * set that flag directly — it only ever becomes true by consuming
+ * Firebase's own link, which this replaces).
+ */
+exports.verifyEmailVerificationCode = onCall({ region: 'asia-southeast1' }, async (request) => {
+  const uid = request.auth?.uid;
+  if (!uid) throw new HttpsError('unauthenticated', 'Sign in required.');
+  const code = typeof request.data?.code === 'string' ? request.data.code.trim() : '';
+  if (!code) throw new HttpsError('invalid-argument', 'A code is required.');
+
+  const userRecord = await auth.getUser(uid);
+  if (!userRecord.email) throw new HttpsError('failed-precondition', 'This account has no email on file.');
+
+  const ref = db.collection('otp_codes').doc(otpDocId('email_verify', userRecord.email));
+  const snap = await ref.get();
+  if (!snap.exists) throw new HttpsError('invalid-argument', 'Invalid or expired code. Please request a new one.');
+  const data = snap.data();
+
+  if (data.uid !== uid) throw new HttpsError('permission-denied', 'This code doesn\'t belong to your account.');
+  if (Date.now() > data.expiresAt) {
+    await ref.delete();
+    throw new HttpsError('invalid-argument', 'This code has expired. Please request a new one.');
+  }
+  if ((data.attempts ?? 0) >= OTP_MAX_ATTEMPTS) {
+    await ref.delete();
+    throw new HttpsError('resource-exhausted', 'Too many incorrect attempts. Please request a new code.');
+  }
+  if (hashOtp(code) !== data.codeHash) {
+    await ref.update({ attempts: FieldValue.increment(1) });
+    throw new HttpsError('invalid-argument', 'Incorrect code. Please try again.');
+  }
+
+  await auth.updateUser(uid, { emailVerified: true });
+  await ref.delete();
+  return { success: true };
+});
+
 /**
  * Proxies Groq's OpenAI-compatible chat-completions endpoint so the raw API
  * key never has to ship inside the mobile/web client bundle. `flutter_dotenv`
@@ -141,7 +390,13 @@ const AI_MAX_MESSAGES = 40;
 // attacker-controlled input, so the cap here just needs to stop a truly
 // runaway payload, not squeeze normal usage.
 const AI_MAX_MESSAGE_CHARS = 16000;
-const GROQ_MODEL = 'llama-3.3-70b-versatile';
+const GROQ_MODEL = 'openai/gpt-oss-120b';
+// gpt-oss models spend part of max_tokens on hidden reasoning before the
+// visible answer (default effort is 'medium') — confirmed directly: a
+// 10-token budget came back completely empty, the reasoning alone used it
+// all up. 'low' leaves more of the (already tight, 220-450 token) budget
+// for the actual answer instead of silently truncating it to nothing.
+const GROQ_REASONING_EFFORT = 'low';
 
 exports.aiComplete = onCall({ region: 'asia-southeast1', secrets: [groqApiKey], timeoutSeconds: 60 }, async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.');
@@ -169,6 +424,7 @@ exports.aiComplete = onCall({ region: 'asia-southeast1', secrets: [groqApiKey], 
     messages,
     temperature: typeof temperature === 'number' ? temperature : 0.7,
     max_tokens: boundedMaxTokens,
+    reasoning_effort: GROQ_REASONING_EFFORT,
   };
   if (jsonMode) body.response_format = { type: 'json_object' };
 
@@ -355,6 +611,93 @@ exports.computeTripRoute = onCall({ region: 'asia-southeast1', secrets: [googleP
 });
 
 /**
+ * Reads text out of an uploaded business-permit photo via Google Cloud
+ * Vision's TEXT_DETECTION — reuses `googlePlacesApiKey` (same Google Cloud
+ * project as Places/Routes, just needs the Cloud Vision API enabled on it
+ * too) rather than provisioning a separate secret. Purely a reading aid for
+ * the admin reviewing a business application — it doesn't verify the
+ * permit is real, current, or belongs to the applicant, only that *some*
+ * text was found in the photo.
+ *
+ * Takes only `businessId` — never a client-supplied `imageUrl` — and reads
+ * the permit URL itself from `businesses/{businessId}/private/permit`
+ * (after verifying the caller owns that business). Two deliberate
+ * consequences of that shape:
+ *   1. This can't be used as a free OCR proxy against an arbitrary image —
+ *      the only images it will ever read are ones already sitting in an
+ *      owned business's own permit slot, which storage.rules already
+ *      restricted to that owner's own upload.
+ *   2. `permitOcrText` is written here via the Admin SDK (bypasses
+ *      firestore.rules, which forbid the client from setting that field
+ *      directly) — this function is the *only* path that field can ever be
+ *      set through, so a client can never fabricate OCR output that Vision
+ *      never actually produced.
+ * Best-effort like the Places/Routes proxies above: no text found (a blank
+ * photo, poor lighting, Vision finding nothing, or Vision/the fetch itself
+ * failing) all land as a normal `{ text: '' }` result, never an error —
+ * this is a reading aid, never worth blocking the owner's submission over.
+ */
+exports.extractPermitText = onCall({ region: 'asia-southeast1', secrets: [googlePlacesApiKey] }, async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.');
+  await enforceRateLimit(request.auth.uid, 'extractPermitText', 20);
+
+  const { businessId } = request.data ?? {};
+  if (typeof businessId !== 'string' || !businessId.trim()) {
+    throw new HttpsError('invalid-argument', 'businessId is required.');
+  }
+
+  const businessRef = db.collection('businesses').doc(businessId);
+  const businessSnap = await businessRef.get();
+  if (!businessSnap.exists || businessSnap.data()?.ownerId !== request.auth.uid) {
+    throw new HttpsError('permission-denied', 'You do not own this listing.');
+  }
+
+  const permitRef = businessRef.collection('private').doc('permit');
+  const permitSnap = await permitRef.get();
+  const imageUrl = permitSnap.data()?.permitUrl;
+  if (typeof imageUrl !== 'string' || !imageUrl) {
+    return { text: '' };
+  }
+
+  const apiKey = googlePlacesApiKey.value();
+  let text = '';
+  if (apiKey) {
+    try {
+      const response = await fetch(`https://vision.googleapis.com/v1/images:annotate?key=${apiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          requests: [
+            {
+              image: { source: { imageUri: imageUrl } },
+              features: [{ type: 'TEXT_DETECTION' }],
+            },
+          ],
+        }),
+      });
+      if (response.status === 200) {
+        const json = await response.json().catch(() => null);
+        const result = json?.responses?.[0];
+        // A per-image error (e.g. Vision couldn't fetch imageUrl) lands
+        // inside a 200 response, not as an HTTP error status.
+        if (result?.error) {
+          console.error('extractPermitText: Vision per-image error', result.error);
+        } else {
+          text = result?.fullTextAnnotation?.text ?? '';
+        }
+      } else {
+        console.error('extractPermitText: Vision API returned', response.status, await response.text().catch(() => ''));
+      }
+    } catch (e) {
+      console.error('extractPermitText: request failed', e);
+    }
+  }
+
+  await permitRef.set({ permitOcrText: text }, { merge: true });
+  return { text };
+});
+
+/**
  * Proxies a single Places photo's bytes so `photoUrl()` never has to embed
  * the raw API key in a URL handed to `CachedNetworkImage` (which can't
  * attach a Firebase Auth header the way the callable functions above use).
@@ -535,6 +878,7 @@ async function summarizeReviews(apiKey, placeName, comments) {
       model: GROQ_MODEL,
       temperature: 0.4,
       max_tokens: 220,
+      reasoning_effort: GROQ_REASONING_EFFORT,
       messages: [
         {
           role: 'system',

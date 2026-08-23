@@ -21,6 +21,7 @@ class FirestorePaths {
   static const String businesses = 'businesses';
   static const String reviewReports = 'review_reports';
   static const String contentReports = 'content_reports';
+  static const String businessOwnerApplications = 'business_owner_applications';
   static const String searchTrends = 'search_trends';
   static const String analyticsSnapshots = 'analytics_snapshots';
 
@@ -30,10 +31,12 @@ class FirestorePaths {
   static const String expenses = 'expenses';
   static const String polls = 'polls';
   static const String cities = 'cities';
+  static const String businessPrivate = 'private';
 
   // Storage folders.
   static const String storageProfilePhotos = 'profile_photos';
   static const String storageReviewPhotos = 'review_photos';
   static const String storageDestinationPhotos = 'destination_photos';
   static const String storageBusinessGallery = 'business_gallery';
+  static const String storageBusinessPermits = 'business_permits';
 }

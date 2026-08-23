@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
@@ -6,9 +8,11 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../core/constants/firestore_paths.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
+import '../../core/services/ocr_service.dart';
 import '../../core/utils/app_exception.dart';
 import '../../core/utils/validators.dart';
 import '../../core/widgets/buttons/animated_button.dart';
+import '../../core/widgets/dialogs/confirmation_dialog.dart';
 import '../../core/widgets/dialogs/discard_changes_scope.dart';
 import '../../core/widgets/indicators/rating_widget.dart';
 import '../../core/widgets/inputs/hero_image_picker.dart';
@@ -106,6 +110,9 @@ class _BusinessFormState extends State<_BusinessForm> {
     text: widget.existing?.openingHours ?? '',
   );
   late String _heroImageUrl = widget.existing?.heroImageUrl ?? '';
+  // Lives outside Business (see BusinessPermit's doc comment) — fetched
+  // separately in initState below since it's not part of widget.existing.
+  String _permitUrl = '';
   late String _priceRange = _priceRanges.contains(widget.existing?.priceRange)
       ? widget.existing!.priceRange
       : _priceRanges.first;
@@ -144,6 +151,12 @@ class _BusinessFormState extends State<_BusinessForm> {
       }
       return provinces..sort((a, b) => a.name.compareTo(b.name));
     });
+    final existingId = widget.existing?.id;
+    if (existingId != null && existingId.isNotEmpty) {
+      _repository.getPermit(existingId).then((permit) {
+        if (mounted) setState(() => _permitUrl = permit?.permitUrl ?? '');
+      });
+    }
   }
 
   @override
@@ -171,6 +184,30 @@ class _BusinessFormState extends State<_BusinessForm> {
       ).showSnackBar(const SnackBar(content: Text('Province is required.')));
       return;
     }
+    if (_heroImageUrl.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please upload a photo for your listing.')),
+      );
+      return;
+    }
+
+    // Only nudge on an actual submission (first-time or resubmit-after-
+    // rejection) — an already-approved owner just saving an unrelated edit
+    // shouldn't be re-asked about a permit they've already deliberately
+    // left out.
+    final isSubmission = widget.existing == null || resubmit;
+    if (isSubmission && _permitUrl.isEmpty && mounted) {
+      final proceed = await showConfirmationDialog(
+        context,
+        title: 'Submit without a permit photo?',
+        message:
+            'A Business Permit or DTI Registration photo speeds up approval '
+            'since the admin has less to manually verify. You can still '
+            'submit without one — an admin may ask for it later.',
+        confirmLabel: 'Submit Anyway',
+      );
+      if (!proceed || !mounted) return;
+    }
 
     setState(() => _saving = true);
     final business = Business(
@@ -197,12 +234,15 @@ class _BusinessFormState extends State<_BusinessForm> {
     );
 
     try {
+      final String id;
       if (widget.existing == null) {
-        await _repository.create(business);
+        id = await _repository.create(business);
       } else if (resubmit) {
-        await _repository.resubmit(widget.existing!.id, business);
+        id = widget.existing!.id;
+        await _repository.resubmit(id, business);
       } else {
-        await _repository.update(widget.existing!.id, business);
+        id = widget.existing!.id;
+        await _repository.update(id, business);
         // Already approved and linked to a restaurant — keep it in sync
         // with this edit (see the class doc on Business).
         final restaurantId = widget.existing!.restaurantId;
@@ -212,6 +252,15 @@ class _BusinessFormState extends State<_BusinessForm> {
             business,
           );
         }
+      }
+      // Separate write — see BusinessPermit's doc comment for why permit
+      // data lives outside the main doc. permitOcrText is deliberately not
+      // set here: extractPermitText (the Cloud Function) is the only thing
+      // that's ever allowed to write it, so it always reflects real Vision
+      // output and never something the client claims on its own.
+      await _repository.setPermitUrl(id, _permitUrl);
+      if (_permitUrl.isNotEmpty) {
+        unawaited(OcrService().extractText(id).catchError((_) => ''));
       }
       if (mounted) {
         _dirty = false;
@@ -350,13 +399,14 @@ class _BusinessFormState extends State<_BusinessForm> {
                 ),
                 if (_category == BusinessCategory.foodAndDining) ...[
                   const SizedBox(height: AppSpacing.md),
-                  TextField(
+                  TextFormField(
                     controller: _cuisineController,
                     decoration: const InputDecoration(
                       labelText: 'Cuisine',
                       hintText: 'e.g. Filipino, Seafood',
                       prefixIcon: Icon(Symbols.restaurant_rounded, size: 20),
                     ),
+                    validator: (v) => Validators.required(v, label: 'Cuisine'),
                   ),
                   const SizedBox(height: AppSpacing.md),
                   DropdownButtonFormField<String>(
@@ -371,13 +421,14 @@ class _BusinessFormState extends State<_BusinessForm> {
                     }),
                   ),
                   const SizedBox(height: AppSpacing.md),
-                  TextField(
+                  TextFormField(
                     controller: _openingHoursController,
                     decoration: const InputDecoration(
                       labelText: 'Opening Hours',
                       hintText: 'e.g. 10:00 AM – 9:00 PM daily',
                       prefixIcon: Icon(Symbols.schedule_rounded, size: 20),
                     ),
+                    validator: (v) => Validators.required(v, label: 'Opening hours'),
                   ),
                 ],
                 const SizedBox(height: AppSpacing.md),
@@ -423,15 +474,17 @@ class _BusinessFormState extends State<_BusinessForm> {
                     prefixIcon: Icon(Symbols.description_rounded, size: 20),
                   ),
                   validator: (v) =>
+                      Validators.required(v, label: 'Description') ??
                       Validators.maxLength(v, 3000, label: 'Description'),
                 ),
                 const SizedBox(height: AppSpacing.md),
-                TextField(
+                TextFormField(
                   controller: _addressController,
                   decoration: const InputDecoration(
                     labelText: 'Address',
                     prefixIcon: Icon(Symbols.location_on_rounded, size: 20),
                   ),
+                  validator: (v) => Validators.required(v, label: 'Address'),
                 ),
                 const SizedBox(height: AppSpacing.md),
                 TextFormField(
@@ -440,7 +493,7 @@ class _BusinessFormState extends State<_BusinessForm> {
                     labelText: 'Contact Number',
                     prefixIcon: Icon(Symbols.call_rounded, size: 20),
                   ),
-                  validator: Validators.phone,
+                  validator: (v) => Validators.phone(v, required: true),
                 ),
                 const SizedBox(height: AppSpacing.md),
                 TextFormField(
@@ -458,6 +511,18 @@ class _BusinessFormState extends State<_BusinessForm> {
                   ownerId: widget.uid,
                   onChanged: (url) => setState(() {
                     _heroImageUrl = url;
+                    _dirty = true;
+                  }),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                HeroImagePicker(
+                  imageUrl: _permitUrl,
+                  folder: FirestorePaths.storageBusinessPermits,
+                  ownerId: widget.uid,
+                  label: 'Business Permit / DTI Registration (optional, speeds up approval)',
+                  height: 140,
+                  onChanged: (url) => setState(() {
+                    _permitUrl = url;
                     _dirty = true;
                   }),
                 ),

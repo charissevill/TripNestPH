@@ -132,6 +132,8 @@ class _SavedItinerariesScreenState extends State<SavedItinerariesScreen> {
     final code = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
+        // Scrolls on a short viewport (landscape, keyboard open) instead of overflowing.
+        scrollable: true,
         title: const Text('Join a Shared Trip'),
         content: TextField(
           controller: controller,

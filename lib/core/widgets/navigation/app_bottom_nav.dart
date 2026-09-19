@@ -24,15 +24,15 @@ class AppBottomNav extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    // The selected tab shows its label next to its icon ("My Business" is the
+    // longest), which needs more room than a very narrow phone has — trim the
+    // spacing there. Unchanged at 360px and wider.
+    final narrow = MediaQuery.sizeOf(context).width < 360;
+    final barMargin = narrow ? AppSpacing.xs : AppSpacing.md;
     return Container(
-      margin: const EdgeInsets.fromLTRB(
-        AppSpacing.md,
-        0,
-        AppSpacing.md,
-        AppSpacing.md,
-      ),
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.sm,
+      margin: EdgeInsets.fromLTRB(barMargin, 0, barMargin, AppSpacing.md),
+      padding: EdgeInsets.symmetric(
+        horizontal: narrow ? AppSpacing.xxs : AppSpacing.sm,
         vertical: AppSpacing.xs,
       ),
       decoration: BoxDecoration(
@@ -56,8 +56,8 @@ class AppBottomNav extends StatelessWidget {
           gap: 4,
           activeColor: Colors.white,
           iconSize: 20,
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.xs,
+          padding: EdgeInsets.symmetric(
+            horizontal: narrow ? AppSpacing.xxs : AppSpacing.xs,
             vertical: 10,
           ),
           duration: const Duration(milliseconds: 320),

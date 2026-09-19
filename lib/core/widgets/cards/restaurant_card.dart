@@ -61,8 +61,7 @@ class RestaurantCard extends StatelessWidget {
                 children: [
                   const Icon(Symbols.location_on_rounded, size: 14, color: Colors.white),
                   const SizedBox(width: 2),
-                  ConstrainedBox(
-                    constraints: BoxConstraints(maxWidth: width - 70),
+                  Flexible(
                     child: Text(
                       restaurant.provinceName,
                       maxLines: 1,

@@ -1462,6 +1462,8 @@ class _TravelerCountDialogState extends State<_TravelerCountDialog> {
     final theme = Theme.of(context);
     final (min, max) = _range;
     return AlertDialog(
+      // Scrolls on a short viewport (landscape, keyboard open) instead of overflowing.
+      scrollable: true,
       title: const Text('Who\'s traveling?'),
       content: Column(
         mainAxisSize: MainAxisSize.min,

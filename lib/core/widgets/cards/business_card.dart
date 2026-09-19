@@ -81,8 +81,7 @@ class BusinessCard extends StatelessWidget {
                     color: Colors.white,
                   ),
                   const SizedBox(width: 2),
-                  ConstrainedBox(
-                    constraints: BoxConstraints(maxWidth: width - 40),
+                  Flexible(
                     child: Text(
                       business.provinceName,
                       maxLines: 1,

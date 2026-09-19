@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -427,9 +429,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 trailing: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(
-                      accentColorProvider.preset.name,
-                      style: theme.textTheme.bodyMedium?.copyWith(color: AppColors.textTertiary),
+                    Flexible(
+                      child: Text(
+                        accentColorProvider.preset.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodyMedium?.copyWith(color: AppColors.textTertiary),
+                      ),
                     ),
                     const SizedBox(width: AppSpacing.xs),
                     Container(
@@ -450,7 +456,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 trailing: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(currentFontFamily.name, style: theme.textTheme.bodyMedium?.copyWith(color: AppColors.textTertiary)),
+                    Flexible(
+                      child: Text(
+                        currentFontFamily.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodyMedium?.copyWith(color: AppColors.textTertiary),
+                      ),
+                    ),
                     const SizedBox(width: AppSpacing.xs),
                     const Icon(Symbols.chevron_right_rounded, color: AppColors.textTertiary),
                   ],
@@ -464,7 +477,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 trailing: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(currentFontSize.name, style: theme.textTheme.bodyMedium?.copyWith(color: AppColors.textTertiary)),
+                    Flexible(
+                      child: Text(
+                        currentFontSize.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodyMedium?.copyWith(color: AppColors.textTertiary),
+                      ),
+                    ),
                     const SizedBox(width: AppSpacing.xs),
                     const Icon(Symbols.chevron_right_rounded, color: AppColors.textTertiary),
                   ],
@@ -717,16 +737,31 @@ class _NavigationRow extends StatelessWidget {
       onTap: onTap,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.md),
-        child: Row(
-          children: [
-            Icon(icon, color: color, size: 22),
-            const SizedBox(width: AppSpacing.md),
-            Expanded(child: Text(label, style: theme.textTheme.bodyLarge?.copyWith(color: isDestructive ? AppColors.error : null))),
-            if (trailing != null)
-              Padding(padding: const EdgeInsets.only(right: AppSpacing.sm), child: trailing!)
-            else
-              const Icon(Symbols.chevron_right_rounded, color: AppColors.textTertiary),
-          ],
+        child: LayoutBuilder(
+          builder: (context, constraints) => Row(
+            children: [
+              Icon(icon, color: color, size: 22),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(child: Text(label, style: theme.textTheme.bodyLarge?.copyWith(color: isDestructive ? AppColors.error : null))),
+              if (trailing != null)
+                // The label is guaranteed a minimum width and the current value
+                // (font/theme name) gets the rest, truncating if it must — so a
+                // narrow screen never squeezes the label to a sliver.
+                ConstrainedBox(
+                  constraints: BoxConstraints(
+                    // Floor: room for the trailing icons (swatch + chevron) so
+                    // they never overflow even when the label takes its minimum.
+                    maxWidth: math.max(
+                      88,
+                      constraints.maxWidth - 22 - AppSpacing.md - 72 * MediaQuery.textScalerOf(context).scale(1),
+                    ),
+                  ),
+                  child: Padding(padding: const EdgeInsets.only(right: AppSpacing.sm), child: trailing!),
+                )
+              else
+                const Icon(Symbols.chevron_right_rounded, color: AppColors.textTertiary),
+            ],
+          ),
         ),
       ),
     );

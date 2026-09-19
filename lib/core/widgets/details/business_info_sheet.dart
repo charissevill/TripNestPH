@@ -428,6 +428,8 @@ class _WriteReviewDialogState extends State<_WriteReviewDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
+      // Scrolls on a short viewport (landscape, keyboard open) instead of overflowing.
+      scrollable: true,
       title: const Text('Write a Review'),
       content: Column(
         mainAxisSize: MainAxisSize.min,

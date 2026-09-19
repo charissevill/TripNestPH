@@ -954,6 +954,8 @@ class _AddMenuItemDialogState extends State<_AddMenuItemDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
+      // Scrolls on a short viewport (landscape, keyboard open) instead of overflowing.
+      scrollable: true,
       title: Text('Add ${widget.itemLabel}'),
       content: SingleChildScrollView(
         child: Form(

@@ -134,6 +134,8 @@ class _SavedScreenState extends State<SavedScreen>
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
+          // Scrolls on a short viewport (landscape, keyboard open) instead of overflowing.
+          scrollable: true,
           title: const Text('Rename list'),
           content: TextField(
             controller: controller,

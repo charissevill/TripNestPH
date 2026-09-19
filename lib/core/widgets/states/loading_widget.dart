@@ -3,6 +3,8 @@ import 'package:shimmer/shimmer.dart';
 
 import '../../theme/app_colors.dart';
 import '../../theme/app_spacing.dart';
+import '../../theme/breakpoints.dart';
+import '../layout/max_width_container.dart';
 
 /// Shimmer skeleton loaders that mimic the shape of the real content so
 /// screens never show a jarring blank frame while (mock) data "loads".
@@ -98,17 +100,23 @@ class LoadingWidget {
     );
   }
 
-  /// A 2-column grid of [mediaCard]-shaped placeholders, matching the
-  /// `crossAxisCount: 2` grids used across Explore/Saved/Nearby Places/
-  /// Recently Viewed (card width comes from the grid itself, not a fixed
-  /// value, so each cell fills its column).
+  /// A grid of [mediaCard]-shaped placeholders, matching the card grids used
+  /// across Explore/Saved/Nearby Places/Recently Viewed — same column count
+  /// (2 on a phone, 3-4 wider) and content width, so the skeleton doesn't
+  /// jump layout when the real cards arrive (card width comes from the grid
+  /// itself, so each cell fills its column).
   static Widget grid({int count = 6}) {
+    return Builder(builder: (context) => _gridSkeleton(context, count));
+  }
+
+  static Widget _gridSkeleton(BuildContext context, int count) {
+    final side = MaxWidthContainer.sidePadding(context, maxWidth: 1400);
     return _shimmer(
       GridView.builder(
-        padding: const EdgeInsets.fromLTRB(
-          AppSpacing.lg,
+        padding: EdgeInsets.fromLTRB(
+          side,
           AppSpacing.md,
-          AppSpacing.lg,
+          side,
           AppSpacing.huge,
         ),
         // shrinkWrap so this also works sized to its own content inside an
@@ -116,8 +124,8 @@ class LoadingWidget {
         // body), not just inside a bounded Expanded region like before.
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: context.gridColumns,
           crossAxisSpacing: AppSpacing.md,
           mainAxisSpacing: AppSpacing.lg,
           mainAxisExtent: 140 + 92,

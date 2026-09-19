@@ -25,6 +25,7 @@ import '../../core/services/weather_service.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_shadows.dart';
 import '../../core/theme/app_spacing.dart';
+import '../../core/theme/breakpoints.dart';
 import '../../core/utils/app_exception.dart';
 import '../../core/utils/expense_split.dart';
 import '../../core/utils/validators.dart';
@@ -457,6 +458,8 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen>
     final shouldSave = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
+        // Scrolls on a short viewport (landscape, keyboard open) instead of overflowing.
+        scrollable: true,
         title: const Text('Save this trip?'),
         content: const Text(
           'This itinerary hasn\'t been saved yet — leaving now will discard it for good.',
@@ -1059,6 +1062,8 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen>
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
+          // Scrolls on a short viewport (landscape, keyboard open) instead of overflowing.
+          scrollable: true,
           title: const Text('Add Expense'),
           content: SingleChildScrollView(
             child: Column(
@@ -1206,6 +1211,8 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen>
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
+          // Scrolls on a short viewport (landscape, keyboard open) instead of overflowing.
+          scrollable: true,
           title: const Text('New Poll'),
           content: SingleChildScrollView(
             child: Column(
@@ -1378,6 +1385,8 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen>
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
+          // Scrolls on a short viewport (landscape, keyboard open) instead of overflowing.
+          scrollable: true,
           title: const Text('Edit Poll'),
           content: SingleChildScrollView(
             child: Column(
@@ -1579,6 +1588,8 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen>
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
+          // Scrolls on a short viewport (landscape, keyboard open) instead of overflowing.
+          scrollable: true,
           title: const Text('Edit Expense'),
           content: SingleChildScrollView(
             child: Column(
@@ -1756,6 +1767,8 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen>
     final label = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
+        // Scrolls on a short viewport (landscape, keyboard open) instead of overflowing.
+        scrollable: true,
         title: const Text('Add Packing Item'),
         content: TextField(
           controller: controller,
@@ -1903,6 +1916,8 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen>
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
+          // Scrolls on a short viewport (landscape, keyboard open) instead of overflowing.
+          scrollable: true,
           title: Text('Edit "${line.name}" price'),
           content: TextField(
             controller: priceController,
@@ -2022,6 +2037,8 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen>
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
+          // Scrolls on a short viewport (landscape, keyboard open) instead of overflowing.
+          scrollable: true,
           title: Text('Add to "${category.label}"'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
@@ -2335,7 +2352,7 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen>
                 headerSliverBuilder: (context, innerBoxIsScrolled) => [
                   SliverAppBar(
                     pinned: true,
-                    expandedHeight: 220,
+                    expandedHeight: context.heroHeight(220),
                     backgroundColor: theme.colorScheme.surface,
                     surfaceTintColor: Colors.transparent,
                     leading: Padding(
@@ -3353,6 +3370,8 @@ class _AddActivityDialogState extends State<_AddActivityDialog> {
     final theme = Theme.of(context);
     final location = _location;
     return AlertDialog(
+      // Scrolls on a short viewport (landscape, keyboard open) instead of overflowing.
+      scrollable: true,
       title: Text(widget.existing == null ? 'Add Activity' : 'Edit Activity'),
       content: SingleChildScrollView(
         child: Column(

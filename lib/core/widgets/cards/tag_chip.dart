@@ -17,6 +17,8 @@ class TagChip extends StatelessWidget {
       decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(AppRadius.pill)),
       child: Text(
         label,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
         style: Theme.of(context).textTheme.labelSmall?.copyWith(color: Colors.white, fontWeight: FontWeight.w700),
       ),
     );

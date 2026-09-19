@@ -15,6 +15,8 @@ Future<bool> showConfirmationDialog(
   final result = await showDialog<bool>(
     context: context,
     builder: (context) => AlertDialog(
+      // Scrolls on a short viewport (landscape, keyboard open) instead of overflowing.
+      scrollable: true,
       title: Text(title),
       content: Text(message),
       actions: [

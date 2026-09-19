@@ -9,6 +9,8 @@ import '../../core/widgets/states/empty_state_widget.dart';
 import '../../core/widgets/states/loading_widget.dart';
 import '../../data/repositories/festival_repository.dart';
 import '../../domain/models/festival.dart';
+import '../../core/theme/breakpoints.dart';
+import '../../core/widgets/layout/max_width_container.dart';
 
 /// Full list of upcoming festivals — reached via "See all" from Home's
 /// "Upcoming Festivals" carousel, so that section always has somewhere to
@@ -123,16 +125,15 @@ class _UpcomingFestivalsScreenState extends State<UpcomingFestivalsScreen> {
     }
     return LayoutBuilder(
       builder: (context, constraints) {
-        final cardWidth = (constraints.maxWidth - AppSpacing.lg * 2 - AppSpacing.md) / 2;
+        // Same column count / content width as Explore and Saved: 2 on a
+        // phone, 3-4 with room for them, capped so cards don't stretch.
+        final columns = context.gridColumns;
+        final side = MaxWidthContainer.sidePadding(context, maxWidth: 1400);
+        final cardWidth = (constraints.maxWidth - side * 2 - AppSpacing.md * (columns - 1)) / columns;
         return GridView.builder(
-          padding: const EdgeInsets.fromLTRB(
-            AppSpacing.lg,
-            0,
-            AppSpacing.lg,
-            AppSpacing.huge,
-          ),
+          padding: EdgeInsets.fromLTRB(side, 0, side, AppSpacing.huge),
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2,
+            crossAxisCount: columns,
             crossAxisSpacing: AppSpacing.md,
             mainAxisSpacing: AppSpacing.lg,
             mainAxisExtent: 150 + 92,

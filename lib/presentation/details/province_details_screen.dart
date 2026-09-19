@@ -7,6 +7,7 @@ import 'package:smooth_page_indicator/smooth_page_indicator.dart';
 import '../../core/routes/route_paths.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
+import '../../core/theme/breakpoints.dart';
 import '../../core/utils/app_exception.dart';
 import '../../core/utils/auto_advance_gallery_mixin.dart';
 import '../../core/utils/maps_launcher.dart';
@@ -174,7 +175,7 @@ class _ProvinceDetailsBody extends StatelessWidget {
       slivers: [
         SliverAppBar(
           pinned: true,
-          expandedHeight: 240,
+          expandedHeight: context.heroHeight(240),
           backgroundColor: theme.colorScheme.surface,
           surfaceTintColor: Colors.transparent,
           leading: Padding(

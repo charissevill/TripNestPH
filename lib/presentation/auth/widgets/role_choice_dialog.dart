@@ -16,7 +16,9 @@ Future<bool?> showRoleChoiceDialog(BuildContext context) {
     context: context,
     builder: (context) => Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.xl)),
-      child: Padding(
+      // Scrolls rather than overflowing on a short viewport (landscape
+      // phone) or at a large text size.
+      child: SingleChildScrollView(
         padding: const EdgeInsets.all(AppSpacing.lg),
         child: Column(
           mainAxisSize: MainAxisSize.min,

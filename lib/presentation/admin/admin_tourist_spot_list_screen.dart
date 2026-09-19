@@ -213,7 +213,11 @@ class _AdminTouristSpotListScreenState
               child: FutureBuilder<List<Province>>(
                 future: _provincesFuture,
                 builder: (context, snapshot) {
-                  final provinces = (snapshot.data ?? const [])
+                  // Copied first: while the future is pending, snapshot.data is
+                  // null and the fallback const list can't be sorted in place
+                  // (that threw, and the error box it left behind blew out the
+                  // whole column's height).
+                  final provinces = [...(snapshot.data ?? const <Province>[])]
                     ..sort((a, b) => a.name.compareTo(b.name));
                   if (_isLguScoped) {
                     return Container(

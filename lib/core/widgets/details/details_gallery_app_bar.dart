@@ -4,6 +4,7 @@ import 'package:material_symbols_icons/symbols.dart';
 import 'package:smooth_page_indicator/smooth_page_indicator.dart';
 
 import '../../theme/app_spacing.dart';
+import '../../theme/breakpoints.dart';
 import '../../utils/auto_advance_gallery_mixin.dart';
 import '../buttons/bookmark_button.dart';
 
@@ -72,7 +73,7 @@ class _DetailsGalleryAppBarState extends State<DetailsGalleryAppBar> with AutoAd
   Widget build(BuildContext context) {
     return SliverAppBar(
       pinned: true,
-      expandedHeight: widget.expandedHeight,
+      expandedHeight: context.heroHeight(widget.expandedHeight),
       backgroundColor: Theme.of(context).colorScheme.surface,
       surfaceTintColor: Colors.transparent,
       leadingWidth: 68,

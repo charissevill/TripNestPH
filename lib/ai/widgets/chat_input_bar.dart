@@ -103,10 +103,14 @@ class _ChatInputBarState extends State<ChatInputBar> {
                   color: AppColors.textTertiary,
                 ),
                 const SizedBox(width: 4),
-                Text(
-                  'AI can make mistakes. Please double-check important info.',
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: AppColors.textTertiary,
+                // Wraps to a second line on a narrow screen instead of overflowing.
+                Flexible(
+                  child: Text(
+                    'AI can make mistakes. Please double-check important info.',
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: AppColors.textTertiary,
+                    ),
                   ),
                 ),
               ],

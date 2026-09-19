@@ -754,7 +754,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                   ),
                 ),
                 SizedBox(
-                  height: 56,
+                  height: context.textScaledHeight(56, textLine: 20),
                   child: ListView.separated(
                     scrollDirection: Axis.horizontal,
                     padding: EdgeInsets.symmetric(horizontal: sidePadding),

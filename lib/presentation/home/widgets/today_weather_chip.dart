@@ -165,11 +165,17 @@ class _TodayWeatherChipState extends State<TodayWeatherChip> {
                   color: theme.colorScheme.primary,
                 ),
                 const SizedBox(width: AppSpacing.xs),
-                Text(
-                  'Today: ${weather.temperature.round()}°C · ${weather.condition}',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: AppColors.textSecondary,
-                    fontWeight: FontWeight.w600,
+                // Wraps instead of overflowing on a narrow screen / large text
+                // when the condition is long (e.g. "Thunderstorm with slight hail").
+                Expanded(
+                  child: Text(
+                    'Today: ${weather.temperature.round()}°C · ${weather.condition}',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: AppColors.textSecondary,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
               ],

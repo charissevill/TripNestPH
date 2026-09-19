@@ -475,9 +475,15 @@ class _HomeContent extends StatelessWidget {
       data.popularRestaurants,
       favoriteCategories,
     );
+    // HeroBanner and LocationPromptCard carry their own 20px side margin, so
+    // they're capped at the shared 1200px content width plus that margin — that
+    // lines their edges up with the carousels below on a desktop window.
+    const bannerMaxWidth = 1200.0 + AppSpacing.lg * 2;
     return SliverList.list(
       children: [
-        HeroBanner(
+        MaxWidthContainer(
+          maxWidth: bannerMaxWidth,
+          child: HeroBanner(
           items: featuredPlaces
               .take(4)
               .map(
@@ -495,6 +501,7 @@ class _HomeContent extends StatelessWidget {
               )
               .toList(),
         ).animate().fadeIn(duration: 420.ms),
+        ),
         const SizedBox(height: AppSpacing.xl),
         SizedBox(
           height: 106,
@@ -542,11 +549,14 @@ class _HomeContent extends StatelessWidget {
           )
         else if (!locationPromptDismissed &&
             nearbyStatus != LocationAccessStatus.granted) ...[
-          LocationPromptCard(
-            status: nearbyStatus,
-            isBusy: locationBusy,
-            onAction: onLocationAction,
-            onDismiss: onDismissLocationPrompt,
+          MaxWidthContainer(
+            maxWidth: bannerMaxWidth,
+            child: LocationPromptCard(
+              status: nearbyStatus,
+              isBusy: locationBusy,
+              onAction: onLocationAction,
+              onDismiss: onDismissLocationPrompt,
+            ),
           ),
           const SizedBox(height: AppSpacing.xxl),
         ],

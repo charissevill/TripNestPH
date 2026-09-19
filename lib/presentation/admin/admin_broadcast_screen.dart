@@ -133,10 +133,16 @@ class _AdminBroadcastScreenState extends State<AdminBroadcastScreen> {
                 const SizedBox(height: AppSpacing.md),
                 DropdownButtonFormField<NotificationCategory>(
                   initialValue: _category,
+                  // Fills the field so a long category name truncates instead
+                  // of overflowing on a narrow screen.
+                  isExpanded: true,
                   decoration: const InputDecoration(labelText: 'Category'),
                   items: NotificationCategory.values
                       .map(
-                        (c) => DropdownMenuItem(value: c, child: Text(c.label)),
+                        (c) => DropdownMenuItem(
+                          value: c,
+                          child: Text(c.label, maxLines: 1, overflow: TextOverflow.ellipsis),
+                        ),
                       )
                       .toList(),
                   onChanged: (value) => setState(() {

@@ -104,13 +104,51 @@ class TravelImageFrame extends StatelessWidget {
                 ),
               ),
             ),
-            if (topLeft != null) Positioned(top: AppSpacing.sm, left: AppSpacing.sm, child: topLeft!),
-            if (topRight != null) Positioned(top: AppSpacing.sm, right: AppSpacing.sm, child: topRight!),
-            if (bottomLeft != null) Positioned(bottom: AppSpacing.sm, left: AppSpacing.sm, child: bottomLeft!),
-            if (bottomRight != null) Positioned(bottom: AppSpacing.sm, right: AppSpacing.sm, child: bottomRight!),
+            if (topLeft != null || topRight != null)
+              Positioned(
+                top: AppSpacing.sm,
+                left: AppSpacing.sm,
+                right: AppSpacing.sm,
+                child: _BadgeRow(start: topLeft, end: topRight, alignment: CrossAxisAlignment.start),
+              ),
+            if (bottomLeft != null || bottomRight != null)
+              Positioned(
+                bottom: AppSpacing.sm,
+                left: AppSpacing.sm,
+                right: AppSpacing.sm,
+                child: _BadgeRow(start: bottomLeft, end: bottomRight, alignment: CrossAxisAlignment.end),
+              ),
           ],
         ),
       ),
+    );
+  }
+}
+
+/// One edge of badges over the image. [end] keeps its natural size pinned to
+/// the far edge and [start] gets whatever width is left (so it can shrink or
+/// wrap) — two independently positioned badges would instead slide over one
+/// another on a narrow card or at a large text size.
+class _BadgeRow extends StatelessWidget {
+  const _BadgeRow({this.start, this.end, required this.alignment});
+
+  final Widget? start;
+  final Widget? end;
+  final CrossAxisAlignment alignment;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: alignment,
+      children: [
+        Expanded(
+          child: start == null
+              ? const SizedBox.shrink()
+              : Align(alignment: Alignment.centerLeft, heightFactor: 1, child: start),
+        ),
+        if (start != null && end != null) const SizedBox(width: AppSpacing.xs),
+        ?end,
+      ],
     );
   }
 }

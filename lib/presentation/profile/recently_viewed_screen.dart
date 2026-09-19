@@ -12,6 +12,8 @@ import '../../core/widgets/states/empty_state_widget.dart';
 import '../../core/widgets/states/loading_widget.dart';
 import '../../data/repositories/user_repository.dart';
 import '../../domain/models/destination.dart';
+import '../../core/theme/breakpoints.dart';
+import '../../core/widgets/layout/max_width_container.dart';
 
 const double _gridImageHeight = 140;
 const double _gridCellExtent = _gridImageHeight + 92;
@@ -100,15 +102,13 @@ class _RecentlyViewedScreenState extends State<RecentlyViewedScreen> {
             }
             return LayoutBuilder(
               builder: (context, constraints) {
+                // Same column count / content width as Explore and Saved: 2 on a
+                // phone, 3-4 with room for them, capped so cards don't stretch.
+                final side = MaxWidthContainer.sidePadding(context, maxWidth: 1400);
                 return GridView.builder(
-                  padding: const EdgeInsets.fromLTRB(
-                    AppSpacing.lg,
-                    AppSpacing.md,
-                    AppSpacing.lg,
-                    AppSpacing.huge,
-                  ),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
+                  padding: EdgeInsets.fromLTRB(side, AppSpacing.md, side, AppSpacing.huge),
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: context.gridColumns,
                     crossAxisSpacing: AppSpacing.md,
                     mainAxisSpacing: AppSpacing.lg,
                     mainAxisExtent: _gridCellExtent,

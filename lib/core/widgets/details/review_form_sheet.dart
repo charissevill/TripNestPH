@@ -142,7 +142,10 @@ class _ReviewFormSheetState extends State<_ReviewFormSheet> {
                   ),
                   const SizedBox(height: AppSpacing.lg),
                   Center(
-                    child: Row(
+                    // Scales down instead of overflowing on a very narrow screen.
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: List.generate(5, (i) {
                         final starValue = i + 1.0;
@@ -158,6 +161,7 @@ class _ReviewFormSheetState extends State<_ReviewFormSheet> {
                           ),
                         );
                       }),
+                    ),
                     ),
                   ),
                   const SizedBox(height: AppSpacing.md),

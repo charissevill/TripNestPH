@@ -16,6 +16,8 @@ Future<String?> showReportContentDialog(BuildContext context) {
     context: context,
     builder: (context) => StatefulBuilder(
       builder: (context, setDialogState) => AlertDialog(
+        // Scrolls on a short viewport (landscape phone) instead of overflowing.
+        scrollable: true,
         title: const Text('Report this listing'),
         content: RadioGroup<String>(
           groupValue: selected,

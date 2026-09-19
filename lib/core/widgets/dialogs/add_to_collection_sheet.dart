@@ -130,14 +130,18 @@ class _AddToCollectionSheetState extends State<_AddToCollectionSheet> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Material(
+    // Lifted above the on-screen keyboard (the "New List" field autofocuses),
+    // and scrolls when the list is taller than the space left.
+    return Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+      child: Material(
       color: theme.colorScheme.surface,
       borderRadius: const BorderRadius.vertical(
         top: Radius.circular(AppRadius.xxl),
       ),
       child: SafeArea(
         top: false,
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(
             AppSpacing.lg,
             AppSpacing.sm,
@@ -212,6 +216,7 @@ class _AddToCollectionSheetState extends State<_AddToCollectionSheet> {
             ],
           ),
         ),
+      ),
       ),
     );
   }

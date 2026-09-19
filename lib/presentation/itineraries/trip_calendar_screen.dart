@@ -191,8 +191,12 @@ class _TripCalendarScreenState extends State<TripCalendarScreen> {
                                     : null,
                               ),
                               alignment: Alignment.center,
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
+                              // Scales down on a narrow screen / large text so the
+                              // day number + trip dot never overflow the square cell.
+                              child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Column(
+                                mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Text(
                                     '${date.day}',
@@ -216,6 +220,7 @@ class _TripCalendarScreenState extends State<TripCalendarScreen> {
                                       ),
                                     ),
                                 ],
+                              ),
                               ),
                             ),
                           ),

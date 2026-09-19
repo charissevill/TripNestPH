@@ -55,6 +55,8 @@ class _AdminBusinessOwnerApplicationsScreenState extends State<AdminBusinessOwne
     final reason = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
+        // Scrolls on a short viewport (landscape, keyboard open) instead of overflowing.
+        scrollable: true,
         title: const Text('Reject this application?'),
         content: TextField(
           controller: reasonController,

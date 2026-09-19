@@ -40,8 +40,11 @@ class AppNavSidebar extends StatelessWidget {
       child: SafeArea(
         right: false,
         bottom: false,
-        child: Column(
+        // Scrolls on a very short window instead of overflowing.
+        child: SingleChildScrollView(
+          child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
             const Padding(
               padding: EdgeInsets.fromLTRB(
@@ -59,6 +62,7 @@ class AppNavSidebar extends StatelessWidget {
                 onTap: () => onTap(i),
               ),
           ],
+        ),
         ),
       ),
     );

@@ -719,6 +719,8 @@ Future<int?> _promptForNumber(
   return showDialog<int>(
     context: context,
     builder: (context) => AlertDialog(
+      // Scrolls on a short viewport (landscape, keyboard open) instead of overflowing.
+      scrollable: true,
       title: Text(title),
       content: Form(
         key: formKey,

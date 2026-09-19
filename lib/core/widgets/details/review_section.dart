@@ -133,6 +133,8 @@ class _ReviewSectionState extends State<ReviewSection> {
     final replyText = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
+        // Scrolls on a short viewport (landscape, keyboard open) instead of overflowing.
+        scrollable: true,
         title: Text(review.hasOwnerReply ? 'Edit your reply' : 'Reply to this review'),
         content: TextField(
           controller: controller,

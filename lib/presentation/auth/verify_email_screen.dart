@@ -107,14 +107,22 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
 
     return Scaffold(
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.lg),
-          child: MaxWidthContainer(
-            maxWidth: 480,
-            child: Form(
-              key: _codeFormKey,
-              child: Column(
+        // Centered on tall screens, but scrolls instead of overflowing when
+        // the viewport is short (landscape phone, keyboard up) or the text
+        // size is large.
+        child: LayoutBuilder(
+          builder: (context, constraints) => SingleChildScrollView(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: constraints.maxHeight),
+              child: Padding(
+                padding: const EdgeInsets.all(AppSpacing.lg),
+                child: MaxWidthContainer(
+                  maxWidth: 480,
+                  child: Form(
+                    key: _codeFormKey,
+                    child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Container(
@@ -188,6 +196,9 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
                   ),
                 ),
               ],
+                    ),
+                  ),
+                ),
               ),
             ),
           ),

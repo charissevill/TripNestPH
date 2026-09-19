@@ -75,12 +75,16 @@ class PlaceCard extends StatelessWidget {
                           color: Colors.white,
                         ),
                         const SizedBox(width: 2),
-                        Text(
-                          _distanceLabel(place.distanceMeters!),
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
+                        Flexible(
+                          child: Text(
+                            _distanceLabel(place.distanceMeters!),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ),
                       ],

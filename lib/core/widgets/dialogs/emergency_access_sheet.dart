@@ -100,7 +100,10 @@ class _EmergencyAccessSheetState extends State<_EmergencyAccessSheet> {
       ),
       child: SafeArea(
         top: false,
-        child: Padding(
+        // Scrolls when the sheet is taller than the screen (landscape, large
+        // text, several local hotlines) so the Call / Find Nearby actions
+        // stay reachable instead of being cut off.
+        child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(
             AppSpacing.lg,
             AppSpacing.sm,

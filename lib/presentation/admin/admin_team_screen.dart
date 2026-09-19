@@ -51,6 +51,8 @@ class _AdminTeamScreenState extends State<AdminTeamScreen> {
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
+          // Scrolls on a short viewport (landscape, keyboard open) instead of overflowing.
+          scrollable: true,
           title: const Text('Invite to Admin Portal'),
           content: SingleChildScrollView(
             child: Form(

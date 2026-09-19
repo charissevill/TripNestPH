@@ -89,6 +89,9 @@ class _CredentialDialogState extends State<CredentialDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
+      // The whole dialog (title + fields) scrolls when the viewport is short —
+      // a landscape phone with the keyboard open leaves very little height.
+      scrollable: true,
       title: Text(widget.title),
       content: SingleChildScrollView(
         child: Form(

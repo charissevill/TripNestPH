@@ -126,7 +126,10 @@ class RestaurantRepository {
   /// Overwrites just the average — [ReviewRepository] owns `reviewCount`
   /// separately via [adjustReviewCount], which is atomic and must never be
   /// clobbered by a plain overwrite based on a possibly-stale read.
-  Future<void> updateAggregateRating(String id, {required double rating}) async {
+  Future<void> updateAggregateRating(
+    String id, {
+    required double rating,
+  }) async {
     try {
       await _collection.doc(id).update({'rating': rating});
     } catch (e) {
@@ -138,7 +141,9 @@ class RestaurantRepository {
   /// `DestinationRepository.adjustReviewCount` for the full reasoning.
   Future<void> adjustReviewCount(String id, int delta) async {
     try {
-      await _collection.doc(id).update({'reviewCount': FieldValue.increment(delta)});
+      await _collection.doc(id).update({
+        'reviewCount': FieldValue.increment(delta),
+      });
     } catch (e) {
       throw AppException.from(e);
     }
@@ -189,8 +194,10 @@ class RestaurantRepository {
         'priceRange': business.priceRange,
         'description': business.description,
         'openingHours': business.openingHours,
-        'menuHighlights': <Map<String, dynamic>>[],
+        'menuHighlights': business.menuItems.map((m) => m.toMap()).toList(),
         'isPopular': false,
+        'latitude': business.latitude,
+        'longitude': business.longitude,
         'phoneNumber': business.contactNumber,
         'websiteUrl': business.websiteUrl,
         'facebookUrl': '',
@@ -230,6 +237,9 @@ class RestaurantRepository {
         'websiteUrl': business.websiteUrl,
         'nameLower': business.name.toLowerCase(),
         'accessibilityTags': business.accessibilityTags,
+        'menuHighlights': business.menuItems.map((m) => m.toMap()).toList(),
+        'latitude': business.latitude,
+        'longitude': business.longitude,
       });
     } catch (e) {
       throw AppException.from(e);

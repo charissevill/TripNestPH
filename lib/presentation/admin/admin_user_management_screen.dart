@@ -162,6 +162,15 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
             )
             .toList();
       });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            suspending
+                ? '${user.name.isNotEmpty ? user.name : user.email} suspended.'
+                : '${user.name.isNotEmpty ? user.name : user.email} reactivated.',
+          ),
+        ),
+      );
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(

@@ -698,6 +698,59 @@ exports.extractPermitText = onCall({ region: 'asia-southeast1', secrets: [google
 });
 
 /**
+ * Turns a dropped map pin's coordinates into a readable place name (plus
+ * its country code, so the client can reject a pin outside the Philippines
+ * — see `MapDestinationPicker`), for the manual "Create Your Own Itinerary"
+ * flow's interactive map picker — reuses `googlePlacesApiKey` (same
+ * project, now also enabled for the Geocoding API) rather than a separate
+ * secret. Best-effort like every other Google-API proxy in this file: any
+ * failure (no network, no result at that point, service down) is a normal
+ * `{ name: '' }`, letting the client fall back to a plain "Pinned location"
+ * label instead of blocking the traveler from using the pin they just
+ * dropped.
+ */
+exports.reverseGeocode = onCall({ region: 'asia-southeast1', secrets: [googlePlacesApiKey] }, async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.');
+  await enforceRateLimit(request.auth.uid, 'reverseGeocode', 30);
+
+  const { latitude, longitude } = request.data ?? {};
+  if (typeof latitude !== 'number' || typeof longitude !== 'number') {
+    throw new HttpsError('invalid-argument', 'latitude and longitude are required.');
+  }
+
+  const apiKey = googlePlacesApiKey.value();
+  if (!apiKey) return { name: '' };
+
+  try {
+    const response = await fetch(
+      `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=${apiKey}`,
+    );
+    if (response.status !== 200) {
+      console.error('reverseGeocode: Geocoding API returned', response.status, await response.text().catch(() => ''));
+      return { name: '' };
+    }
+    const json = await response.json().catch(() => null);
+    if (json?.status !== 'OK') return { name: '' };
+    const result = json?.results?.[0];
+    const address = result?.formatted_address ?? '';
+    // Remote pins with no street address resolve to a leading Open Location
+    // Code ("H6CF+R8 Balbalan, Kalinga, Philippines") — meaningless to a
+    // traveler, so strip it and keep the readable part after it.
+    const stripped = address.replace(/^[23456789CFGHJMPQRVWX]{4,8}\+[23456789CFGHJMPQRVWX]{2,3}[,\s]+/, '');
+    // This app is Philippines-only, so the client uses this to reject a pin
+    // dropped outside it — read from Google's own address component rather
+    // than string-matching "Philippines" in the formatted address, which
+    // isn't guaranteed to appear (or be spelled the same way) in every
+    // locale/result shape.
+    const countryComponent = (result?.address_components ?? []).find((c) => c.types?.includes('country'));
+    return { name: stripped || address, countryCode: countryComponent?.short_name ?? '' };
+  } catch (e) {
+    console.error('reverseGeocode: request failed', e);
+    return { name: '' };
+  }
+});
+
+/**
  * Proxies a single Places photo's bytes so `photoUrl()` never has to embed
  * the raw API key in a URL handed to `CachedNetworkImage` (which can't
  * attach a Firebase Auth header the way the callable functions above use).

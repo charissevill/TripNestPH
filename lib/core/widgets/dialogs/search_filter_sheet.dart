@@ -60,13 +60,14 @@ Future<bool?> showSearchFilterSheet(
   );
 }
 
-/// Region → Province drill-down plus minimum-rating/budget/distance/
-/// accessibility filters, shared across destinations, restaurants and
-/// festivals. Only [provinceId] is actually applied to content queries —
-/// region is a browsing aid to narrow the province list, not a filter
-/// dimension of its own. Budget/accessibility have no meaningful reading on
-/// destinations or festivals (no per-listing price/accessibility data), so
-/// they're simply ignored wherever a screen applies them to those tabs.
+/// Region + Province filters, shared across destinations, restaurants and
+/// festivals. The Province list is always selectable — picking a Region
+/// first just narrows it down to that region's provinces, it's not a
+/// required step. Only [provinceId] is actually applied to content queries;
+/// [regionId] is purely a browsing aid. Budget/accessibility have no
+/// meaningful reading on destinations or festivals (no per-listing price/
+/// accessibility data), so they're simply ignored wherever a screen applies
+/// them to those tabs.
 class SearchFilterSheet extends StatefulWidget {
   const SearchFilterSheet({
     super.key,
@@ -120,19 +121,26 @@ class _SearchFilterSheetState extends State<SearchFilterSheet> {
   void _selectRegion(String regionId, bool selected) {
     setState(() {
       _regionId = selected ? regionId : null;
-      // The previously selected province may not belong to the newly
-      // picked region — always clear it rather than leave a mismatched
-      // filter applied invisibly.
-      _provinceId = null;
+      // A province already picked from a different region no longer
+      // matches this narrower list — clear it rather than leave a
+      // mismatched filter applied invisibly. A province picked with no
+      // region active is never cleared by this, since it can't mismatch.
+      if (_provinceId != null) {
+        final stillValid = widget.provinces.any(
+          (p) => p.id == _provinceId && (!selected || p.regionId == regionId),
+        );
+        if (!stillValid) _provinceId = null;
+      }
     });
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final provincesInRegion = _regionId == null
-        ? const <Province>[]
-        : (widget.provinces.where((p) => p.regionId == _regionId).toList()..sort((a, b) => a.name.compareTo(b.name)));
+    final selectableProvinces = (_regionId == null
+        ? widget.provinces.toList()
+        : widget.provinces.where((p) => p.regionId == _regionId).toList())
+      ..sort((a, b) => a.name.compareTo(b.name));
 
     return Material(
       color: theme.colorScheme.surface,
@@ -200,23 +208,21 @@ class _SearchFilterSheetState extends State<SearchFilterSheet> {
                               );
                             }).toList(),
                           ),
-                        if (_regionId != null) ...[
-                          const SizedBox(height: AppSpacing.xl),
-                          Text('Province', style: theme.textTheme.titleSmall),
-                          const SizedBox(height: AppSpacing.sm),
-                          Wrap(
-                            spacing: AppSpacing.sm,
-                            runSpacing: AppSpacing.sm,
-                            children: provincesInRegion.map((province) {
-                              final selected = _provinceId == province.id;
-                              return ChoiceChip(
-                                label: Text(province.name),
-                                selected: selected,
-                                onSelected: (v) => setState(() => _provinceId = v ? province.id : null),
-                              );
-                            }).toList(),
-                          ),
-                        ],
+                        const SizedBox(height: AppSpacing.xl),
+                        Text('Province', style: theme.textTheme.titleSmall),
+                        const SizedBox(height: AppSpacing.sm),
+                        Wrap(
+                          spacing: AppSpacing.sm,
+                          runSpacing: AppSpacing.sm,
+                          children: selectableProvinces.map((province) {
+                            final selected = _provinceId == province.id;
+                            return ChoiceChip(
+                              label: Text(province.name),
+                              selected: selected,
+                              onSelected: (v) => setState(() => _provinceId = v ? province.id : null),
+                            );
+                          }).toList(),
+                        ),
                         const SizedBox(height: AppSpacing.xl),
                         Text('Minimum Rating', style: theme.textTheme.titleSmall),
                         const SizedBox(height: AppSpacing.sm),

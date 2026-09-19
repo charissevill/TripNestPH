@@ -7,6 +7,7 @@ import '../../theme/app_colors.dart';
 import '../../theme/app_spacing.dart';
 import '../../utils/app_exception.dart';
 import '../../utils/image_crop_helper.dart';
+import '../media/image_error_placeholder.dart';
 
 /// Admin Portal multi-photo field for a swipeable gallery (see
 /// `DetailsGalleryAppBar`, the shared widget that renders these as an
@@ -123,7 +124,13 @@ class _Thumbnail extends StatelessWidget {
         children: [
           ClipRRect(
             borderRadius: BorderRadius.circular(AppRadius.md),
-            child: CachedNetworkImage(imageUrl: url, width: 90, height: 90, fit: BoxFit.cover),
+            child: CachedNetworkImage(
+              imageUrl: url,
+              width: 90,
+              height: 90,
+              fit: BoxFit.cover,
+              errorWidget: (context, url, error) => const ImageErrorPlaceholder(width: 90, height: 90),
+            ),
           ),
           Positioned(
             right: 2,

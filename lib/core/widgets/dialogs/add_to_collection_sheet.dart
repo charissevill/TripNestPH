@@ -5,6 +5,7 @@ import '../../../data/repositories/favorites_repository.dart';
 import '../../../domain/models/favorite_collection.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_spacing.dart';
+import '../../utils/app_exception.dart';
 
 /// Bottom sheet letting a traveler assign an already-saved favorite to a
 /// named [FavoriteCollection] — pick an existing one, create a new one
@@ -23,6 +24,10 @@ Future<void> showAddToCollectionSheet(
     context: context,
     backgroundColor: Colors.transparent,
     isScrollControlled: true,
+    // See trip_calendar_screen.dart's showModalBottomSheet for why this
+    // matters — without it, the floating AI Chat FAB floats visibly on
+    // top of this sheet instead of being covered by it.
+    useRootNavigator: true,
     builder: (context) => _AddToCollectionSheet(
       collections: collections,
       currentCollectionId: currentCollectionId,
@@ -58,6 +63,7 @@ class _AddToCollectionSheet extends StatefulWidget {
 class _AddToCollectionSheetState extends State<_AddToCollectionSheet> {
   bool _creatingNew = false;
   bool _busy = false;
+  String? _error;
   final _nameController = TextEditingController();
 
   @override
@@ -70,13 +76,26 @@ class _AddToCollectionSheetState extends State<_AddToCollectionSheet> {
   }
 
   Future<void> _select(String? collectionId) async {
-    setState(() => _busy = true);
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
     try {
-      await widget.repository.setCollection(widget.userId, widget.type, widget.itemId, collectionId);
-    } catch (_) {
-      // Best-effort — the sheet just stays open on failure rather than
-      // silently claiming success; the traveler can retry the tap.
-      if (mounted) setState(() => _busy = false);
+      await widget.repository.setCollection(
+        widget.userId,
+        widget.type,
+        widget.itemId,
+        collectionId,
+      );
+    } catch (e) {
+      // The sheet stays open on failure rather than silently claiming
+      // success; the inline message tells the traveler they can retry.
+      if (mounted) {
+        setState(() {
+          _busy = false;
+          _error = AppException.from(e).message;
+        });
+      }
       return;
     }
     if (mounted) Navigator.of(context).pop();
@@ -85,12 +104,20 @@ class _AddToCollectionSheetState extends State<_AddToCollectionSheet> {
   Future<void> _createAndSelect() async {
     final name = _nameController.text.trim();
     if (name.isEmpty) return;
-    setState(() => _busy = true);
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
     try {
       final id = await widget.repository.createCollection(widget.userId, name);
       await _select(id);
-    } catch (_) {
-      if (mounted) setState(() => _busy = false);
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _busy = false;
+          _error = AppException.from(e).message;
+        });
+      }
     }
   }
 
@@ -105,11 +132,18 @@ class _AddToCollectionSheetState extends State<_AddToCollectionSheet> {
     final theme = Theme.of(context);
     return Material(
       color: theme.colorScheme.surface,
-      borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadius.xxl)),
+      borderRadius: const BorderRadius.vertical(
+        top: Radius.circular(AppRadius.xxl),
+      ),
       child: SafeArea(
         top: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.sm, AppSpacing.lg, AppSpacing.xl),
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.lg,
+            AppSpacing.sm,
+            AppSpacing.lg,
+            AppSpacing.xl,
+          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -119,11 +153,18 @@ class _AddToCollectionSheetState extends State<_AddToCollectionSheet> {
                   width: 44,
                   height: 5,
                   margin: const EdgeInsets.only(bottom: AppSpacing.lg),
-                  decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(AppRadius.pill)),
+                  decoration: BoxDecoration(
+                    color: AppColors.border,
+                    borderRadius: BorderRadius.circular(AppRadius.pill),
+                  ),
                 ),
               ),
               Text('Add to List', style: theme.textTheme.headlineSmall),
               const SizedBox(height: AppSpacing.sm),
+              if (_error != null) ...[
+                Text(_error!, style: const TextStyle(color: AppColors.error)),
+                const SizedBox(height: AppSpacing.sm),
+              ],
               _CollectionOption(
                 label: 'Unsorted',
                 selected: widget.currentCollectionId == null,
@@ -145,19 +186,26 @@ class _AddToCollectionSheetState extends State<_AddToCollectionSheet> {
                         autofocus: true,
                         maxLength: 60,
                         enabled: !_busy,
-                        decoration: const InputDecoration(hintText: 'New list name', counterText: ''),
+                        decoration: const InputDecoration(
+                          hintText: 'New list name',
+                          counterText: '',
+                        ),
                         onSubmitted: (_) => _createAndSelect(),
                       ),
                     ),
                     IconButton(
                       icon: const Icon(Symbols.check_rounded),
-                      onPressed: _busy || _nameController.text.trim().isEmpty ? null : _createAndSelect,
+                      onPressed: _busy || _nameController.text.trim().isEmpty
+                          ? null
+                          : _createAndSelect,
                     ),
                   ],
                 )
               else
                 TextButton.icon(
-                  onPressed: _busy ? null : () => setState(() => _creatingNew = true),
+                  onPressed: _busy
+                      ? null
+                      : () => setState(() => _creatingNew = true),
                   icon: const Icon(Symbols.add_rounded, size: 18),
                   label: const Text('New List'),
                 ),
@@ -170,7 +218,11 @@ class _AddToCollectionSheetState extends State<_AddToCollectionSheet> {
 }
 
 class _CollectionOption extends StatelessWidget {
-  const _CollectionOption({required this.label, required this.selected, required this.onTap});
+  const _CollectionOption({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
 
   final String label;
   final bool selected;
@@ -183,7 +235,9 @@ class _CollectionOption extends StatelessWidget {
       contentPadding: EdgeInsets.zero,
       onTap: onTap,
       leading: Icon(
-        selected ? Symbols.check_circle_rounded : Symbols.radio_button_unchecked_rounded,
+        selected
+            ? Symbols.check_circle_rounded
+            : Symbols.radio_button_unchecked_rounded,
         color: selected ? theme.colorScheme.primary : AppColors.textTertiary,
       ),
       title: Text(label),

@@ -6,6 +6,7 @@ import '../../../domain/models/review.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_spacing.dart';
 import '../indicators/rating_widget.dart';
+import '../media/image_error_placeholder.dart';
 
 /// Vertical list of traveler reviews shown near the bottom of every Details
 /// screen. Falls back to an initials avatar when no photo is provided, and
@@ -140,7 +141,13 @@ class _ReviewTile extends StatelessWidget {
                     separatorBuilder: (_, _) => const SizedBox(width: AppSpacing.xs),
                     itemBuilder: (context, i) => ClipRRect(
                       borderRadius: BorderRadius.circular(AppRadius.md),
-                      child: CachedNetworkImage(imageUrl: review.photoUrls[i], width: 64, height: 64, fit: BoxFit.cover),
+                      child: CachedNetworkImage(
+                        imageUrl: review.photoUrls[i],
+                        width: 64,
+                        height: 64,
+                        fit: BoxFit.cover,
+                        errorWidget: (context, url, error) => const ImageErrorPlaceholder(width: 64, height: 64),
+                      ),
                     ),
                   ),
                 ),

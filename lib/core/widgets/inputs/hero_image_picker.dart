@@ -7,6 +7,7 @@ import '../../theme/app_colors.dart';
 import '../../theme/app_spacing.dart';
 import '../../utils/app_exception.dart';
 import '../../utils/image_crop_helper.dart';
+import '../media/image_error_placeholder.dart';
 
 /// Admin Portal photo field: shows the current hero photo (or a placeholder),
 /// and picking a new one uploads it to Firebase Storage and calls
@@ -82,7 +83,12 @@ class _HeroImagePickerState extends State<HeroImagePicker> {
             child: Stack(
               fit: StackFit.expand,
               children: [
-                if (widget.imageUrl.isNotEmpty) CachedNetworkImage(imageUrl: widget.imageUrl, fit: BoxFit.cover),
+                if (widget.imageUrl.isNotEmpty)
+                  CachedNetworkImage(
+                    imageUrl: widget.imageUrl,
+                    fit: BoxFit.cover,
+                    errorWidget: (context, url, error) => const ImageErrorPlaceholder(),
+                  ),
                 if (widget.imageUrl.isEmpty && !_uploading)
                   const Center(
                     child: Column(

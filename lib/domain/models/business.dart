@@ -1,3 +1,5 @@
+import 'restaurant.dart' show MenuItem;
+
 /// A `businessOwner` account's self-service listing (accommodation, food
 /// stall, tour operator, shop, etc.) — separate from the curated
 /// `tourist_spots` collection, which stays Admin/LGU-authored. A
@@ -30,6 +32,11 @@ class Business {
     this.restaurantId = '',
     this.accessibilityTags = const [],
     this.viewCount = 0,
+    this.menuItems = const [],
+    this.latitude,
+    this.longitude,
+    this.rating = 0,
+    this.reviewCount = 0,
   });
 
   final String id;
@@ -88,6 +95,38 @@ class Business {
   /// `isValidViewCountIncrement`).
   final int viewCount;
 
+  /// A simple name/price/photo catalog — a cafe's menu, a hotel's room
+  /// types, a tour operator's packages, a shop's products, a transport
+  /// service's rates, all the same shape (see `_CatalogLabels` on
+  /// `MyBusinessScreen`, which is the only place this differs per
+  /// [category]: the section/item labels shown to the owner, not the data
+  /// itself). Only [isFoodAndDining] currently mirrors onto anything a
+  /// traveler can see (the linked `restaurants` doc's own `menuHighlights`
+  /// field — see `RestaurantRepository.createFromBusiness`/
+  /// `updateFromBusiness`) — every other category has no public-facing
+  /// listing page yet (see this class's own doc comment), so its catalog is
+  /// saved but not shown anywhere outside the owner's own edit screen until
+  /// one exists.
+  final List<MenuItem> menuItems;
+
+  /// Set via the Address field's "Pin on Map" picker (see
+  /// `MyBusinessScreen._pickAddressOnMap`) — null for a listing created
+  /// before that existed, or whose owner only ever typed the address by
+  /// hand. Null means Explore's map view for this listing's category just
+  /// skips it, the same "best-effort, never fabricated" rule every other
+  /// optional coordinate in this app already follows.
+  final double? latitude;
+  final double? longitude;
+
+  /// System-managed, same as [viewCount]: only ever recalculated by
+  /// `ReviewRepository` after a traveler writes/edits/removes a review
+  /// targeting this listing (`ReviewTargetType.business`) — the owner's own
+  /// `toInfoMap()` edit path never touches either field.
+  final double rating;
+  final int reviewCount;
+
+  bool get hasCoordinates => latitude != null && longitude != null;
+
   bool get isApproved => status == 'approved';
   bool get isPending => status == 'pending';
   bool get isRejected => status == 'rejected';
@@ -114,8 +153,17 @@ class Business {
       status: map['status'] as String? ?? 'pending',
       rejectionReason: map['rejectionReason'] as String? ?? '',
       restaurantId: map['restaurantId'] as String? ?? '',
-      accessibilityTags: List<String>.from(map['accessibilityTags'] as List? ?? const []),
+      accessibilityTags: List<String>.from(
+        map['accessibilityTags'] as List? ?? const [],
+      ),
       viewCount: (map['viewCount'] as num?)?.toInt() ?? 0,
+      menuItems: (map['menuItems'] as List? ?? const [])
+          .map((e) => MenuItem.fromMap(Map<String, dynamic>.from(e as Map)))
+          .toList(),
+      latitude: (map['latitude'] as num?)?.toDouble(),
+      longitude: (map['longitude'] as num?)?.toDouble(),
+      rating: (map['rating'] as num?)?.toDouble() ?? 0,
+      reviewCount: (map['reviewCount'] as num?)?.toInt() ?? 0,
     );
   }
 
@@ -139,6 +187,9 @@ class Business {
       'priceRange': priceRange,
       'openingHours': openingHours,
       'accessibilityTags': accessibilityTags,
+      'menuItems': menuItems.map((m) => m.toMap()).toList(),
+      'latitude': latitude,
+      'longitude': longitude,
     };
   }
 }

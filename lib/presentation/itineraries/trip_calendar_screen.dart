@@ -46,6 +46,11 @@ class _TripCalendarScreenState extends State<TripCalendarScreen> {
     }
     showModalBottomSheet(
       context: context,
+      // Pushed on the ROOT navigator, not the current tab's nested one —
+      // the floating AI Chat FAB lives on MainShellScreen's own Scaffold,
+      // a sibling of the tab's navigator, so a nested-navigator sheet
+      // doesn't cover it and it visibly floats on top of the sheet.
+      useRootNavigator: true,
       builder: (context) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,

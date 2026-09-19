@@ -12,6 +12,7 @@ import '../../core/services/places_service.dart';
 import '../../core/services/search_history_service.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
+import '../../core/utils/app_exception.dart';
 import '../../core/utils/listing_filters.dart';
 import '../../core/utils/place_dedup.dart';
 import '../../core/widgets/dialogs/active_filter_chips.dart';
@@ -21,6 +22,7 @@ import '../../core/widgets/details/place_details_sheet.dart';
 import '../../core/widgets/indicators/rating_widget.dart';
 import '../../core/widgets/inputs/search_bar_widget.dart';
 import '../../core/widgets/layout/max_width_container.dart';
+import '../../core/widgets/media/image_error_placeholder.dart';
 import '../../core/widgets/states/empty_state_widget.dart';
 import '../../core/widgets/states/loading_widget.dart';
 import '../../data/repositories/festival_repository.dart';
@@ -170,6 +172,10 @@ class _SearchScreenState extends State<SearchScreen> {
   String _query = '';
   List<_SearchResult> _results = [];
   bool _loading = false;
+  // True when the last search/filter request failed (offline, backend error)
+  // — distinguishes "couldn't search" from a genuine "no results" so a
+  // network failure never masquerades as an empty result set.
+  bool _searchFailed = false;
   // Shared by _runSearch and _runFilterOnly, both of which can be triggered
   // independently (typing vs. applying a filter) and race against each
   // other over the network — only the result of whichever call is still
@@ -435,7 +441,10 @@ class _SearchScreenState extends State<SearchScreen> {
 
   Future<void> _runSearch(String query) async {
     final requestId = ++_searchRequestId;
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _searchFailed = false;
+    });
     try {
       final trimmed = query.trim();
       final restaurantsFuture = _restaurantRepository.searchByName(query);
@@ -558,11 +567,13 @@ class _SearchScreenState extends State<SearchScreen> {
       });
     } catch (e) {
       if (!mounted || requestId != _searchRequestId) return;
+      logTechnicalError(e);
       setState(() {
         _results = [];
         _provinceMatch = null;
         _regionMatch = null;
         _loading = false;
+        _searchFailed = true;
       });
     }
   }
@@ -587,7 +598,10 @@ class _SearchScreenState extends State<SearchScreen> {
 
   Future<void> _runFilterOnly() async {
     final requestId = ++_searchRequestId;
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _searchFailed = false;
+    });
     try {
       final restaurants = await _restaurantRepository.filter(
         provinceId: _provinceId,
@@ -609,11 +623,13 @@ class _SearchScreenState extends State<SearchScreen> {
       });
     } catch (e) {
       if (!mounted || requestId != _searchRequestId) return;
+      logTechnicalError(e);
       setState(() {
         _results = [];
         _provinceMatch = null;
         _regionMatch = null;
         _loading = false;
+        _searchFailed = true;
       });
     }
   }
@@ -900,15 +916,25 @@ class _SearchScreenState extends State<SearchScreen> {
                               _regionMatch == null
                           ? ListView(
                               children: [
-                                EmptyStateWidget(
-                                  icon: Symbols.search_off_rounded,
-                                  title: 'No results for "$_query"',
-                                  message:
-                                      'Try a different keyword, or browse by category from Explore instead.',
-                                  actionLabel: 'Go to Explore',
-                                  onActionTap: () =>
-                                      context.go(RoutePaths.explore),
-                                ),
+                                if (_searchFailed)
+                                  EmptyStateWidget(
+                                    icon: Symbols.error_outline_rounded,
+                                    title: 'Couldn\'t complete your search',
+                                    message:
+                                        'Please check your internet connection and try again.',
+                                    actionLabel: 'Retry',
+                                    onActionTap: _refresh,
+                                  )
+                                else
+                                  EmptyStateWidget(
+                                    icon: Symbols.search_off_rounded,
+                                    title: 'No results for "$_query"',
+                                    message:
+                                        'Try a different keyword, or browse by category from Explore instead.',
+                                    actionLabel: 'Go to Explore',
+                                    onActionTap: () =>
+                                        context.go(RoutePaths.explore),
+                                  ),
                               ],
                             )
                           : _buildResultsList(),
@@ -1089,6 +1115,8 @@ class _ProvinceMatchTile extends StatelessWidget {
                       width: 64,
                       height: 64,
                       fit: BoxFit.cover,
+                      errorWidget: (context, url, error) =>
+                          const ImageErrorPlaceholder(width: 64, height: 64),
                     ),
             ),
             const SizedBox(width: AppSpacing.md),
@@ -1175,6 +1203,8 @@ class _SearchResultTile extends StatelessWidget {
                       width: 64,
                       height: 64,
                       fit: BoxFit.cover,
+                      errorWidget: (context, url, error) =>
+                          const ImageErrorPlaceholder(width: 64, height: 64),
                     ),
             ),
             const SizedBox(width: AppSpacing.md),

@@ -46,177 +46,201 @@ class AdminHomeScreen extends StatelessWidget {
       );
     }
 
-    return Scaffold(
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Symbols.arrow_back_rounded),
-          onPressed: () => context.pop(),
-        ),
-        title: const Text('Admin Portal'),
-      ),
-      body: StreamBuilder<AdminUser?>(
-        stream: AdminRepository().streamSelf(uid),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return LoadingWidget.block(height: 300);
-          }
-          final admin = snapshot.data;
-          if (admin == null || !admin.isActive) {
-            return const SafeArea(
-              child: EmptyStateWidget(
-                icon: Symbols.block_rounded,
-                title: 'No access',
-                message:
-                    'This account doesn\'t have an active Admin Portal role.',
-              ),
-            );
-          }
-
-          final canManageContent =
-              admin.role == AdminRole.admin || admin.role == AdminRole.lgu;
-          final isAdmin = admin.role == AdminRole.admin;
-          final tiles = <Widget>[
-            if (canManageContent) ...[
-              _AdminModuleTile(
-                icon: Symbols.public_rounded,
-                label: 'Provinces',
-                subtitle:
-                    'Write overview, culture, tips, hotlines and budget guidance',
-                onTap: () => context.push(RoutePaths.adminProvinces),
-              ),
-              _AdminModuleTile(
-                icon: Symbols.edit_note_rounded,
-                label: 'Bulk Fill Province Content',
-                subtitle:
-                    'Fill overview/culture/budget for many provinces from a CSV',
-                onTap: () => context.push(RoutePaths.adminBulkProvinceContent),
-              ),
-              _AdminModuleTile(
-                icon: Symbols.place_rounded,
-                label: 'Tourist Spots',
-                subtitle: 'Add, edit or remove destinations shown to travelers',
-                onTap: () => context.push(RoutePaths.adminTouristSpots),
-              ),
-              _AdminModuleTile(
-                icon: Symbols.upload_file_rounded,
-                label: 'Bulk Import',
-                subtitle: 'Create many tourist spots at once from a CSV file',
-                onTap: () => context.push(RoutePaths.adminBulkImport),
-              ),
-              _AdminModuleTile(
-                icon: Symbols.celebration_rounded,
-                label: 'Festivals',
-                subtitle: 'Add, edit or remove festivals shown to travelers',
-                onTap: () => context.push(RoutePaths.adminFestivals),
-              ),
-            ],
-            if (admin.role == AdminRole.businessOwner)
-              _AdminModuleTile(
-                icon: Symbols.storefront_rounded,
-                label: 'My Business',
-                subtitle:
-                    'Submit or edit your business listing for admin approval',
-                onTap: () => context.push(RoutePaths.myBusiness),
-              ),
-            if (canManageContent)
-              _AdminModuleTile(
-                icon: Symbols.analytics_rounded,
-                label: 'Analytics',
-                subtitle: isAdmin
-                    ? 'Traveler, content, business and engagement stats'
-                    : 'Content and engagement stats for ${admin.provinceName ?? 'your province'}',
-                onTap: () => context.push(RoutePaths.adminAnalytics),
-              ),
-            if (isAdmin)
-              _AdminModuleTile(
-                icon: Symbols.person_search_rounded,
-                label: 'Travelers',
-                subtitle: 'Search and suspend/reactivate traveler accounts',
-                onTap: () => context.push(RoutePaths.adminUsers),
-              ),
-            if (isAdmin)
-              _AdminModuleTile(
-                icon: Symbols.storefront_rounded,
-                label: 'Businesses',
-                subtitle:
-                    'Approve, reject or suspend business owner submissions',
-                onTap: () => context.push(RoutePaths.adminBusinesses),
-              ),
-            if (isAdmin)
-              _AdminModuleTile(
-                icon: Symbols.how_to_reg_rounded,
-                label: 'Business Applications',
-                subtitle: 'Review requests to become a Business Owner',
-                onTap: () => context.push(RoutePaths.adminBusinessOwnerApplications),
-              ),
-            if (isAdmin)
-              _AdminModuleTile(
-                icon: Symbols.flag_rounded,
-                label: 'Reported Reviews',
-                subtitle: 'Moderate reviews travelers have flagged',
-                onTap: () => context.push(RoutePaths.adminReportedReviews),
-              ),
-            if (canManageContent)
-              _AdminModuleTile(
-                icon: Symbols.campaign_rounded,
-                label: 'Send Announcement',
-                subtitle: 'Broadcast a notification to every traveler',
-                onTap: () => context.push(RoutePaths.adminBroadcast),
-              ),
-            if (isAdmin)
-              _AdminModuleTile(
-                icon: Symbols.group_rounded,
-                label: 'Team',
-                subtitle: 'Invite or manage Admin Portal accounts',
-                onTap: () => context.push(
-                  RoutePaths.adminTeam,
-                  extra: {
-                    'uid': uid,
-                    'name': admin.name.isNotEmpty ? admin.name : admin.email,
-                  },
-                ),
-              ),
-          ];
-
-          if (context.windowSize == WindowSize.expanded) {
-            return _WelcomePanel(admin: admin, moduleCount: tiles.length);
-          }
-
-          return SafeArea(
-            child: ListView(
-              padding: const EdgeInsets.all(AppSpacing.lg),
-              children: [
-                Text(
-                  'Signed in as ${admin.name.isNotEmpty ? admin.name : admin.email}',
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  admin.provinceName != null
-                      ? 'Role: ${admin.role} · Managing ${admin.provinceName}'
-                      : 'Role: ${admin.role}',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppColors.textTertiary,
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.xl),
-                if (tiles.isEmpty)
-                  EmptyStateWidget(
-                    icon: Symbols.construction_rounded,
-                    title: 'Nothing here yet',
-                    message:
-                        'The ${admin.role} workflow hasn\'t been built in this Admin Portal yet.',
+    return StreamBuilder<AdminUser?>(
+      stream: AdminRepository().streamSelf(uid),
+      builder: (context, snapshot) {
+        final admin = snapshot.data;
+        return Scaffold(
+          appBar: AppBar(
+            // This is the standalone Admin Portal build's landing route —
+            // reached right after login with nothing to pop back to (see
+            // admin_router.dart) — so only show a back arrow when there's
+            // actually somewhere to go, instead of a dead button.
+            leading: context.canPop()
+                ? IconButton(
+                    icon: const Icon(Symbols.arrow_back_rounded),
+                    onPressed: () => context.pop(),
                   )
-                else
-                  for (var i = 0; i < tiles.length; i++) ...[
-                    tiles[i],
-                    if (i != tiles.length - 1)
-                      const SizedBox(height: AppSpacing.sm),
-                  ],
-              ],
+                : null,
+            // A businessOwner account only ever sees "My Business" below —
+            // labeling that as "Admin Portal" reads as if they'd somehow
+            // been granted admin access, which they haven't.
+            title: Text(
+              admin?.role == AdminRole.businessOwner
+                  ? 'Business Owner'
+                  : 'Admin Portal',
             ),
-          );
-        },
+          ),
+          body: _AdminHomeBody(uid: uid, snapshot: snapshot),
+        );
+      },
+    );
+  }
+}
+
+class _AdminHomeBody extends StatelessWidget {
+  const _AdminHomeBody({required this.uid, required this.snapshot});
+
+  final String uid;
+  final AsyncSnapshot<AdminUser?> snapshot;
+
+  @override
+  Widget build(BuildContext context) {
+    if (snapshot.connectionState == ConnectionState.waiting) {
+      return LoadingWidget.block(height: 300);
+    }
+    final admin = snapshot.data;
+    if (admin == null || !admin.isActive) {
+      return const SafeArea(
+        child: EmptyStateWidget(
+          icon: Symbols.block_rounded,
+          title: 'No access',
+          message: 'This account doesn\'t have an active Admin Portal role.',
+        ),
+      );
+    }
+
+    final canManageContent =
+        admin.role == AdminRole.admin || admin.role == AdminRole.lgu;
+    final isAdmin = admin.role == AdminRole.admin;
+    final tiles = <Widget>[
+      if (canManageContent) ...[
+        _AdminModuleTile(
+          icon: Symbols.public_rounded,
+          label: 'Provinces',
+          subtitle:
+              'Write overview, culture, tips, hotlines and budget guidance',
+          onTap: () => context.push(RoutePaths.adminProvinces),
+        ),
+        _AdminModuleTile(
+          icon: Symbols.edit_note_rounded,
+          label: 'Bulk Fill Province Content',
+          subtitle:
+              'Fill overview/culture/budget for many provinces from a CSV',
+          onTap: () => context.push(RoutePaths.adminBulkProvinceContent),
+        ),
+        _AdminModuleTile(
+          icon: Symbols.place_rounded,
+          label: 'Tourist Spots',
+          subtitle: 'Add, edit or remove destinations shown to travelers',
+          onTap: () => context.push(RoutePaths.adminTouristSpots),
+        ),
+        _AdminModuleTile(
+          icon: Symbols.upload_file_rounded,
+          label: 'Bulk Import',
+          subtitle: 'Create many tourist spots at once from a CSV file',
+          onTap: () => context.push(RoutePaths.adminBulkImport),
+        ),
+        _AdminModuleTile(
+          icon: Symbols.celebration_rounded,
+          label: 'Festivals',
+          subtitle: 'Add, edit or remove festivals shown to travelers',
+          onTap: () => context.push(RoutePaths.adminFestivals),
+        ),
+      ],
+      if (admin.role == AdminRole.businessOwner)
+        _AdminModuleTile(
+          icon: Symbols.storefront_rounded,
+          label: 'My Business',
+          subtitle: 'Submit or edit your business listing for admin approval',
+          onTap: () => context.push(RoutePaths.myBusiness),
+        ),
+      if (canManageContent)
+        _AdminModuleTile(
+          icon: Symbols.analytics_rounded,
+          label: 'Analytics',
+          subtitle: isAdmin
+              ? 'Traveler, content, business and engagement stats'
+              : 'Content and engagement stats for ${admin.provinceName ?? 'your province'}',
+          onTap: () => context.push(RoutePaths.adminAnalytics),
+        ),
+      if (isAdmin)
+        _AdminModuleTile(
+          icon: Symbols.person_search_rounded,
+          label: 'Travelers',
+          subtitle: 'Search and suspend/reactivate traveler accounts',
+          onTap: () => context.push(RoutePaths.adminUsers),
+        ),
+      if (canManageContent)
+        _AdminModuleTile(
+          icon: Symbols.storefront_rounded,
+          label: 'Businesses',
+          subtitle: isAdmin
+              ? 'Approve, reject or suspend business owner submissions'
+              : 'Approve, reject or suspend submissions in ${admin.provinceName ?? 'your province'}',
+          onTap: () => context.push(RoutePaths.adminBusinesses),
+        ),
+      if (isAdmin)
+        _AdminModuleTile(
+          icon: Symbols.how_to_reg_rounded,
+          label: 'Business Applications',
+          subtitle: 'Review requests to become a Business Owner',
+          onTap: () => context.push(RoutePaths.adminBusinessOwnerApplications),
+        ),
+      if (isAdmin)
+        _AdminModuleTile(
+          icon: Symbols.flag_rounded,
+          label: 'Reported Reviews',
+          subtitle: 'Moderate reviews travelers have flagged',
+          onTap: () => context.push(RoutePaths.adminReportedReviews),
+        ),
+      if (canManageContent)
+        _AdminModuleTile(
+          icon: Symbols.campaign_rounded,
+          label: 'Send Announcement',
+          subtitle: 'Broadcast a notification to every traveler',
+          onTap: () => context.push(RoutePaths.adminBroadcast),
+        ),
+      if (isAdmin)
+        _AdminModuleTile(
+          icon: Symbols.group_rounded,
+          label: 'Team',
+          subtitle: 'Invite or manage Admin Portal accounts',
+          onTap: () => context.push(
+            RoutePaths.adminTeam,
+            extra: {
+              'uid': uid,
+              'name': admin.name.isNotEmpty ? admin.name : admin.email,
+            },
+          ),
+        ),
+    ];
+
+    if (context.windowSize == WindowSize.expanded) {
+      return _WelcomePanel(admin: admin, moduleCount: tiles.length);
+    }
+
+    return SafeArea(
+      child: ListView(
+        padding: const EdgeInsets.all(AppSpacing.lg),
+        children: [
+          Text(
+            'Signed in as ${admin.name.isNotEmpty ? admin.name : admin.email}',
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
+          const SizedBox(height: 2),
+          Text(
+            admin.provinceName != null
+                ? 'Role: ${admin.role} · Managing ${admin.provinceName}'
+                : 'Role: ${admin.role}',
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: AppColors.textTertiary),
+          ),
+          const SizedBox(height: AppSpacing.xl),
+          if (tiles.isEmpty)
+            EmptyStateWidget(
+              icon: Symbols.construction_rounded,
+              title: 'Nothing here yet',
+              message:
+                  'The ${admin.role} workflow hasn\'t been built in this Admin Portal yet.',
+            )
+          else
+            for (var i = 0; i < tiles.length; i++) ...[
+              tiles[i],
+              if (i != tiles.length - 1) const SizedBox(height: AppSpacing.sm),
+            ],
+        ],
       ),
     );
   }
@@ -248,7 +272,11 @@ class _WelcomePanel extends StatelessWidget {
                 borderRadius: BorderRadius.circular(AppRadius.lg),
               ),
               alignment: Alignment.center,
-              child: const Icon(Symbols.shield_person_rounded, color: AppColors.primary, size: 32),
+              child: const Icon(
+                Symbols.shield_person_rounded,
+                color: AppColors.primary,
+                size: 32,
+              ),
             ),
             const SizedBox(height: AppSpacing.lg),
             Text(
@@ -261,7 +289,9 @@ class _WelcomePanel extends StatelessWidget {
               moduleCount > 0
                   ? 'Pick a module from the sidebar to get started.'
                   : 'The ${admin.role} workflow hasn\'t been built in this Admin Portal yet.',
-              style: theme.textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: AppColors.textSecondary,
+              ),
               textAlign: TextAlign.center,
             ),
           ],

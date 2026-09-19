@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../core/utils/app_exception.dart';
 import '../models/ai_chat_session.dart';
 import '../models/ai_message.dart';
 import '../repositories/ai_repository.dart';
@@ -218,6 +219,7 @@ class AiChatProvider extends ChangeNotifier {
       );
     } catch (e) {
       if (version != _requestVersion) return;
+      logTechnicalError(e);
       final message = e is AiException ? e.message : 'Something went wrong. Please try again.';
       errorMessage = message;
       _appendToSession(

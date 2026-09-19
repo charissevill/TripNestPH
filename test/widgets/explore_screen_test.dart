@@ -11,6 +11,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:tripnest_ph/core/providers/favorites_provider.dart';
 import 'package:tripnest_ph/core/services/places_service.dart';
 import 'package:tripnest_ph/core/utils/function_caller.dart';
+import 'package:tripnest_ph/core/widgets/cards/category_card.dart';
 import 'package:tripnest_ph/core/widgets/details/place_details_sheet.dart';
 import 'package:tripnest_ph/data/repositories/favorites_repository.dart';
 import 'package:tripnest_ph/data/repositories/festival_repository.dart';
@@ -87,6 +88,11 @@ void main() {
     required FakeFirebaseFirestore firestore,
     required PlacesService placesService,
     String? initialCategoryId,
+    // Portrait phone by default — same reasoning as home_screen_test.dart's
+    // identical pin: the default 800×600 test surface would otherwise land
+    // in the responsive shell's "medium" tier instead of "compact". Pass a
+    // landscape size (width > height) to reproduce a short-viewport layout.
+    Size physicalSize = const Size(390, 844),
   }) async {
     final screen = ExploreScreen(
       initialCategoryId: initialCategoryId,
@@ -96,11 +102,7 @@ void main() {
       provinceRepository: ProvinceRepository(firestore: firestore),
       placesService: placesService,
     );
-    // Pinned to a phone-sized surface — same reasoning as
-    // `home_screen_test.dart`'s identical pin: the default 800×600 test
-    // surface would otherwise land in the responsive shell's "medium" tier
-    // instead of "compact".
-    tester.view.physicalSize = const Size(390, 844);
+    tester.view.physicalSize = physicalSize;
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
 
@@ -186,6 +188,266 @@ void main() {
       await _settle(tester);
 
       expect(find.text('Alona Beach'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'the Beaches card stays visibly highlighted, and an "Aklan" chip appears, once both filters are applied',
+    (tester) async {
+      final firestore = FakeFirebaseFirestore();
+      await seedGeography(firestore);
+      await firestore.collection('regions').doc('region-6').set({
+        'name': 'Western Visayas',
+        'islandGroup': 'Visayas',
+      });
+      await firestore.collection('provinces').doc('aklan').set({
+        'name': 'Aklan',
+        'regionId': 'region-6',
+        'regionName': 'Western Visayas',
+        'islandGroup': 'Visayas',
+      });
+      final placesService = PlacesService(
+        caller: _fakePlacesSearchText({
+          'top tourist attractions in the Philippines': [],
+          'beaches in the Philippines': [],
+          'beaches in Aklan, Philippines': [
+            {
+              'id': 'places/puka',
+              'displayName': {'text': 'Puka Shell Beach'},
+              'formattedAddress': 'Boracay, Aklan',
+              'location': {'latitude': 11.99, 'longitude': 121.90},
+            },
+          ],
+        }),
+      );
+
+      await buildScreen(
+        tester: tester,
+        firestore: firestore,
+        placesService: placesService,
+      );
+
+      // Before selecting anything: the Beaches card isn't highlighted yet.
+      expect(
+        find.byWidgetPredicate(
+          (w) => w is CategoryCard && w.category.id == 'beaches' && w.isSelected,
+        ),
+        findsNothing,
+      );
+
+      await tester.tap(find.text('Beaches'));
+      await tester.pump(const Duration(milliseconds: 400));
+      await _settle(tester);
+
+      // After tapping: the same card now renders with isSelected: true —
+      // the highlighted border/label color the traveler actually sees.
+      expect(
+        find.byWidgetPredicate(
+          (w) => w is CategoryCard && w.category.id == 'beaches' && w.isSelected,
+        ),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.byIcon(Symbols.tune_rounded));
+      await _settle(tester);
+      await tester.tap(find.text('Aklan'));
+      await _settle(tester);
+      await tester.tap(find.text('Apply'));
+      await _settle(tester);
+
+      // Both selections stay visible at once: the Beaches card is still
+      // highlighted, and a removable "Aklan" chip now sits under the search
+      // bar (ActiveFilterChips) — plus the results themselves are scoped to
+      // that combination.
+      expect(
+        find.byWidgetPredicate(
+          (w) => w is CategoryCard && w.category.id == 'beaches' && w.isSelected,
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('Aklan'), findsOneWidget);
+      expect(find.text('Puka Shell Beach'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'Beaches category + Aklan province filter together show only beaches located in Aklan',
+    (tester) async {
+      final firestore = FakeFirebaseFirestore();
+      await seedGeography(firestore);
+      await firestore.collection('regions').doc('region-6').set({
+        'name': 'Western Visayas',
+        'islandGroup': 'Visayas',
+      });
+      await firestore.collection('provinces').doc('aklan').set({
+        'name': 'Aklan',
+        'regionId': 'region-6',
+        'regionName': 'Western Visayas',
+        'islandGroup': 'Visayas',
+      });
+      final placesService = PlacesService(
+        caller: _fakePlacesSearchText({
+          'top tourist attractions in the Philippines': [],
+          'beaches in the Philippines': [],
+          'beaches in Aklan, Philippines': [
+            {
+              'id': 'places/puka',
+              'displayName': {'text': 'Puka Shell Beach'},
+              'formattedAddress': 'Boracay, Aklan',
+              'location': {'latitude': 11.99, 'longitude': 121.90},
+            },
+            {
+              'id': 'places/alona',
+              'displayName': {'text': 'Alona Beach'},
+              'formattedAddress': 'Panglao, Bohol',
+              'location': {'latitude': 9.55, 'longitude': 123.77},
+            },
+          ],
+        }),
+      );
+
+      await buildScreen(
+        tester: tester,
+        firestore: firestore,
+        placesService: placesService,
+      );
+
+      await tester.tap(find.text('Beaches'));
+      await tester.pump(const Duration(milliseconds: 400));
+      await _settle(tester);
+
+      await tester.tap(find.byIcon(Symbols.tune_rounded));
+      await _settle(tester);
+      await tester.tap(find.text('Western Visayas'));
+      await _settle(tester);
+      await tester.tap(find.text('Aklan'));
+      await _settle(tester);
+      await tester.tap(find.text('Apply'));
+      await _settle(tester);
+
+      expect(find.text('Puka Shell Beach'), findsOneWidget);
+      expect(find.text('Alona Beach'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'Beaches + Aklan filter on a landscape-height viewport renders with no overflow',
+    (tester) async {
+      final firestore = FakeFirebaseFirestore();
+      await seedGeography(firestore);
+      await firestore.collection('regions').doc('region-6').set({
+        'name': 'Western Visayas',
+        'islandGroup': 'Visayas',
+      });
+      await firestore.collection('provinces').doc('aklan').set({
+        'name': 'Aklan',
+        'regionId': 'region-6',
+        'regionName': 'Western Visayas',
+        'islandGroup': 'Visayas',
+      });
+      final placesService = PlacesService(
+        caller: _fakePlacesSearchText({
+          'top tourist attractions in the Philippines': [],
+          'beaches in the Philippines': [],
+          'beaches in Aklan, Philippines': [
+            {
+              'id': 'places/puka',
+              'displayName': {'text': 'Puka Shell Beach'},
+              'formattedAddress': 'Boracay, Aklan',
+              'location': {'latitude': 11.99, 'longitude': 121.90},
+            },
+          ],
+        }),
+      );
+
+      // A landscape phone: much shorter than it is wide, unlike the
+      // portrait default every other test in this file uses. This is
+      // exactly the shape that overflowed before the Explore body became
+      // one shared scrollable — the fixed-height header + tabs + category
+      // row alone could already exceed a viewport this short, squeezing
+      // the (then-Expanded) grid into negative space.
+      await buildScreen(
+        tester: tester,
+        firestore: firestore,
+        placesService: placesService,
+        physicalSize: const Size(844, 390),
+      );
+
+      await tester.tap(find.text('Beaches'));
+      await tester.pump(const Duration(milliseconds: 400));
+      await _settle(tester);
+
+      await tester.tap(find.byIcon(Symbols.tune_rounded));
+      await _settle(tester);
+      // The sheet's own province list needs scrolling to reach "Aklan" on
+      // a viewport this short — expected, it already caps itself at 85%
+      // height with an internal scroll; only Explore's own body is what
+      // this test cares about.
+      await tester.dragUntilVisible(
+        find.text('Aklan'),
+        find.byType(Scrollable).last,
+        const Offset(0, -50),
+      );
+      await tester.tap(find.text('Aklan'));
+      await _settle(tester);
+      await tester.tap(find.text('Apply'));
+      await _settle(tester);
+
+      // The real assertion: no RenderFlex-overflow (or any other) error
+      // was thrown while laying out the header + active-filter chip +
+      // category row + results together on a short viewport.
+      expect(tester.takeException(), isNull);
+      expect(find.text('Aklan'), findsOneWidget);
+      expect(find.text('Puka Shell Beach'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'a province can be picked directly in the filter sheet without selecting a Region first',
+    (tester) async {
+      final firestore = FakeFirebaseFirestore();
+      await seedGeography(firestore);
+      await firestore.collection('regions').doc('region-6').set({
+        'name': 'Western Visayas',
+        'islandGroup': 'Visayas',
+      });
+      await firestore.collection('provinces').doc('aklan').set({
+        'name': 'Aklan',
+        'regionId': 'region-6',
+        'regionName': 'Western Visayas',
+        'islandGroup': 'Visayas',
+      });
+      final placesService = PlacesService(
+        caller: _fakePlacesSearchText({
+          'top tourist attractions in the Philippines': [],
+          'top tourist attractions in Aklan, Philippines': [
+            {
+              'id': 'places/kalibo',
+              'displayName': {'text': 'Kalibo Plaza'},
+              'formattedAddress': 'Kalibo, Aklan',
+              'location': {'latitude': 11.70, 'longitude': 122.36},
+            },
+          ],
+        }),
+      );
+
+      await buildScreen(
+        tester: tester,
+        firestore: firestore,
+        placesService: placesService,
+      );
+
+      await tester.tap(find.byIcon(Symbols.tune_rounded));
+      await _settle(tester);
+
+      // "Aklan" is tapped directly — no Region chip is tapped beforehand.
+      await tester.tap(find.text('Aklan'));
+      await _settle(tester);
+      await tester.tap(find.text('Apply'));
+      await _settle(tester);
+
+      expect(find.text('Kalibo Plaza'), findsOneWidget);
+      expect(find.text('Aklan'), findsOneWidget);
     },
   );
 

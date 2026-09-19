@@ -74,7 +74,8 @@ class _AdminTouristSpotListScreenState
   /// this just avoids the traveler navigating into a dead end.
   AdminUser? _admin;
 
-  bool get _isLguScoped => _admin?.role == AdminRole.lgu && _admin?.provinceId != null;
+  bool get _isLguScoped =>
+      _admin?.role == AdminRole.lgu && _admin?.provinceId != null;
 
   @override
   void initState() {
@@ -153,6 +154,11 @@ class _AdminTouristSpotListScreenState
     try {
       await _destinationRepository.delete(destination.id);
       _selectProvince(_selectedProvince);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('"${destination.name}" removed.')),
+        );
+      }
     } catch (e) {
       if (mounted)
         ScaffoldMessenger.of(
@@ -217,15 +223,22 @@ class _AdminTouristSpotListScreenState
                       ),
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(AppRadius.md),
-                        border: Border.all(color: Theme.of(context).colorScheme.outline),
+                        border: Border.all(
+                          color: Theme.of(context).colorScheme.outline,
+                        ),
                       ),
                       child: Row(
                         children: [
-                          const Icon(Symbols.public_rounded, color: AppColors.textTertiary),
+                          const Icon(
+                            Symbols.public_rounded,
+                            color: AppColors.textTertiary,
+                          ),
                           const SizedBox(width: AppSpacing.sm),
                           Expanded(
                             child: Text(
-                              _selectedProvince?.name ?? _admin?.provinceName ?? 'Loading your province...',
+                              _selectedProvince?.name ??
+                                  _admin?.provinceName ??
+                                  'Loading your province...',
                               style: Theme.of(context).textTheme.bodyLarge,
                             ),
                           ),

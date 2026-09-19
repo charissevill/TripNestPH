@@ -7,6 +7,7 @@ import '../../../core/routes/route_paths.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../data/repositories/itinerary_repository.dart';
 import '../../../domain/models/saved_itinerary.dart';
+import '../../../core/widgets/media/image_error_placeholder.dart';
 
 /// Streams the signed-in traveler's trips and hands the nearest one whose
 /// start date hasn't fully passed yet (or `null`, if none qualify) to
@@ -99,9 +100,25 @@ class UpcomingTripCard extends StatelessWidget {
               CachedNetworkImage(
                 imageUrl: trip.itinerary.coverImageUrl,
                 fit: BoxFit.cover,
+                errorWidget: (context, url, error) =>
+                    const ImageErrorPlaceholder(),
               )
             else
-              ColoredBox(color: theme.colorScheme.primary),
+              // A manually-built trip never has a cover photo (see
+              // `Itinerary.coverImageUrl`'s doc comment) — same faded
+              // centered-icon fallback `UpcomingFestivalCard` uses for its
+              // own no-photo case, instead of a flat, empty-looking block
+              // of color.
+              ColoredBox(
+                color: theme.colorScheme.primary,
+                child: Center(
+                  child: Icon(
+                    Symbols.flight_takeoff_rounded,
+                    size: 40,
+                    color: Colors.white.withValues(alpha: 0.35),
+                  ),
+                ),
+              ),
             DecoratedBox(
               decoration: BoxDecoration(
                 gradient: LinearGradient(

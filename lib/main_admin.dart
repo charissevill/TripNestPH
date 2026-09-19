@@ -21,6 +21,8 @@ import 'core/services/analytics_service.dart';
 import 'core/services/notification_service.dart';
 import 'core/theme/accent_colors.dart';
 import 'core/theme/app_theme.dart';
+import 'core/utils/app_exception.dart';
+import 'core/utils/safe_launch.dart';
 import 'firebase_options.dart';
 
 /// Dedicated entrypoint for the Admin Portal's own deployed site — same
@@ -58,7 +60,10 @@ void main() async {
         return true;
       };
     }
-  } catch (e) {
+  } catch (e, stack) {
+    // Kept out of the UI on purpose — the full error only goes to the debug
+    // log; the error screen shows a plain-language message.
+    logTechnicalError(e, stack);
     initError = e;
   }
 
@@ -156,6 +161,7 @@ class _TripNestAdminAppState extends State<TripNestAdminApp> {
       child: Consumer3<ThemeModeProvider, AccentColorProvider, TypographyProvider>(
         builder: (context, themeModeProvider, accentColorProvider, typographyProvider, _) {
           return MaterialApp.router(
+            scaffoldMessengerKey: appMessengerKey,
             title: '${AppStrings.appName} Admin',
             debugShowCheckedModeBanner: false,
             theme: AppTheme.light(accentColorProvider.preset, fontFamily: typographyProvider.fontFamily),
@@ -197,8 +203,8 @@ class _AdminFirebaseInitErrorScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Something went wrong starting the app\'s backend services. '
-                  'Please check your connection and try again.\n\n$error',
+                  'Something went wrong while starting the app. '
+                  'Please check your internet connection, then close and reopen the app.',
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),

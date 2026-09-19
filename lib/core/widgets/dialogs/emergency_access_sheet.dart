@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../../data/repositories/province_repository.dart';
 import '../../../domain/models/province.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_spacing.dart';
+import '../../utils/app_exception.dart';
 import '../../utils/maps_launcher.dart';
+import '../../utils/safe_launch.dart';
 
 /// One-tap emergency info: a nationwide hotline always shown first, that
 /// province's own hotlines (fetched live — [provinceId] may be known before
@@ -25,6 +26,10 @@ Future<void> showEmergencyAccessSheet(
     context: context,
     backgroundColor: Colors.transparent,
     isScrollControlled: true,
+    // See trip_calendar_screen.dart's showModalBottomSheet for why this
+    // matters — without it, the floating AI Chat FAB floats visibly on
+    // top of this sheet instead of being covered by it.
+    useRootNavigator: true,
     builder: (context) => _EmergencyAccessSheet(
       provinceId: provinceId,
       provinceName: provinceName,
@@ -34,7 +39,11 @@ Future<void> showEmergencyAccessSheet(
 }
 
 class _EmergencyAccessSheet extends StatefulWidget {
-  const _EmergencyAccessSheet({this.provinceId, this.provinceName, required this.provinceRepository});
+  const _EmergencyAccessSheet({
+    this.provinceId,
+    this.provinceName,
+    required this.provinceRepository,
+  });
 
   final String? provinceId;
   final String? provinceName;
@@ -47,6 +56,7 @@ class _EmergencyAccessSheet extends StatefulWidget {
 class _EmergencyAccessSheetState extends State<_EmergencyAccessSheet> {
   List<EmergencyHotline> _hotlines = const [];
   bool _loading = true;
+  bool _loadFailed = false;
 
   @override
   void initState() {
@@ -67,23 +77,36 @@ class _EmergencyAccessSheetState extends State<_EmergencyAccessSheet> {
         _hotlines = province?.emergencyHotlines ?? const [];
         _loading = false;
       });
-    } catch (_) {
-      if (mounted) setState(() => _loading = false);
+    } catch (e) {
+      logTechnicalError(e);
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _loadFailed = true;
+        });
+      }
     }
   }
 
-  Future<void> _call(String number) => launchUrl(Uri.parse('tel:$number'));
+  Future<void> _call(String number) => callNumber(number);
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Material(
       color: theme.colorScheme.surface,
-      borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadius.xxl)),
+      borderRadius: const BorderRadius.vertical(
+        top: Radius.circular(AppRadius.xxl),
+      ),
       child: SafeArea(
         top: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.sm, AppSpacing.lg, AppSpacing.xl),
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.lg,
+            AppSpacing.sm,
+            AppSpacing.lg,
+            AppSpacing.xl,
+          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -93,14 +116,22 @@ class _EmergencyAccessSheetState extends State<_EmergencyAccessSheet> {
                   width: 44,
                   height: 5,
                   margin: const EdgeInsets.only(bottom: AppSpacing.lg),
-                  decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(AppRadius.pill)),
+                  decoration: BoxDecoration(
+                    color: AppColors.border,
+                    borderRadius: BorderRadius.circular(AppRadius.pill),
+                  ),
                 ),
               ),
               Row(
                 children: [
                   const Icon(Symbols.emergency_rounded, color: AppColors.error),
                   const SizedBox(width: AppSpacing.sm),
-                  Expanded(child: Text('Emergency', style: theme.textTheme.headlineSmall)),
+                  Expanded(
+                    child: Text(
+                      'Emergency',
+                      style: theme.textTheme.headlineSmall,
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: 4),
@@ -108,18 +139,40 @@ class _EmergencyAccessSheetState extends State<_EmergencyAccessSheet> {
                 widget.provinceName != null && widget.provinceName!.isNotEmpty
                     ? 'Numbers for ${widget.provinceName}, plus nationwide help.'
                     : 'Nationwide emergency numbers.',
-                style: theme.textTheme.bodySmall?.copyWith(color: AppColors.textTertiary),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: AppColors.textTertiary,
+                ),
               ),
               const SizedBox(height: AppSpacing.lg),
-              _HotlineTile(label: 'National Emergency Hotline', number: '911', onTap: () => _call('911')),
+              _HotlineTile(
+                label: 'National Emergency Hotline',
+                number: '911',
+                onTap: () => _call('911'),
+              ),
               if (_loading)
                 const Padding(
                   padding: EdgeInsets.symmetric(vertical: AppSpacing.md),
-                  child: Center(child: CircularProgressIndicator(strokeWidth: 2.4)),
+                  child: Center(
+                    child: CircularProgressIndicator(strokeWidth: 2.4),
+                  ),
+                )
+              else if (_loadFailed)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+                  child: Text(
+                    'Couldn\'t load local hotlines right now. The national hotline above still works.',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: AppColors.textTertiary,
+                    ),
+                  ),
                 )
               else
                 for (final hotline in _hotlines)
-                  _HotlineTile(label: hotline.label, number: hotline.number, onTap: () => _call(hotline.number)),
+                  _HotlineTile(
+                    label: hotline.label,
+                    number: hotline.number,
+                    onTap: () => _call(hotline.number),
+                  ),
               const SizedBox(height: AppSpacing.xl),
               Text('Find Nearby', style: theme.textTheme.titleSmall),
               const SizedBox(height: AppSpacing.sm),
@@ -127,15 +180,21 @@ class _EmergencyAccessSheetState extends State<_EmergencyAccessSheet> {
                 children: [
                   Expanded(
                     child: OutlinedButton.icon(
-                      onPressed: () => MapsLauncher.openPlaceSearch('hospital near me'),
-                      icon: const Icon(Symbols.local_hospital_rounded, size: 18),
+                      onPressed: () =>
+                          MapsLauncher.openPlaceSearch('hospital near me'),
+                      icon: const Icon(
+                        Symbols.local_hospital_rounded,
+                        size: 18,
+                      ),
                       label: const Text('Hospital'),
                     ),
                   ),
                   const SizedBox(width: AppSpacing.sm),
                   Expanded(
                     child: OutlinedButton.icon(
-                      onPressed: () => MapsLauncher.openPlaceSearch('police station near me'),
+                      onPressed: () => MapsLauncher.openPlaceSearch(
+                        'police station near me',
+                      ),
                       icon: const Icon(Symbols.local_police_rounded, size: 18),
                       label: const Text('Police'),
                     ),
@@ -151,7 +210,11 @@ class _EmergencyAccessSheetState extends State<_EmergencyAccessSheet> {
 }
 
 class _HotlineTile extends StatelessWidget {
-  const _HotlineTile({required this.label, required this.number, required this.onTap});
+  const _HotlineTile({
+    required this.label,
+    required this.number,
+    required this.onTap,
+  });
 
   final String label;
   final String number;
@@ -170,7 +233,12 @@ class _HotlineTile extends StatelessWidget {
             const Icon(Symbols.call_rounded, size: 18, color: AppColors.error),
             const SizedBox(width: AppSpacing.sm),
             Expanded(child: Text(label, style: theme.textTheme.bodyMedium)),
-            Text(number, style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700)),
+            Text(
+              number,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
           ],
         ),
       ),

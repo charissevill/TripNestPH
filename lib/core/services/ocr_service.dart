@@ -24,7 +24,7 @@ class OcrService {
       final result = await _call('extractPermitText', {'businessId': businessId});
       return result['text'] as String? ?? '';
     } on FirebaseFunctionsException catch (e) {
-      throw AppException(e.message ?? 'Could not read text from that image.');
+      throw AppException.from(e);
     }
   }
 }

@@ -22,10 +22,17 @@ class DetailsGalleryAppBar extends StatefulWidget {
     this.onEmergency,
     this.heroTag,
     this.expandedHeight = 340,
+    this.assetFallback,
   });
 
   final List<String> imageUrls;
   final String title;
+
+  /// Shown instead of the tinted icon when [imageUrls] is empty or every
+  /// photo in it fails to load — a real bundled cover photo (currently
+  /// only [FestivalDetailsScreen] passes one) reads as a finished header
+  /// instead of a placeholder.
+  final String? assetFallback;
 
   /// Null on a listing with no bookmark concept (provinces) — the bookmark
   /// button is hidden entirely rather than shown disabled.
@@ -97,15 +104,17 @@ class _DetailsGalleryAppBarState extends State<DetailsGalleryAppBar> with AutoAd
             // simple (non-live-photo) half of it, since the other three
             // Details screens share this one widget.
             if (widget.imageUrls.isEmpty)
-              Container(
-                color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.15),
-                alignment: Alignment.center,
-                child: Icon(
-                  Symbols.image_rounded,
-                  size: 48,
-                  color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.4),
-                ),
-              )
+              widget.assetFallback != null
+                  ? Image.asset(widget.assetFallback!, fit: BoxFit.cover)
+                  : Container(
+                      color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.15),
+                      alignment: Alignment.center,
+                      child: Icon(
+                        Symbols.image_rounded,
+                        size: 48,
+                        color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.4),
+                      ),
+                    )
             else
               PageView.builder(
                 controller: _pageController,
@@ -116,18 +125,20 @@ class _DetailsGalleryAppBarState extends State<DetailsGalleryAppBar> with AutoAd
                     fit: BoxFit.cover,
                     // A source photo can fail to load for reasons that have
                     // nothing to do with this app (a dead link, a host
-                    // rate-limiting a burst of requests) — same tinted-icon
-                    // fallback as the "no photos at all" case above, rather
-                    // than surfacing the raw exception.
-                    errorWidget: (context, url, error) => Container(
-                      color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.15),
-                      alignment: Alignment.center,
-                      child: Icon(
-                        Symbols.image_rounded,
-                        size: 48,
-                        color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.4),
-                      ),
-                    ),
+                    // rate-limiting a burst of requests) — same fallback as
+                    // the "no photos at all" case above, rather than
+                    // surfacing the raw exception.
+                    errorWidget: (context, url, error) => widget.assetFallback != null
+                        ? Image.asset(widget.assetFallback!, fit: BoxFit.cover)
+                        : Container(
+                            color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.15),
+                            alignment: Alignment.center,
+                            child: Icon(
+                              Symbols.image_rounded,
+                              size: 48,
+                              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.4),
+                            ),
+                          ),
                   );
                   return index == 0 && widget.heroTag != null ? Hero(tag: widget.heroTag!, child: image) : image;
                 },

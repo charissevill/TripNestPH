@@ -15,14 +15,14 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/utils/app_exception.dart';
 import '../../core/widgets/buttons/animated_button.dart';
+import '../../core/widgets/buttons/selectable_chip.dart';
 import '../../core/widgets/inputs/search_bar_widget.dart';
 import '../../core/widgets/layout/max_width_container.dart';
 import '../../core/widgets/states/loading_widget.dart';
-import '../../data/repositories/destination_repository.dart';
-import '../../data/repositories/province_repository.dart';
 import '../../domain/models/destination.dart';
 import '../../domain/models/place.dart';
 import '../../domain/models/province.dart';
+import 'widgets/destination_picker_sheet.dart';
 
 /// The AI itinerary request form: destination, budget tier, trip length,
 /// traveler count/type, transportation and interests, ending in a large
@@ -127,7 +127,7 @@ class _AiPlannerScreenState extends State<AiPlannerScreen> {
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (context) => _DestinationPickerSheet(
+      builder: (context) => DestinationPickerSheet(
         currentDestination: _destination,
         currentProvince: _province,
       ),
@@ -572,7 +572,7 @@ class _AiPlannerScreenState extends State<AiPlannerScreen> {
               children: travelerTypeOptions.map((option) {
                 final (label, icon) = option;
                 final selected = _travelerType == label;
-                return _SelectableChip(
+                return SelectableChip(
                   label: label,
                   icon: icon,
                   selected: selected,
@@ -596,7 +596,7 @@ class _AiPlannerScreenState extends State<AiPlannerScreen> {
               children: transportOptions.map((option) {
                 final (label, icon) = option;
                 final selected = _transportation.contains(label);
-                return _SelectableChip(
+                return SelectableChip(
                   label: label,
                   icon: icon,
                   selected: selected,
@@ -619,7 +619,7 @@ class _AiPlannerScreenState extends State<AiPlannerScreen> {
               children: interestOptions.map((option) {
                 final (label, icon) = option;
                 final selected = _interests.contains(label);
-                return _SelectableChip(
+                return SelectableChip(
                   label: label,
                   icon: icon,
                   selected: selected,
@@ -641,7 +641,7 @@ class _AiPlannerScreenState extends State<AiPlannerScreen> {
               children: tripPaceOptions.map((option) {
                 final (label, icon) = option;
                 final selected = _tripPace == label;
-                return _SelectableChip(
+                return SelectableChip(
                   label: label,
                   icon: icon,
                   selected: selected,
@@ -848,60 +848,6 @@ class _SelectableCard extends StatelessWidget {
   }
 }
 
-class _SelectableChip extends StatelessWidget {
-  const _SelectableChip({
-    required this.label,
-    required this.icon,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String label;
-  final IconData icon;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(AppRadius.pill),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.md,
-          vertical: AppSpacing.sm,
-        ),
-        decoration: BoxDecoration(
-          color: selected ? theme.colorScheme.primary : theme.colorScheme.surface,
-          borderRadius: BorderRadius.circular(AppRadius.pill),
-          border: Border.all(
-            color: selected ? theme.colorScheme.primary : theme.colorScheme.outline,
-          ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              size: 16,
-              color: selected ? Colors.white : theme.textTheme.bodyMedium?.color,
-            ),
-            const SizedBox(width: AppSpacing.xs),
-            Text(
-              label,
-              style: theme.textTheme.labelMedium?.copyWith(
-                color: selected ? Colors.white : theme.colorScheme.onSurface,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 class _StepperButton extends StatelessWidget {
   const _StepperButton({required this.icon, required this.onTap});
 
@@ -928,291 +874,6 @@ class _StepperButton extends StatelessWidget {
           color: enabled ? theme.colorScheme.primary : theme.colorScheme.onSurfaceVariant,
         ),
       ),
-    );
-  }
-}
-
-enum _PickerMode { destination, province }
-
-class _DestinationPickerSheet extends StatefulWidget {
-  const _DestinationPickerSheet({
-    required this.currentDestination,
-    required this.currentProvince,
-  });
-
-  final Destination? currentDestination;
-  final Province? currentProvince;
-
-  @override
-  State<_DestinationPickerSheet> createState() =>
-      _DestinationPickerSheetState();
-}
-
-class _DestinationPickerSheetState extends State<_DestinationPickerSheet> {
-  final DestinationRepository _destinationRepository = DestinationRepository();
-  final ProvinceRepository _provinceRepository = ProvinceRepository();
-  final TextEditingController _searchController = TextEditingController();
-  Timer? _debounce;
-  late _PickerMode _mode = widget.currentProvince != null
-      ? _PickerMode.province
-      : _PickerMode.destination;
-
-  List<Destination>? _destinations;
-  Object? _destinationsError;
-
-  List<Province>? _allProvinces;
-  Object? _provincesError;
-  String _provinceQuery = '';
-
-  @override
-  void initState() {
-    super.initState();
-    _loadDestinations();
-    _loadProvinces();
-  }
-
-  @override
-  void dispose() {
-    _debounce?.cancel();
-    _searchController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _loadDestinations({String query = ''}) async {
-    setState(() => _destinationsError = null);
-    try {
-      final results = query.trim().isEmpty
-          ? await _destinationRepository.getPopular(limit: 50)
-          : await _destinationRepository.searchByName(query.trim());
-      if (mounted) setState(() => _destinations = results);
-    } catch (e) {
-      if (mounted) setState(() => _destinationsError = e);
-    }
-  }
-
-  Future<void> _loadProvinces() async {
-    setState(() => _provincesError = null);
-    try {
-      final results = (await _provinceRepository.getAll())
-        ..sort((a, b) => a.name.compareTo(b.name));
-      if (mounted) setState(() => _allProvinces = results);
-    } catch (e) {
-      if (mounted) setState(() => _provincesError = e);
-    }
-  }
-
-  void _onSearchChanged(String value) {
-    if (_mode == _PickerMode.province) {
-      setState(() => _provinceQuery = value);
-      return;
-    }
-    _debounce?.cancel();
-    _debounce = Timer(
-      const Duration(milliseconds: 350),
-      () => _loadDestinations(query: value),
-    );
-  }
-
-  void _switchMode(_PickerMode mode) {
-    if (mode == _mode) return;
-    setState(() {
-      _mode = mode;
-      _searchController.clear();
-      _provinceQuery = '';
-    });
-    if (mode == _PickerMode.destination) _loadDestinations();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final provinces = _allProvinces
-        ?.where(
-          (p) => p.name.toLowerCase().contains(_provinceQuery.toLowerCase()),
-        )
-        .toList();
-    return DraggableScrollableSheet(
-      initialChildSize: 0.7,
-      minChildSize: 0.4,
-      maxChildSize: 0.9,
-      expand: false,
-      builder: (context, scrollController) {
-        return Material(
-          color: theme.colorScheme.surface,
-          borderRadius: const BorderRadius.vertical(
-            top: Radius.circular(AppRadius.xxl),
-          ),
-          child: Column(
-            children: [
-              const SizedBox(height: AppSpacing.sm),
-              Container(
-                width: 44,
-                height: 5,
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.outline,
-                  borderRadius: BorderRadius.circular(AppRadius.pill),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  AppSpacing.lg,
-                  AppSpacing.lg,
-                  AppSpacing.lg,
-                  AppSpacing.md,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        _mode == _PickerMode.destination
-                            ? 'Choose a destination'
-                            : 'Choose a province',
-                        style: theme.textTheme.headlineSmall,
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.md),
-                    Row(
-                      children: [
-                        _SelectableChip(
-                          label: 'Specific Spot',
-                          icon: Symbols.place_rounded,
-                          selected: _mode == _PickerMode.destination,
-                          onTap: () => _switchMode(_PickerMode.destination),
-                        ),
-                        const SizedBox(width: AppSpacing.sm),
-                        _SelectableChip(
-                          label: 'Whole Province',
-                          icon: Symbols.public_rounded,
-                          selected: _mode == _PickerMode.province,
-                          onTap: () => _switchMode(_PickerMode.province),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: AppSpacing.md),
-                    SearchBarWidget(
-                      controller: _searchController,
-                      hintText: _mode == _PickerMode.destination
-                          ? 'Search destinations...'
-                          : 'Search provinces...',
-                      onChanged: _onSearchChanged,
-                    ),
-                  ],
-                ),
-              ),
-              Expanded(
-                child: _mode == _PickerMode.destination
-                    ? _destinationsError != null
-                          ? Center(
-                              child: Padding(
-                                padding: const EdgeInsets.all(AppSpacing.lg),
-                                child: Text(
-                                  AppException.from(
-                                    _destinationsError!,
-                                  ).message,
-                                  textAlign: TextAlign.center,
-                                ),
-                              ),
-                            )
-                          : _destinations == null
-                          ? ListView(
-                              children: List.generate(
-                                6,
-                                (_) =>
-                                    LoadingWidget.textTile(leadingCircle: true),
-                              ),
-                            )
-                          : _destinations!.isEmpty
-                          ? const Center(child: Text('No destinations found'))
-                          : ListView.builder(
-                              controller: scrollController,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: AppSpacing.lg,
-                              ),
-                              itemCount: _destinations!.length,
-                              itemBuilder: (context, i) {
-                                final destination = _destinations![i];
-                                final selected =
-                                    widget.currentDestination?.id ==
-                                    destination.id;
-                                return ListTile(
-                                  onTap: () =>
-                                      Navigator.of(context).pop(destination),
-                                  contentPadding: EdgeInsets.zero,
-                                  leading: CircleAvatar(
-                                    backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.12),
-                                    child: Icon(
-                                      Symbols.place_rounded,
-                                      color: theme.colorScheme.primary,
-                                    ),
-                                  ),
-                                  title: Text(destination.name),
-                                  subtitle: Text(destination.provinceName),
-                                  trailing: selected
-                                      ? Icon(
-                                          Symbols.check_circle_rounded,
-                                          color: theme.colorScheme.primary,
-                                        )
-                                      : null,
-                                );
-                              },
-                            )
-                    : _provincesError != null
-                    ? Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(AppSpacing.lg),
-                          child: Text(
-                            AppException.from(_provincesError!).message,
-                            textAlign: TextAlign.center,
-                          ),
-                        ),
-                      )
-                    : provinces == null
-                    ? ListView(
-                        children: List.generate(
-                          6,
-                          (_) => LoadingWidget.textTile(leadingCircle: true),
-                        ),
-                      )
-                    : provinces.isEmpty
-                    ? const Center(child: Text('No provinces found'))
-                    : ListView.builder(
-                        controller: scrollController,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: AppSpacing.lg,
-                        ),
-                        itemCount: provinces.length,
-                        itemBuilder: (context, i) {
-                          final province = provinces[i];
-                          final selected =
-                              widget.currentProvince?.id == province.id;
-                          return ListTile(
-                            onTap: () => Navigator.of(context).pop(province),
-                            contentPadding: EdgeInsets.zero,
-                            leading: CircleAvatar(
-                              backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.12),
-                              child: Icon(
-                                Symbols.public_rounded,
-                                color: theme.colorScheme.primary,
-                              ),
-                            ),
-                            title: Text(province.name),
-                            subtitle: Text(province.regionName),
-                            trailing: selected
-                                ? Icon(
-                                    Symbols.check_circle_rounded,
-                                    color: theme.colorScheme.primary,
-                                  )
-                                : null,
-                          );
-                        },
-                      ),
-              ),
-            ],
-          ),
-        );
-      },
     );
   }
 }

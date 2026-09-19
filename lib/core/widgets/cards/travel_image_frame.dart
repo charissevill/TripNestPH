@@ -21,6 +21,7 @@ class TravelImageFrame extends StatelessWidget {
     this.borderRadius = AppRadius.lg,
     this.heroTag,
     this.emptyIcon,
+    this.assetFallback,
   });
 
   final String imageUrl;
@@ -32,17 +33,25 @@ class TravelImageFrame extends StatelessWidget {
   final double borderRadius;
   final Object? heroTag;
 
-  /// When set and [imageUrl] is empty, skips the network image entirely and
-  /// renders this icon directly instead — lets callers with no photo (e.g. a
-  /// live Places result with no `photoUrl`) pick a fallback that fits their
-  /// content (hotel vs. landmark) rather than always showing a generic
-  /// broken-image glyph.
+  /// When set and [imageUrl] is empty (and [assetFallback] isn't set),
+  /// skips the network image entirely and renders this icon directly
+  /// instead — lets callers with no photo (e.g. a live Places result with
+  /// no `photoUrl`) pick a fallback that fits their content (hotel vs.
+  /// landmark) rather than always showing a generic broken-image glyph.
   final IconData? emptyIcon;
+
+  /// When set and [imageUrl] is empty, takes priority over [emptyIcon] —
+  /// a real bundled cover photo (e.g. `FestivalCard`'s
+  /// `festival_default_cover.jpg`) reads as a finished card instead of a
+  /// placeholder, for content types common enough to warrant one.
+  final String? assetFallback;
 
   @override
   Widget build(BuildContext context) {
     Widget image;
-    if (imageUrl.isEmpty && emptyIcon != null) {
+    if (imageUrl.isEmpty && assetFallback != null) {
+      image = Image.asset(assetFallback!, fit: BoxFit.cover);
+    } else if (imageUrl.isEmpty && emptyIcon != null) {
       image = Container(
         color: AppColors.shimmerBase,
         alignment: Alignment.center,
@@ -58,11 +67,16 @@ class TravelImageFrame extends StatelessWidget {
           highlightColor: AppColors.shimmerHighlight,
           child: Container(color: AppColors.shimmerBase),
         ),
-        errorWidget: (context, _, _) => Container(
-          color: AppColors.shimmerBase,
-          alignment: Alignment.center,
-          child: Icon(emptyIcon ?? Symbols.image_rounded, color: Theme.of(context).colorScheme.onSurfaceVariant, size: 32),
-        ),
+        // A broken/expired URL is "no visible photo" the same as an empty
+        // one — falls back the same way rather than only handling the
+        // empty-string case.
+        errorWidget: (context, _, _) => assetFallback != null
+            ? Image.asset(assetFallback!, fit: BoxFit.cover)
+            : Container(
+                color: AppColors.shimmerBase,
+                alignment: Alignment.center,
+                child: Icon(emptyIcon ?? Symbols.image_rounded, color: Theme.of(context).colorScheme.onSurfaceVariant, size: 32),
+              ),
       );
     }
 

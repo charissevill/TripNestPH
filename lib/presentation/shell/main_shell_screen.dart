@@ -1,13 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
+import 'package:provider/provider.dart';
 
+import '../../core/providers/auth_provider.dart';
 import '../../core/routes/route_paths.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/breakpoints.dart';
 import '../../core/widgets/banners/offline_banner.dart';
 import '../../core/widgets/navigation/app_bottom_nav.dart';
 import '../../core/widgets/navigation/app_nav_sidebar.dart';
+import '../../data/repositories/admin_repository.dart';
+import '../../domain/models/admin_user.dart';
 
 /// Hosts the five top-level tabs (Home, Explore, AI Planner, Saved, Profile)
 /// preserving each tab's own navigation stack and scroll position via
@@ -34,41 +38,62 @@ class MainShellScreen extends StatelessWidget {
         ? null
         : _AiChatFab(onTap: () => context.push(RoutePaths.aiChat));
 
-    // Kept as a verbatim copy of the original single-Scaffold layout below
-    // this breakpoint — this branch must never be refactored to share code
-    // with the desktop one, so a desktop-only change can never leak into
-    // the mobile layout.
-    if (context.useSideNav) {
-      return Scaffold(
-        body: Row(
-          children: [
-            AppNavSidebar(currentIndex: navigationShell.currentIndex, onTap: _onTap),
-            Expanded(
-              child: Column(
-                children: [
-                  const OfflineBanner(),
-                  Expanded(child: navigationShell),
-                ],
-              ),
-            ),
-          ],
-        ),
-        floatingActionButton: fab,
-      );
-    }
+    final uid = context.watch<AuthProvider>().firebaseUser?.uid;
 
-    return Scaffold(
-      body: Column(
-        children: [
-          const OfflineBanner(),
-          Expanded(child: navigationShell),
-        ],
-      ),
-      floatingActionButton: fab,
-      bottomNavigationBar: AppBottomNav(
-        currentIndex: navigationShell.currentIndex,
-        onTap: _onTap,
-      ),
+    return StreamBuilder<AdminUser?>(
+      // Firestore rejects an empty document id outright, so this only ever
+      // subscribes once there's a real uid — Stream.value(null) covers the
+      // brief window before that (e.g. right as the shell first mounts).
+      stream: uid == null
+          ? Stream.value(null)
+          : AdminRepository().streamSelf(uid),
+      builder: (context, snapshot) {
+        final isBusinessOwner =
+            snapshot.data?.role == AdminRole.businessOwner &&
+            (snapshot.data?.isActive ?? false);
+
+        // Kept as a verbatim copy of the original single-Scaffold layout
+        // below this breakpoint — this branch must never be refactored to
+        // share code with the desktop one, so a desktop-only change can
+        // never leak into the mobile layout.
+        if (context.useSideNav) {
+          return Scaffold(
+            body: Row(
+              children: [
+                AppNavSidebar(
+                  currentIndex: navigationShell.currentIndex,
+                  onTap: _onTap,
+                  isBusinessOwner: isBusinessOwner,
+                ),
+                Expanded(
+                  child: Column(
+                    children: [
+                      const OfflineBanner(),
+                      Expanded(child: navigationShell),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            floatingActionButton: fab,
+          );
+        }
+
+        return Scaffold(
+          body: Column(
+            children: [
+              const OfflineBanner(),
+              Expanded(child: navigationShell),
+            ],
+          ),
+          floatingActionButton: fab,
+          bottomNavigationBar: AppBottomNav(
+            currentIndex: navigationShell.currentIndex,
+            onTap: _onTap,
+            isBusinessOwner: isBusinessOwner,
+          ),
+        );
+      },
     );
   }
 }
@@ -86,7 +111,10 @@ class _AiChatFab extends StatelessWidget {
       width: 56,
       height: 56,
       decoration: BoxDecoration(
-        gradient: AppColors.gradient([colorScheme.primary, colorScheme.primaryFixedDim]),
+        gradient: AppColors.gradient([
+          colorScheme.primary,
+          colorScheme.primaryFixedDim,
+        ]),
         shape: BoxShape.circle,
         boxShadow: [
           BoxShadow(
@@ -102,7 +130,11 @@ class _AiChatFab extends StatelessWidget {
         child: InkWell(
           onTap: onTap,
           customBorder: const CircleBorder(),
-          child: const Icon(Symbols.auto_awesome_rounded, color: Colors.white, size: 26),
+          child: const Icon(
+            Symbols.auto_awesome_rounded,
+            color: Colors.white,
+            size: 26,
+          ),
         ),
       ),
     );

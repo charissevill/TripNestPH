@@ -100,18 +100,11 @@ class UpcomingFestivalCard extends StatelessWidget {
               CachedNetworkImage(
                 imageUrl: festival.heroImageUrl,
                 fit: BoxFit.cover,
+                errorWidget: (context, _, _) =>
+                    Image.asset('assets/images/festival_default_cover.jpg', fit: BoxFit.cover),
               )
             else
-              ColoredBox(
-                color: theme.colorScheme.primary,
-                child: Center(
-                  child: Icon(
-                    Symbols.celebration_rounded,
-                    size: 40,
-                    color: Colors.white.withValues(alpha: 0.35),
-                  ),
-                ),
-              ),
+              Image.asset('assets/images/festival_default_cover.jpg', fit: BoxFit.cover),
             DecoratedBox(
               decoration: BoxDecoration(
                 gradient: LinearGradient(

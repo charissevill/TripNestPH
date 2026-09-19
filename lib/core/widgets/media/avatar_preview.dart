@@ -1,5 +1,8 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
+
+import 'image_error_placeholder.dart';
 
 /// Wraps an avatar with an Instagram-style "hold to preview" gesture: long
 /// pressing shows the full-size photo over a dimmed backdrop, and releasing
@@ -78,6 +81,8 @@ class _AvatarPreviewOverlay extends StatelessWidget {
                   child: CachedNetworkImage(
                     imageUrl: photoUrl,
                     fit: BoxFit.cover,
+                    errorWidget: (context, url, error) =>
+                        const ImageErrorPlaceholder(icon: Symbols.person_rounded),
                   ),
                 ),
               ),

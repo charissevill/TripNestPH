@@ -219,6 +219,9 @@ class _ProfileFooter extends StatelessWidget {
             radius: 20,
             backgroundColor: AppColors.primary.withValues(alpha: 0.12),
             backgroundImage: admin.photoUrl.isNotEmpty ? NetworkImage(admin.photoUrl) : null,
+            // A failed photo just leaves the tinted circle instead of
+            // surfacing an uncaught image-load error.
+            onBackgroundImageError: admin.photoUrl.isNotEmpty ? (error, stackTrace) {} : null,
             child: admin.photoUrl.isNotEmpty
                 ? null
                 : Text(initials, style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w700)),

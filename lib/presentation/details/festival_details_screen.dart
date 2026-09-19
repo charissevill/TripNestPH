@@ -171,6 +171,7 @@ class _FestivalDetailsBody extends StatelessWidget {
               provinceName: festival.provinceName,
             ),
             heroTag: 'festival-${festival.id}',
+            assetFallback: 'assets/images/festival_default_cover.jpg',
           ),
           SliverPadding(
             padding: EdgeInsets.fromLTRB(
@@ -376,7 +377,7 @@ class _FestivalDetailsBody extends StatelessWidget {
                 child: AnimatedButton(
                   label: festival.registrationLink.isNotEmpty
                       ? 'Register Now'
-                      : 'Plan a Trip Here',
+                      : 'Plan a Trip Nearby',
                   icon: festival.registrationLink.isNotEmpty
                       ? Symbols.how_to_reg_rounded
                       : Symbols.auto_awesome_rounded,

@@ -11,20 +11,24 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/theme/breakpoints.dart';
 import '../../core/utils/app_exception.dart';
+import '../../core/widgets/cards/business_card.dart';
 import '../../core/widgets/cards/destination_card.dart';
 import '../../core/widgets/cards/festival_card.dart';
 import '../../core/widgets/cards/place_card.dart';
 import '../../core/widgets/cards/restaurant_card.dart';
+import '../../core/widgets/details/business_info_sheet.dart';
 import '../../core/widgets/details/place_details_sheet.dart';
 import '../../core/widgets/dialogs/add_to_collection_sheet.dart';
 import '../../core/widgets/dialogs/confirmation_dialog.dart';
 import '../../core/widgets/layout/max_width_container.dart';
 import '../../core/widgets/states/empty_state_widget.dart';
 import '../../core/widgets/states/loading_widget.dart';
+import '../../data/repositories/business_repository.dart';
 import '../../data/repositories/destination_repository.dart';
 import '../../data/repositories/favorites_repository.dart';
 import '../../data/repositories/festival_repository.dart';
 import '../../data/repositories/restaurant_repository.dart';
+import '../../domain/models/business.dart';
 import '../../domain/models/destination.dart';
 import '../../domain/models/favorite_collection.dart';
 import '../../domain/models/festival.dart';
@@ -36,11 +40,11 @@ const double _gridImageHeight = 140;
 const double _gridCellExtent = _gridImageHeight + 92;
 
 /// Everything the traveler has bookmarked, split into Destinations,
-/// Restaurants, Festivals, and Attractions (live Google Places results)
-/// tabs, all backed by [FavoritesProvider] — the first three resolved live
-/// against their own Firestore collection given just a saved id, the last
-/// rendered directly from its own fully-hydrated snapshot (a `Place` has no
-/// other collection to resolve one from).
+/// Restaurants, Festivals, Local Finds (businesses), and Attractions (live
+/// Google Places results) tabs, all backed by [FavoritesProvider] — the
+/// first four resolved live against their own Firestore collection given
+/// just a saved id, the last rendered directly from its own fully-hydrated
+/// snapshot (a `Place` has no other collection to resolve one from).
 class SavedScreen extends StatefulWidget {
   const SavedScreen({super.key});
 
@@ -51,12 +55,13 @@ class SavedScreen extends StatefulWidget {
 class _SavedScreenState extends State<SavedScreen>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController = TabController(
-    length: 4,
+    length: 5,
     vsync: this,
   );
   final DestinationRepository _destinationRepository = DestinationRepository();
   final RestaurantRepository _restaurantRepository = RestaurantRepository();
   final FestivalRepository _festivalRepository = FestivalRepository();
+  final BusinessRepository _businessRepository = BusinessRepository();
   final FavoritesRepository _favoritesRepository = FavoritesRepository();
   final PlacesService _places = PlacesService();
 
@@ -72,12 +77,23 @@ class _SavedScreenState extends State<SavedScreen>
   /// [FavoriteType.destination]/etc ids filtered down to just the ones
   /// assigned to [_selectedCollectionId] — a no-op (every id passes) when
   /// "All" is selected.
-  List<String> _filterByCollection(List<String> ids, FavoriteType type, Map<String, String?> collectionByKey) {
+  List<String> _filterByCollection(
+    List<String> ids,
+    FavoriteType type,
+    Map<String, String?> collectionByKey,
+  ) {
     if (_selectedCollectionId == null) return ids;
-    return ids.where((id) => collectionByKey['${type.name}:$id'] == _selectedCollectionId).toList();
+    return ids
+        .where(
+          (id) => collectionByKey['${type.name}:$id'] == _selectedCollectionId,
+        )
+        .toList();
   }
 
-  Future<void> _showCollectionOptions(FavoriteCollection collection, String uid) async {
+  Future<void> _showCollectionOptions(
+    FavoriteCollection collection,
+    String uid,
+  ) async {
     final action = await showModalBottomSheet<String>(
       context: context,
       builder: (context) => SafeArea(
@@ -90,8 +106,14 @@ class _SavedScreenState extends State<SavedScreen>
               onTap: () => Navigator.of(context).pop('rename'),
             ),
             ListTile(
-              leading: const Icon(Symbols.delete_outline_rounded, color: AppColors.error),
-              title: const Text('Delete list', style: TextStyle(color: AppColors.error)),
+              leading: const Icon(
+                Symbols.delete_outline_rounded,
+                color: AppColors.error,
+              ),
+              title: const Text(
+                'Delete list',
+                style: TextStyle(color: AppColors.error),
+              ),
               onTap: () => Navigator.of(context).pop('delete'),
             ),
           ],
@@ -120,7 +142,10 @@ class _SavedScreenState extends State<SavedScreen>
             onChanged: (_) => setDialogState(() {}),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cancel')),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
             FilledButton(
               onPressed: controller.text.trim().isEmpty
                   ? null
@@ -135,24 +160,35 @@ class _SavedScreenState extends State<SavedScreen>
     try {
       await _favoritesRepository.renameCollection(collection.id, name);
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(AppException.from(e).message)));
+      if (mounted)
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(AppException.from(e).message)));
     }
   }
 
-  Future<void> _deleteCollection(FavoriteCollection collection, String uid) async {
+  Future<void> _deleteCollection(
+    FavoriteCollection collection,
+    String uid,
+  ) async {
     final confirmed = await showConfirmationDialog(
       context,
       title: 'Delete "${collection.name}"?',
-      message: 'Favorites in this list aren\'t removed — they just go back to Unsorted.',
+      message:
+          'Favorites in this list aren\'t removed — they just go back to Unsorted.',
       confirmLabel: 'Delete',
       isDestructive: true,
     );
     if (!confirmed || !mounted) return;
     try {
       await _favoritesRepository.deleteCollection(uid, collection.id);
-      if (_selectedCollectionId == collection.id) setState(() => _selectedCollectionId = null);
+      if (_selectedCollectionId == collection.id)
+        setState(() => _selectedCollectionId = null);
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(AppException.from(e).message)));
+      if (mounted)
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(AppException.from(e).message)));
     }
   }
 
@@ -186,7 +222,11 @@ class _SavedScreenState extends State<SavedScreen>
               ),
               child: const Padding(
                 padding: EdgeInsets.all(6),
-                child: Icon(Symbols.playlist_add_rounded, size: 18, color: Colors.white),
+                child: Icon(
+                  Symbols.playlist_add_rounded,
+                  size: 18,
+                  color: Colors.white,
+                ),
               ),
             ),
           ),
@@ -203,6 +243,7 @@ class _SavedScreenState extends State<SavedScreen>
     final destinationIds = saved.savedDestinationIds.toList();
     final restaurantIds = saved.savedRestaurantIds.toList();
     final festivalIds = saved.savedFestivalIds.toList();
+    final businessIds = saved.savedBusinessIds.toList();
 
     return Scaffold(
       body: SafeArea(
@@ -229,10 +270,26 @@ class _SavedScreenState extends State<SavedScreen>
               isScrollable: true,
               tabAlignment: TabAlignment.start,
               tabs: [
-                Tab(text: 'Places (${destinationIds.length})'),
-                Tab(text: 'Food (${restaurantIds.length})'),
-                Tab(text: 'Festivals (${festivalIds.length})'),
-                Tab(text: 'Attractions (${saved.savedPlaces.length})'),
+                Tab(
+                  icon: const Icon(Symbols.landscape_rounded),
+                  text: 'Places (${destinationIds.length})',
+                ),
+                Tab(
+                  icon: const Icon(Symbols.restaurant_rounded),
+                  text: 'Food (${restaurantIds.length})',
+                ),
+                Tab(
+                  icon: const Icon(Symbols.celebration_rounded),
+                  text: 'Festivals (${festivalIds.length})',
+                ),
+                Tab(
+                  icon: const Icon(Symbols.storefront_rounded),
+                  text: 'Local Finds (${businessIds.length})',
+                ),
+                Tab(
+                  icon: const Icon(Symbols.attractions_rounded),
+                  text: 'Attractions (${saved.savedPlaces.length})',
+                ),
               ],
             ),
             if (uid != null)
@@ -260,17 +317,24 @@ class _SavedScreenState extends State<SavedScreen>
                               ChoiceChip(
                                 label: const Text('All'),
                                 selected: _selectedCollectionId == null,
-                                onSelected: (_) => setState(() => _selectedCollectionId = null),
+                                onSelected: (_) => setState(
+                                  () => _selectedCollectionId = null,
+                                ),
                               ),
                               for (final collection in collections) ...[
                                 const SizedBox(width: AppSpacing.sm),
                                 GestureDetector(
-                                  onLongPress: () => _showCollectionOptions(collection, uid),
+                                  onLongPress: () =>
+                                      _showCollectionOptions(collection, uid),
                                   child: ChoiceChip(
                                     label: Text(collection.name),
-                                    selected: _selectedCollectionId == collection.id,
+                                    selected:
+                                        _selectedCollectionId == collection.id,
                                     onSelected: (_) => setState(
-                                      () => _selectedCollectionId = _selectedCollectionId == collection.id ? null : collection.id,
+                                      () => _selectedCollectionId =
+                                          _selectedCollectionId == collection.id
+                                          ? null
+                                          : collection.id,
                                     ),
                                   ),
                                 ),
@@ -282,7 +346,9 @@ class _SavedScreenState extends State<SavedScreen>
                           padding: const EdgeInsets.only(top: 2),
                           child: Text(
                             'Long-press a list to rename or delete it.',
-                            style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
                           ),
                         ),
                       ],
@@ -292,22 +358,35 @@ class _SavedScreenState extends State<SavedScreen>
               ),
             Expanded(
               child: uid == null
-                  ? _buildTabs(destinationIds, restaurantIds, festivalIds, saved, uid: '', collections: const [], collectionByKey: const {})
+                  ? _buildTabs(
+                      destinationIds,
+                      restaurantIds,
+                      festivalIds,
+                      businessIds,
+                      saved,
+                      uid: '',
+                      collections: const [],
+                      collectionByKey: const {},
+                    )
                   : StreamBuilder<List<FavoriteCollection>>(
                       stream: _favoritesRepository.streamCollections(uid),
                       builder: (context, collectionsSnapshot) {
-                        final collections = collectionsSnapshot.data ?? const [];
+                        final collections =
+                            collectionsSnapshot.data ?? const [];
                         return StreamBuilder<List<FavoriteDoc>>(
                           stream: _favoritesRepository.streamFavoriteDocs(uid),
                           builder: (context, docsSnapshot) {
                             final collectionByKey = <String, String?>{
-                              for (final doc in docsSnapshot.data ?? const <FavoriteDoc>[])
-                                '${doc.type.name}:${doc.itemId}': doc.collectionId,
+                              for (final doc
+                                  in docsSnapshot.data ?? const <FavoriteDoc>[])
+                                '${doc.type.name}:${doc.itemId}':
+                                    doc.collectionId,
                             };
                             return _buildTabs(
                               destinationIds,
                               restaurantIds,
                               festivalIds,
+                              businessIds,
                               saved,
                               uid: uid,
                               collections: collections,
@@ -328,17 +407,41 @@ class _SavedScreenState extends State<SavedScreen>
     List<String> destinationIds,
     List<String> restaurantIds,
     List<String> festivalIds,
+    List<String> businessIds,
     FavoritesProvider saved, {
     required String uid,
     required List<FavoriteCollection> collections,
     required Map<String, String?> collectionByKey,
   }) {
-    final filteredDestinationIds = _filterByCollection(destinationIds, FavoriteType.destination, collectionByKey);
-    final filteredRestaurantIds = _filterByCollection(restaurantIds, FavoriteType.restaurant, collectionByKey);
-    final filteredFestivalIds = _filterByCollection(festivalIds, FavoriteType.festival, collectionByKey);
+    final filteredDestinationIds = _filterByCollection(
+      destinationIds,
+      FavoriteType.destination,
+      collectionByKey,
+    );
+    final filteredRestaurantIds = _filterByCollection(
+      restaurantIds,
+      FavoriteType.restaurant,
+      collectionByKey,
+    );
+    final filteredFestivalIds = _filterByCollection(
+      festivalIds,
+      FavoriteType.festival,
+      collectionByKey,
+    );
+    final filteredBusinessIds = _filterByCollection(
+      businessIds,
+      FavoriteType.business,
+      collectionByKey,
+    );
     final filteredPlaces = _selectedCollectionId == null
         ? saved.savedPlaces
-        : saved.savedPlaces.where((p) => collectionByKey['${FavoriteType.place.name}:${p.id}'] == _selectedCollectionId).toList();
+        : saved.savedPlaces
+              .where(
+                (p) =>
+                    collectionByKey['${FavoriteType.place.name}:${p.id}'] ==
+                    _selectedCollectionId,
+              )
+              .toList();
 
     return TabBarView(
       controller: _tabController,
@@ -350,7 +453,9 @@ class _SavedScreenState extends State<SavedScreen>
             builder: (context, snapshot) => _SavedGrid(
               itemCount: snapshot.data?.length ?? 0,
               isLoading: snapshot.connectionState != ConnectionState.done,
-              emptyTitle: _selectedCollectionId == null ? 'No saved places yet' : 'No places in this list yet',
+              emptyTitle: _selectedCollectionId == null
+                  ? 'No saved places yet'
+                  : 'No places in this list yet',
               emptyMessage: _selectedCollectionId == null
                   ? 'Tap the bookmark icon on any destination to save it here.'
                   : 'Add a saved place to this list from the small list icon on its card.',
@@ -361,11 +466,14 @@ class _SavedScreenState extends State<SavedScreen>
                     destination: destination,
                     width: width,
                     imageHeight: _gridImageHeight,
-                    onTap: () => context.push(RoutePaths.destinationDetails(destination.id)),
+                    onTap: () => context.push(
+                      RoutePaths.destinationDetails(destination.id),
+                    ),
                   ),
                   userId: uid,
                   collections: collections,
-                  currentCollectionId: collectionByKey['${FavoriteType.destination.name}:${destination.id}'],
+                  currentCollectionId:
+                      collectionByKey['${FavoriteType.destination.name}:${destination.id}'],
                   type: FavoriteType.destination,
                   itemId: destination.id,
                 );
@@ -380,7 +488,9 @@ class _SavedScreenState extends State<SavedScreen>
             builder: (context, snapshot) => _SavedGrid(
               itemCount: snapshot.data?.length ?? 0,
               isLoading: snapshot.connectionState != ConnectionState.done,
-              emptyTitle: _selectedCollectionId == null ? 'No saved restaurants yet' : 'No restaurants in this list yet',
+              emptyTitle: _selectedCollectionId == null
+                  ? 'No saved restaurants yet'
+                  : 'No restaurants in this list yet',
               emptyMessage: _selectedCollectionId == null
                   ? 'Bookmark restaurants you want to try to see them here.'
                   : 'Add a saved restaurant to this list from the small list icon on its card.',
@@ -391,11 +501,14 @@ class _SavedScreenState extends State<SavedScreen>
                     restaurant: restaurant,
                     width: width,
                     imageHeight: _gridImageHeight,
-                    onTap: () => context.push(RoutePaths.restaurantDetails(restaurant.id)),
+                    onTap: () => context.push(
+                      RoutePaths.restaurantDetails(restaurant.id),
+                    ),
                   ),
                   userId: uid,
                   collections: collections,
-                  currentCollectionId: collectionByKey['${FavoriteType.restaurant.name}:${restaurant.id}'],
+                  currentCollectionId:
+                      collectionByKey['${FavoriteType.restaurant.name}:${restaurant.id}'],
                   type: FavoriteType.restaurant,
                   itemId: restaurant.id,
                 );
@@ -410,7 +523,9 @@ class _SavedScreenState extends State<SavedScreen>
             builder: (context, snapshot) => _SavedGrid(
               itemCount: snapshot.data?.length ?? 0,
               isLoading: snapshot.connectionState != ConnectionState.done,
-              emptyTitle: _selectedCollectionId == null ? 'No saved festivals yet' : 'No festivals in this list yet',
+              emptyTitle: _selectedCollectionId == null
+                  ? 'No saved festivals yet'
+                  : 'No festivals in this list yet',
               emptyMessage: _selectedCollectionId == null
                   ? 'Bookmark festivals to plan your trips around them.'
                   : 'Add a saved festival to this list from the small list icon on its card.',
@@ -421,13 +536,48 @@ class _SavedScreenState extends State<SavedScreen>
                     festival: festival,
                     width: width,
                     imageHeight: _gridImageHeight,
-                    onTap: () => context.push(RoutePaths.festivalDetails(festival.id)),
+                    onTap: () =>
+                        context.push(RoutePaths.festivalDetails(festival.id)),
                   ),
                   userId: uid,
                   collections: collections,
-                  currentCollectionId: collectionByKey['${FavoriteType.festival.name}:${festival.id}'],
+                  currentCollectionId:
+                      collectionByKey['${FavoriteType.festival.name}:${festival.id}'],
                   type: FavoriteType.festival,
                   itemId: festival.id,
+                );
+              },
+            ),
+          ),
+        ),
+        RefreshIndicator(
+          onRefresh: () async => setState(() {}),
+          child: FutureBuilder<List<Business>>(
+            future: _businessRepository.getByIds(filteredBusinessIds),
+            builder: (context, snapshot) => _SavedGrid(
+              itemCount: snapshot.data?.length ?? 0,
+              isLoading: snapshot.connectionState != ConnectionState.done,
+              emptyTitle: _selectedCollectionId == null
+                  ? 'No saved local finds yet'
+                  : 'No local finds in this list yet',
+              emptyMessage: _selectedCollectionId == null
+                  ? 'Tap the heart icon on any local find to save it here.'
+                  : 'Add a saved local find to this list from the small list icon on its card.',
+              itemBuilder: (context, width, i) {
+                final business = snapshot.data![i];
+                return _cardWithCollectionButton(
+                  card: BusinessCard(
+                    business: business,
+                    width: width,
+                    imageHeight: _gridImageHeight,
+                    onTap: () => showBusinessInfoSheet(context, business),
+                  ),
+                  userId: uid,
+                  collections: collections,
+                  currentCollectionId:
+                      collectionByKey['${FavoriteType.business.name}:${business.id}'],
+                  type: FavoriteType.business,
+                  itemId: business.id,
                 );
               },
             ),
@@ -440,7 +590,9 @@ class _SavedScreenState extends State<SavedScreen>
         _SavedGrid(
           itemCount: filteredPlaces.length,
           isLoading: false,
-          emptyTitle: _selectedCollectionId == null ? 'No saved attractions yet' : 'No attractions in this list yet',
+          emptyTitle: _selectedCollectionId == null
+              ? 'No saved attractions yet'
+              : 'No attractions in this list yet',
           emptyMessage: _selectedCollectionId == null
               ? 'Tap the bookmark icon on any attraction to save it here.'
               : 'Add a saved attraction to this list from the small list icon on its card.',
@@ -451,12 +603,19 @@ class _SavedScreenState extends State<SavedScreen>
                 place: place,
                 width: width,
                 imageHeight: _gridImageHeight,
-                imageUrl: place.photoNames.isNotEmpty ? _places.photoUrl(place.photoNames.first) : '',
-                onTap: () => showPlaceDetailsSheet(context, place: place, placesService: _places),
+                imageUrl: place.photoNames.isNotEmpty
+                    ? _places.photoUrl(place.photoNames.first)
+                    : '',
+                onTap: () => showPlaceDetailsSheet(
+                  context,
+                  place: place,
+                  placesService: _places,
+                ),
               ),
               userId: uid,
               collections: collections,
-              currentCollectionId: collectionByKey['${FavoriteType.place.name}:${place.id}'],
+              currentCollectionId:
+                  collectionByKey['${FavoriteType.place.name}:${place.id}'],
               type: FavoriteType.place,
               itemId: place.id,
             );
@@ -501,7 +660,8 @@ class _SavedGrid extends StatelessWidget {
         final columns = context.gridColumns;
         final side = MaxWidthContainer.sidePadding(context, maxWidth: 1400);
         final cardWidth =
-            (constraints.maxWidth - side * 2 - AppSpacing.md * (columns - 1)) / columns;
+            (constraints.maxWidth - side * 2 - AppSpacing.md * (columns - 1)) /
+            columns;
         return GridView.builder(
           padding: EdgeInsets.fromLTRB(
             side,

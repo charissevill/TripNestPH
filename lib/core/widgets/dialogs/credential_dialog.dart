@@ -66,7 +66,14 @@ class _CredentialDialogState extends State<CredentialDialog> {
       _busy = true;
       _error = null;
     });
-    final ok = await widget.onConfirm();
+    // A thrown error must never leave the dialog stuck on its busy spinner —
+    // treat it the same as the callback reporting failure.
+    var ok = false;
+    try {
+      ok = await widget.onConfirm();
+    } catch (_) {
+      ok = false;
+    }
     if (!mounted) return;
     if (ok) {
       Navigator.of(context).pop(true);

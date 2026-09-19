@@ -19,6 +19,7 @@ import '../../core/widgets/dialogs/credential_dialog.dart';
 import '../../core/widgets/dialogs/discard_changes_scope.dart';
 import '../../core/widgets/media/avatar_preview.dart';
 import '../../data/mock/mock_categories.dart';
+import '../../core/widgets/media/image_error_placeholder.dart';
 
 const List<String> _travelPreferenceOptions = [
   'Beaches',
@@ -108,23 +109,33 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
+    if (!_dirty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Nothing to save.')),
+      );
+      return;
+    }
     setState(() {
       _saving = true;
       _error = null;
     });
     final auth = context.read<AuthProvider>();
-    final ok = await auth.updateName(_nameController.text.trim());
-    if (ok) {
-      await auth.updateTravelPreferences(_preferences.toList());
-      await auth.updateFavoriteCategories(_categories.toList());
-    }
+    var ok = await auth.updateName(_nameController.text.trim());
+    // Each of these reports failure through its return value (and
+    // `auth.errorMessage`) rather than throwing — without checking them, a
+    // failed preferences save still showed "Profile updated."
+    if (ok) ok = await auth.updateTravelPreferences(_preferences.toList());
+    if (ok) ok = await auth.updateFavoriteCategories(_categories.toList());
     if (!mounted) return;
     setState(() => _saving = false);
     if (ok) {
       _dirty = false;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Profile updated.')),
+      );
       context.pop();
     } else {
-      setState(() => _error = auth.errorMessage);
+      setState(() => _error = auth.errorMessage ?? 'Couldn\'t save your profile. Please try again.');
     }
   }
 
@@ -174,6 +185,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                               ? CachedNetworkImage(
                                   imageUrl: user!.photoUrl,
                                   fit: BoxFit.cover,
+                                  errorWidget: (context, url, error) =>
+                                      const ImageErrorPlaceholder(
+                                        icon: Symbols.person_rounded,
+                                      ),
                                 )
                               : Container(
                                   color: theme.colorScheme.primary.withValues(

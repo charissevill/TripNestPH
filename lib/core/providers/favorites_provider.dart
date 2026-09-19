@@ -10,7 +10,8 @@ import '../utils/app_exception.dart';
 /// UI already calls (`isDestinationSaved`, `toggleDestination`, ...) so no
 /// screen or card widget needs to change — only where the data comes from.
 class FavoritesProvider extends ChangeNotifier {
-  FavoritesProvider({FavoritesRepository? repository}) : _repository = repository ?? FavoritesRepository();
+  FavoritesProvider({FavoritesRepository? repository})
+    : _repository = repository ?? FavoritesRepository();
 
   final FavoritesRepository _repository;
   StreamSubscription<Map<FavoriteType, Set<String>>>? _subscription;
@@ -20,6 +21,7 @@ class FavoritesProvider extends ChangeNotifier {
   Set<String> _savedDestinationIds = {};
   Set<String> _savedRestaurantIds = {};
   Set<String> _savedFestivalIds = {};
+  Set<String> _savedBusinessIds = {};
 
   // Chains writes for the same (type, id) so a rapid double-tap (save, then
   // unsave before the first write lands) applies to Firestore in the order
@@ -38,14 +40,20 @@ class FavoritesProvider extends ChangeNotifier {
   bool isRestaurantSaved(String id) => _savedRestaurantIds.contains(id);
   bool isFestivalSaved(String id) => _savedFestivalIds.contains(id);
   bool isPlaceSaved(String id) => _savedPlaceIds.contains(id);
+  bool isBusinessSaved(String id) => _savedBusinessIds.contains(id);
 
   int get totalSavedCount =>
-      _savedDestinationIds.length + _savedRestaurantIds.length + _savedFestivalIds.length + _savedPlaces.length;
+      _savedDestinationIds.length +
+      _savedRestaurantIds.length +
+      _savedFestivalIds.length +
+      _savedPlaces.length +
+      _savedBusinessIds.length;
 
   Set<String> get savedDestinationIds => _savedDestinationIds;
   Set<String> get savedRestaurantIds => _savedRestaurantIds;
   Set<String> get savedFestivalIds => _savedFestivalIds;
   List<Place> get savedPlaces => _savedPlaces;
+  Set<String> get savedBusinessIds => _savedBusinessIds;
 
   /// Called whenever the signed-in user changes (including sign-out, where
   /// [userId] is null and every favorite clears from view).
@@ -57,6 +65,7 @@ class FavoritesProvider extends ChangeNotifier {
     _savedDestinationIds = {};
     _savedRestaurantIds = {};
     _savedFestivalIds = {};
+    _savedBusinessIds = {};
     _savedPlaces = [];
     _savedPlaceIds = {};
     notifyListeners();
@@ -66,18 +75,26 @@ class FavoritesProvider extends ChangeNotifier {
       _savedDestinationIds = byType[FavoriteType.destination] ?? {};
       _savedRestaurantIds = byType[FavoriteType.restaurant] ?? {};
       _savedFestivalIds = byType[FavoriteType.festival] ?? {};
+      _savedBusinessIds = byType[FavoriteType.business] ?? {};
       notifyListeners();
     });
-    _placesSubscription = _repository.streamSavedPlaces(userId).listen((places) {
+    _placesSubscription = _repository.streamSavedPlaces(userId).listen((
+      places,
+    ) {
       _savedPlaces = places;
       _savedPlaceIds = places.map((p) => p.id).toSet();
       notifyListeners();
     });
   }
 
-  void toggleDestination(String id) => _toggle(FavoriteType.destination, id, _savedDestinationIds);
-  void toggleRestaurant(String id) => _toggle(FavoriteType.restaurant, id, _savedRestaurantIds);
-  void toggleFestival(String id) => _toggle(FavoriteType.festival, id, _savedFestivalIds);
+  void toggleDestination(String id) =>
+      _toggle(FavoriteType.destination, id, _savedDestinationIds);
+  void toggleRestaurant(String id) =>
+      _toggle(FavoriteType.restaurant, id, _savedRestaurantIds);
+  void toggleFestival(String id) =>
+      _toggle(FavoriteType.festival, id, _savedFestivalIds);
+  void toggleBusiness(String id) =>
+      _toggle(FavoriteType.business, id, _savedBusinessIds);
 
   void _toggle(FavoriteType type, String id, Set<String> currentSet) {
     final userId = _userId;
@@ -96,19 +113,22 @@ class FavoritesProvider extends ChangeNotifier {
     final key = '${type.name}:$id';
     final previous = _pendingByKey[key] ?? Future.value();
     final chained = previous.then((_) {
-      return (wasSaved ? _repository.remove(userId, type, id) : _repository.add(userId, type, id)).catchError((e) {
-        // A genuine offline error queues via Firestore's own persistence
-        // and will apply once connectivity returns — nothing to revert. Any
-        // other failure (stale auth token, a rules regression) means the
-        // write never happened and never will on its own, so the optimistic
-        // flip above must be undone instead of silently lying to the user
-        // that it saved.
-        if (isOfflineException(e)) return;
-        if (currentSet.contains(id) == !wasSaved) {
-          wasSaved ? currentSet.add(id) : currentSet.remove(id);
-          notifyListeners();
-        }
-      });
+      return (wasSaved
+              ? _repository.remove(userId, type, id)
+              : _repository.add(userId, type, id))
+          .catchError((e) {
+            // A genuine offline error queues via Firestore's own persistence
+            // and will apply once connectivity returns — nothing to revert. Any
+            // other failure (stale auth token, a rules regression) means the
+            // write never happened and never will on its own, so the optimistic
+            // flip above must be undone instead of silently lying to the user
+            // that it saved.
+            if (isOfflineException(e)) return;
+            if (currentSet.contains(id) == !wasSaved) {
+              wasSaved ? currentSet.add(id) : currentSet.remove(id);
+              notifyListeners();
+            }
+          });
     });
     _pendingByKey[key] = chained;
   }
@@ -137,7 +157,8 @@ class FavoritesProvider extends ChangeNotifier {
             // Stale once persisted — it's the distance from wherever this
             // place was originally found, not from the traveler's position
             // whenever they later revisit their saved list.
-            snapshot: Map<String, dynamic>.from(place.toJson())..remove('distanceMeters'),
+            snapshot: Map<String, dynamic>.from(place.toJson())
+              ..remove('distanceMeters'),
           );
     future.catchError((_) {
       // Offline persistence queues the write for later; nothing to revert.

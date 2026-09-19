@@ -26,17 +26,12 @@ class RoutePaths {
   static const String generatedItinerary = '/planner/itinerary';
   static const String manualItinerary = '/planner/manual';
 
-  // Deep links into a specific section of the itinerary screen — same
-  // extra-passed itinerary/savedId as [generatedItinerary], just opened
-  // pre-scrolled to that section instead of the top.
-  static const String tripExpenses = '/planner/itinerary/expenses';
-  static const String tripPacking = '/planner/itinerary/packing';
-  static const String tripPolls = '/planner/itinerary/polls';
   static const String aiChat = '/ai-chat';
   static const String savedItineraries = '/saved-itineraries';
   static const String notifications = '/notifications';
   static const String editProfile = '/profile/edit';
   static const String recentlyViewed = '/profile/recently-viewed';
+  static const String myReviews = '/profile/reviews';
   static String legalInfo(String topicKey) => '/settings/legal/$topicKey';
   static const String legalInfoPattern = '/settings/legal/:topicKey';
   static const String faq = '/settings/faq';
@@ -63,7 +58,8 @@ class RoutePaths {
   static const String adminBulkImport = '/admin/bulk-import';
   static const String adminBulkProvinceContent = '/admin/bulk-province-content';
   static const String myBusiness = '/my-business';
-  static const String adminBusinessOwnerApplications = '/admin/business-owner-applications';
+  static const String adminBusinessOwnerApplications =
+      '/admin/business-owner-applications';
 
   // Detail routes, parameterized by id.
   static String destinationDetails(String id) => '/destination/$id';

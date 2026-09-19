@@ -23,9 +23,14 @@ class Itinerary {
     this.destinationId,
     this.destinationLatitude,
     this.destinationLongitude,
+    this.isManuallyCreated = false,
   });
 
   final String destinationName;
+
+  /// Always empty for a manual trip ([isManuallyCreated]) — there's no AI
+  /// generation step to pull a destination photo from, so callers showing
+  /// this (e.g. `UpcomingTripCard`) need their own no-photo fallback.
   final String coverImageUrl;
   final int totalDays;
   final int travelers;
@@ -69,6 +74,16 @@ class Itinerary {
   final double? destinationLatitude;
   final double? destinationLongitude;
 
+  /// True only for a trip built via "Create Your Own Itinerary" (no AI
+  /// involved at all) — hides the Travel Tips section, the Budget Summary
+  /// section, and the Regenerate/Refine actions on
+  /// [GeneratedItineraryScreen] (nothing an AI generated to redo or
+  /// estimate), and skips seeding a default Packing Checklist
+  /// (`ItineraryRepository.save`), since there's no itinerary content yet
+  /// to base suggestions on either. False (default) for every AI-generated
+  /// itinerary, including ones saved before this field existed.
+  final bool isManuallyCreated;
+
   factory Itinerary.fromMap(Map<String, dynamic> map) {
     return Itinerary(
       destinationName: map['destinationName'] as String? ?? '',
@@ -98,6 +113,7 @@ class Itinerary {
       destinationId: map['destinationId'] as String?,
       destinationLatitude: (map['destinationLatitude'] as num?)?.toDouble(),
       destinationLongitude: (map['destinationLongitude'] as num?)?.toDouble(),
+      isManuallyCreated: map['isManuallyCreated'] as bool? ?? false,
     );
   }
 
@@ -124,6 +140,7 @@ class Itinerary {
       destinationId: destinationId,
       destinationLatitude: destinationLatitude,
       destinationLongitude: destinationLongitude,
+      isManuallyCreated: isManuallyCreated,
     );
   }
 
@@ -146,6 +163,7 @@ class Itinerary {
       'destinationId': destinationId,
       'destinationLatitude': destinationLatitude,
       'destinationLongitude': destinationLongitude,
+      'isManuallyCreated': isManuallyCreated,
     };
   }
 }

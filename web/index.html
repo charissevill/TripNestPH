@@ -31,6 +31,12 @@
 
   <title>TripNest PH</title>
   <link rel="manifest" href="manifest.json">
+
+  <!-- Powers the interactive map picker in "Create Your Own Itinerary".
+       Browser-referrer restricted to this app's own domains (see the
+       Google Cloud Console API key config) — safe to ship in page
+       source the way every Maps JS embed works. -->
+  <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAcdh6gl9HSyXYOZhnywouT5Yd9_x0BDC4" async></script>
 </head>
 <body>
   <!--

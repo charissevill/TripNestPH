@@ -9,6 +9,7 @@ import '../../theme/app_colors.dart';
 import '../../theme/app_spacing.dart';
 import '../../utils/validators.dart';
 import '../buttons/animated_button.dart';
+import '../media/image_error_placeholder.dart';
 
 /// The bottom sheet used to write or edit a review: star rating, comment
 /// and up to three photos. Returns a [ReviewFormResult] via `Navigator.pop`,
@@ -190,6 +191,11 @@ class _ReviewFormSheetState extends State<_ReviewFormSheet> {
                                   width: 64,
                                   height: 64,
                                   fit: BoxFit.cover,
+                                  errorWidget: (context, url, error) =>
+                                      const ImageErrorPlaceholder(
+                                        width: 64,
+                                        height: 64,
+                                      ),
                                 ),
                               ),
                               Positioned(
@@ -227,6 +233,11 @@ class _ReviewFormSheetState extends State<_ReviewFormSheet> {
                                   width: 64,
                                   height: 64,
                                   fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) =>
+                                      const ImageErrorPlaceholder(
+                                        width: 64,
+                                        height: 64,
+                                      ),
                                 ),
                               ),
                               Positioned(

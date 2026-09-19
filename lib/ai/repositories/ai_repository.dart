@@ -62,11 +62,19 @@ class AiRepository {
     required int days,
   }) async {
     if (_weatherOverride != null) {
-      return _weatherOverride.getForecast(latitude: latitude, longitude: longitude, days: days);
+      return _weatherOverride.getForecast(
+        latitude: latitude,
+        longitude: longitude,
+        days: days,
+      );
     }
     final weatherService = WeatherService();
     try {
-      return await weatherService.getForecast(latitude: latitude, longitude: longitude, days: days);
+      return await weatherService.getForecast(
+        latitude: latitude,
+        longitude: longitude,
+        days: days,
+      );
     } finally {
       weatherService.dispose();
     }
@@ -105,6 +113,24 @@ class AiRepository {
     bool forceRefresh = false,
   }) async {
     try {
+      // A request built from an AI Chat conversation ("Build Full
+      // Itinerary") already has the real day-by-day plan sitting right
+      // there in the chat reply — parsing that directly and only asking AI
+      // to cost it out (see generateItineraryFromChatPlan) guarantees the
+      // generated trip's places are the chat's places, rather than asking a
+      // second, separate generation call to "match" that reply in prose and
+      // hoping it actually does. Never true for Regenerate (which builds a
+      // fresh request with no priorConversationContext, by design —
+      // see AiItineraryRequest.priorConversationContext's doc comment), so
+      // this can't ever short-circuit those into reproducing the same plan.
+      if (request.priorConversationContext != null &&
+          request.priorConversationContext!.isNotEmpty) {
+        final fromChat = await generateItineraryFromChatPlan(
+          request,
+          coverImageUrl: coverImageUrl,
+        );
+        if (fromChat != null) return fromChat;
+      }
       return await _generateItineraryViaAi(
         request,
         coverImageUrl: coverImageUrl,
@@ -114,6 +140,399 @@ class AiRepository {
       if (e.isConfigError) return _demoItinerary();
       rethrow;
     }
+  }
+
+  /// Builds an [Itinerary] straight from the day-by-day plan a chat reply
+  /// already gave (see [ChatPrompts.systemPrompt]'s "Day <N> – ..." / "- <Time>:
+  /// **<Place>** — ..." format), instead of asking a second AI call to
+  /// regenerate one that merely "matches" it. That older approach — folding
+  /// the chat's named places into freshly-fetched candidate lists and
+  /// telling the model "this itinerary MUST match that reply" — depended on
+  /// the model actually honoring free-text prose instructions consistently,
+  /// which it doesn't: in practice a chat reply's own places routinely
+  /// didn't survive into the generated itinerary at all. Deterministically
+  /// parsing what the reply already said removes that gap entirely — the
+  /// itinerary's places are literally the chat's places, not a second
+  /// guess at them.
+  ///
+  /// Only the budget breakdown and travel tips still come from a (much
+  /// narrower) AI call — see [ItineraryPrompts.budgetAndTipsSystem] — since
+  /// costing out a trip and writing tips isn't something regex parsing can
+  /// do, but that call is never asked to pick or move a place, so it can't
+  /// reintroduce this same mismatch.
+  ///
+  /// Returns null when [request.priorConversationContext] doesn't actually
+  /// contain a parseable day-by-day plan (e.g. a reply saved before this
+  /// format existed, or the traveler tapped "Build Full Itinerary" off a
+  /// short single-recommendation reply with no real "Day N" structure) —
+  /// the caller falls back to the normal AI-generation path in that case.
+  Future<Itinerary?> generateItineraryFromChatPlan(
+    AiItineraryRequest request, {
+    required String coverImageUrl,
+  }) async {
+    final parsedDays = _parseChatDayPlan(request.priorConversationContext!);
+    if (parsedDays == null || parsedDays.isEmpty) return null;
+
+    final destinationCoordinates = await _resolveDestinationCoordinates(
+      request,
+    );
+
+    final results = await Future.wait([
+      _geocodeActivities(
+        parsedDays,
+        areaName: request.destinationName,
+        biasLatitude: destinationCoordinates.latitude,
+        biasLongitude: destinationCoordinates.longitude,
+      ),
+      _fetchAccommodations(request),
+      _fetchPlaceAttractions(request),
+      _provinceRepository.getById(request.provinceId),
+      destinationCoordinates.latitude != null &&
+              destinationCoordinates.longitude != null
+          ? _fetchForecast(
+              latitude: destinationCoordinates.latitude!,
+              longitude: destinationCoordinates.longitude!,
+              days: parsedDays.length,
+            )
+          : Future.value(<WeatherForecast>[]),
+    ]);
+    final geocodedDays = results[0] as List<ItineraryDay>;
+    final accommodations = results[1] as List<PlaceRecommendation>;
+    final placeAttractions = results[2] as List<PlaceRecommendation>;
+    final province = results[3] as Province?;
+    final weather = results[4] as List<WeatherForecast>;
+
+    final (
+      budgetBreakdown,
+      totalBudget,
+      travelTips,
+    ) = await _estimateBudgetAndTips(
+      request,
+      geocodedDays: geocodedDays,
+      province: province,
+      accommodations: accommodations,
+    );
+
+    return Itinerary(
+      destinationName: request.destinationName,
+      coverImageUrl: coverImageUrl,
+      totalDays: geocodedDays.length,
+      travelers: request.travelers,
+      totalBudget: totalBudget,
+      days: geocodedDays,
+      budgetBreakdown: budgetBreakdown,
+      weather: weather,
+      travelTips: travelTips,
+      recommendedRestaurantIds: const [],
+      nearbyAttractionIds: const [],
+      recommendedAccommodations: accommodations,
+      recommendedPlaceAttractions: placeAttractions,
+      accommodationName: request.accommodationName ?? '',
+      destinationId: request.destinationId.isEmpty
+          ? null
+          : request.destinationId,
+      destinationLatitude: destinationCoordinates.latitude,
+      destinationLongitude: destinationCoordinates.longitude,
+    );
+  }
+
+  /// Recognized time-of-day labels for a chat-parsed activity line — used
+  /// to reject a line that only superficially looks like "<label>: ...
+  /// **bold**..." (e.g. "Note: **Important** — bring cash") from being
+  /// mistaken for a real day activity.
+  static const Set<String> _dayPartKeywords = {
+    'morning',
+    'afternoon',
+    'evening',
+    'noon',
+    'night',
+  };
+
+  /// Parses a chat reply's `Day <N> – <theme>` / `<Time>: **<Place>** —
+  /// <sentence>` structure (see [ChatPrompts.systemPrompt]) into
+  /// ungeocoded [ItineraryDay]s — [ItineraryActivity.location] is set but
+  /// `latitude`/`longitude` stay null until [_geocodeActivities] resolves
+  /// them. Tolerant of small formatting drift a real reply can still have
+  /// despite the system prompt's exact-format instruction (an LLM doesn't
+  /// follow a format instruction with 100% consistency) — a leading bullet
+  /// marker is optional, and a lead-in word or two between the time label's
+  /// colon and the bold place name (e.g. "Morning: Explore **Burnham
+  /// Park** – ...", not just "Morning: **Burnham Park** – ...") is folded
+  /// into the description rather than causing the whole line to be
+  /// dropped. What's NOT tolerated: a place name that isn't `**bold**`, or
+  /// a label that isn't recognizably a time of day (see [_dayPartKeywords])
+  /// — those still fall through to the AI-regeneration fallback rather than
+  /// risk mis-parsing an unrelated line as an activity.
+  ///
+  /// Returns null when no `Day <N>` header is found at all (nothing to
+  /// build from) rather than an empty list, so callers can tell "no
+  /// structured plan here" apart from "structured, but every day parsed
+  /// empty" (both fall back the same way, but the distinction matters for
+  /// debugging a real reply that unexpectedly failed to parse).
+  List<ItineraryDay>? _parseChatDayPlan(String content) {
+    final dayHeaderPattern = RegExp(
+      r'^Day\s+(\d+)\s*[–—-]\s*(.+)$',
+      multiLine: true,
+    );
+    final linePattern = RegExp(
+      r'^[-•]?\s*([A-Za-z][A-Za-z\s-]{1,24}):\s*(.+)$',
+    );
+    final boldPattern = RegExp(r'\*\*(.+?)\*\*');
+
+    final dayMatches = dayHeaderPattern.allMatches(content).toList();
+    if (dayMatches.isEmpty) return null;
+
+    final days = <ItineraryDay>[];
+    for (var i = 0; i < dayMatches.length; i++) {
+      final match = dayMatches[i];
+      final dayNumber = int.tryParse(match.group(1)!) ?? (days.length + 1);
+      final blockStart = match.end;
+      final blockEnd = i + 1 < dayMatches.length
+          ? dayMatches[i + 1].start
+          : content.length;
+      final block = content.substring(blockStart, blockEnd);
+
+      final activities = <ItineraryActivity>[];
+      for (final rawLine in block.split('\n')) {
+        final line = rawLine.trim();
+        if (line.isEmpty) continue;
+        final lineMatch = linePattern.firstMatch(line);
+        if (lineMatch == null) continue;
+        final time = lineMatch.group(1)!.trim();
+        if (!_dayPartKeywords.any((k) => time.toLowerCase().contains(k)))
+          continue;
+        final rest = lineMatch.group(2)!.trim();
+        final boldMatch = boldPattern.firstMatch(rest);
+        if (boldMatch == null) continue;
+        final placeName = boldMatch.group(1)!.trim();
+        if (placeName.isEmpty) continue;
+        final before = rest.substring(0, boldMatch.start).trim();
+        final after = rest
+            .substring(boldMatch.end)
+            .trim()
+            .replaceFirst(RegExp(r'^[–—-]\s*'), '');
+        final description = [
+          before,
+          after,
+        ].where((s) => s.isNotEmpty).join(' ').trim();
+        activities.add(
+          ItineraryActivity(
+            time: time,
+            title: placeName,
+            description: description.isEmpty
+                ? 'Visit $placeName.'
+                : description,
+            iconKey: _iconKeyForActivity(time, placeName, description),
+            location: placeName,
+          ),
+        );
+      }
+      if (activities.isEmpty) continue;
+      days.add(
+        ItineraryDay(
+          dayNumber: dayNumber,
+          dateLabel: '',
+          activities: activities,
+        ),
+      );
+    }
+    return days.isEmpty ? null : days;
+  }
+
+  /// A best-effort, keyword-based icon pick for a chat-parsed activity —
+  /// there's no AI call in [generateItineraryFromChatPlan]'s day-building
+  /// path to ask for one (see that method's doc comment for why), so this
+  /// fills the same visual role [ItineraryPrompts.iconKeys] guidance does
+  /// for an AI-picked one. Falls back to a time-of-day-appropriate default
+  /// rather than [IconRegistry]'s own generic fallback, so a chat-derived
+  /// itinerary's activity list doesn't visibly look less considered than an
+  /// AI-generated one.
+  String _iconKeyForActivity(
+    String time,
+    String placeName,
+    String description,
+  ) {
+    final text = '$placeName $description'.toLowerCase();
+    if (text.contains('museum') ||
+        text.contains('gallery') ||
+        text.contains('heritage') ||
+        text.contains('histor')) {
+      return 'account_balance';
+    }
+    if (text.contains('hik') ||
+        text.contains('trail') ||
+        text.contains('trek') ||
+        text.contains('peak') ||
+        text.contains('summit')) {
+      return 'hiking';
+    }
+    if (text.contains('beach') ||
+        text.contains('island') ||
+        text.contains('cove'))
+      return 'beach_access';
+    if (text.contains('forest') ||
+        text.contains('jungle') ||
+        text.contains('rainforest'))
+      return 'forest';
+    if (text.contains('market') ||
+        text.contains('shop') ||
+        text.contains('souvenir') ||
+        text.contains('bazaar')) {
+      return 'shopping_bag';
+    }
+    if (text.contains('festival') || text.contains('celebrat'))
+      return 'celebration';
+    if (text.contains('boat') ||
+        text.contains('island hop') ||
+        text.contains('ferry'))
+      return 'directions_boat';
+    if (text.contains('garden') ||
+        text.contains('park') ||
+        text.contains('view') ||
+        text.contains('scenic')) {
+      return 'landscape';
+    }
+    if (text.contains('café') ||
+        text.contains('cafe') ||
+        text.contains('coffee') ||
+        text.contains('dessert') ||
+        text.contains('restaurant') ||
+        text.contains('dine') ||
+        text.contains('food') ||
+        text.contains('eat') ||
+        text.contains('breakfast') ||
+        text.contains('lunch') ||
+        text.contains('dinner')) {
+      return time.toLowerCase().contains('evening')
+          ? 'restaurant'
+          : 'lunch_dining';
+    }
+    return time.toLowerCase().contains('evening') ? 'restaurant' : 'landscape';
+  }
+
+  /// The narrow AI call [generateItineraryFromChatPlan] uses to cost out an
+  /// already-fixed day plan and write travel tips for it — see
+  /// [ItineraryPrompts.budgetAndTipsSystem]'s doc comment for why this stays
+  /// separate from (and much smaller than) the full itinerary-generation
+  /// prompt. Falls back to a plain even-split estimate and no travel tips
+  /// (rather than throwing) if the call fails or returns something
+  /// unparseable — a chat-derived itinerary with a slightly rougher budget
+  /// estimate is still far better than failing the whole generation over a
+  /// secondary detail.
+  Future<(List<BudgetItem>, double, List<String>)> _estimateBudgetAndTips(
+    AiItineraryRequest request, {
+    required List<ItineraryDay> geocodedDays,
+    required Province? province,
+    required List<PlaceRecommendation> accommodations,
+  }) async {
+    final dayPlanSummary = geocodedDays
+        .map(
+          (day) =>
+              'Day ${day.dayNumber}: ${day.activities.map((a) => '${a.title} (${a.time})').join(', ')}',
+        )
+        .join('\n');
+
+    try {
+      final raw = await _openAi.complete(
+        messages: [
+          {'role': 'system', 'content': ItineraryPrompts.budgetAndTipsSystem()},
+          {
+            'role': 'user',
+            'content': ItineraryPrompts.budgetAndTipsUser(
+              request: request,
+              dayPlanSummary: dayPlanSummary,
+              emergencyHotlines: province?.emergencyHotlines ?? const [],
+              provinceTravelTips: province?.travelTips ?? const [],
+              provinceBudgetMin: province?.estimatedDailyBudgetMin,
+              provinceBudgetMax: province?.estimatedDailyBudgetMax,
+              accommodationName:
+                  request.accommodationName ??
+                  (accommodations.isNotEmpty
+                      ? accommodations.first.name
+                      : null),
+            ),
+          },
+        ],
+        temperature: 0.5,
+        maxTokens: 900,
+        jsonMode: true,
+      );
+      final json = jsonDecode(_stripCodeFences(raw)) as Map<String, dynamic>;
+      final budgetBreakdown = (json['budgetBreakdown'] as List? ?? const [])
+          .map((b) => BudgetItem.fromMap(Map<String, dynamic>.from(b as Map)))
+          .toList();
+      final travelTips = List<String>.from(
+        json['travelTips'] as List? ?? const [],
+      );
+      final totalBudget =
+          (json['totalBudget'] as num?)?.toDouble() ??
+          budgetBreakdown.fold<double>(0, (sum, b) => sum + b.amount);
+      if (budgetBreakdown.isEmpty)
+        throw const AiException('empty budget breakdown');
+      return (budgetBreakdown, totalBudget, travelTips);
+    } catch (_) {
+      return (
+        _fallbackBudgetBreakdown(request),
+        _fallbackTotalBudget(request),
+        <String>[],
+      );
+    }
+  }
+
+  /// Used only when [_estimateBudgetAndTips]'s AI call itself fails — an
+  /// even, generic split of the traveler's chosen budget tier range across
+  /// the same 5 categories the AI path always uses, so the itinerary still
+  /// has a complete, sensibly-shaped budget summary instead of an empty one.
+  double _fallbackTotalBudget(AiItineraryRequest request) {
+    // budgetRange is a display string like "₱5k – ₱15k" or "₱40k+" (see
+    // planner_options.dart's budgetTiers) — "k" means thousands, so it has
+    // to be handled explicitly or "5k" parses as the number 5.
+    final numbers = <double>[];
+    for (final m in RegExp(
+      r'([\d,]+)\s*(k)?',
+      caseSensitive: false,
+    ).allMatches(request.budgetRange)) {
+      final n = double.tryParse(m.group(1)!.replaceAll(',', ''));
+      if (n == null || n <= 0) continue;
+      numbers.add(m.group(2) != null ? n * 1000 : n);
+    }
+    if (numbers.isEmpty) return 15000;
+    return numbers.length > 1 ? (numbers[0] + numbers[1]) / 2 : numbers[0];
+  }
+
+  List<BudgetItem> _fallbackBudgetBreakdown(AiItineraryRequest request) {
+    final total = _fallbackTotalBudget(request);
+    const shares = {
+      'Transportation': 0.2,
+      'Food': 0.3,
+      'Entrance Fees': 0.15,
+      'Accommodation': 0.25,
+      'Miscellaneous': 0.1,
+    };
+    const iconKeys = {
+      'Transportation': 'directions_boat',
+      'Food': 'restaurant',
+      'Entrance Fees': 'payments',
+      'Accommodation': 'hotel',
+      'Miscellaneous': 'shopping_bag',
+    };
+    const colorKeys = {
+      'Transportation': 'primary',
+      'Food': 'secondary',
+      'Entrance Fees': 'accent',
+      'Accommodation': 'primaryDark',
+      'Miscellaneous': 'secondaryDark',
+    };
+    return shares.entries
+        .map(
+          (e) => BudgetItem(
+            label: e.key,
+            amount: total * e.value,
+            iconKey: iconKeys[e.key]!,
+            colorKey: colorKeys[e.key]!,
+          ),
+        )
+        .toList();
   }
 
   Future<Itinerary> _generateItineraryViaAi(
@@ -155,12 +574,26 @@ class AiRepository {
             )
           : Future.value(<WeatherForecast>[]),
     ]);
-    final candidateRestaurants = candidateResults[0] as List<Restaurant>;
+    final candidateRestaurants = <Restaurant>[
+      ...candidateResults[0] as List<Restaurant>,
+    ];
     final accommodations = candidateResults[1] as List<PlaceRecommendation>;
-    final candidatePlaceAttractions =
-        candidateResults[2] as List<PlaceRecommendation>;
+    final candidatePlaceAttractions = <PlaceRecommendation>[
+      ...candidateResults[2] as List<PlaceRecommendation>,
+    ];
     final province = candidateResults[3] as Province?;
     final weather = candidateResults[4] as List<WeatherForecast>;
+
+    // A trip generated from an AI Chat conversation ("Build Full
+    // Itinerary") needs the specific places that chat reply already named
+    // to actually be pickable here, not just fetched fresh and hoped to
+    // overlap — see AiItineraryRequest.priorConversationEntities' doc
+    // comment for why.
+    _mergePriorConversationEntities(
+      request.priorConversationEntities,
+      restaurants: candidateRestaurants,
+      attractions: candidatePlaceAttractions,
+    );
 
     // Closer candidates lead each list — anchored on the accommodation when
     // the traveler gave one, otherwise on the destination itself (always
@@ -308,7 +741,8 @@ class AiRepository {
     required ({double? latitude, double? longitude}) fallbackAnchor,
   }) {
     final anchorLat = request.accommodationLatitude ?? fallbackAnchor.latitude;
-    final anchorLng = request.accommodationLongitude ?? fallbackAnchor.longitude;
+    final anchorLng =
+        request.accommodationLongitude ?? fallbackAnchor.longitude;
     // Also covers the empty-list case: `_fetchAccommodations`/
     // `_fetchPlaceAttractions` return a `const []` when the destination has
     // no coordinates, and sorting an unmodifiable list throws.
@@ -423,6 +857,60 @@ class AiRepository {
           ),
         )
         .toList();
+  }
+
+  /// Folds the real [Place]/[Restaurant] objects an AI Chat conversation
+  /// already named (see [AiItineraryRequest.priorConversationEntities])
+  /// into this generation's own freshly-fetched candidate lists, deduped by
+  /// lowercased name so something already present isn't listed twice.
+  /// Mutates [restaurants]/[attractions] in place — called right before
+  /// [_sortByDistanceFromAnchor] ranks those same lists, so a merged-in
+  /// place still gets a real distance-based position rather than always
+  /// landing first or last.
+  void _mergePriorConversationEntities(
+    List<Object> entities, {
+    required List<Restaurant> restaurants,
+    required List<PlaceRecommendation> attractions,
+  }) {
+    if (entities.isEmpty) return;
+    final knownRestaurantNames = restaurants
+        .map((r) => r.name.trim().toLowerCase())
+        .toSet();
+    final knownAttractionNames = attractions
+        .map((p) => p.name.trim().toLowerCase())
+        .toSet();
+    for (final entity in entities) {
+      switch (entity) {
+        case Restaurant r:
+          if (knownRestaurantNames.add(r.name.trim().toLowerCase()))
+            restaurants.add(r);
+        case Place p:
+          if (knownAttractionNames.add(p.name.trim().toLowerCase())) {
+            attractions.add(
+              PlaceRecommendation(
+                placeId: p.id,
+                name: p.name,
+                rating: p.rating,
+                userRatingCount: p.userRatingCount,
+                priceLevel: p.priceLevel,
+                photoUrl: p.photoNames.isNotEmpty
+                    ? _places.photoUrl(p.photoNames.first)
+                    : '',
+                address: p.address,
+                latitude: p.latitude,
+                longitude: p.longitude,
+                mapsUri: p.googleMapsUri,
+                websiteUri: p.websiteUri,
+              ),
+            );
+          }
+        // A Business (or anything else) has no Restaurant/PlaceRecommendation-
+        // shaped equivalent to merge in — see the doc comment on
+        // AiItineraryRequest.priorConversationEntities.
+        case Object():
+          break;
+      }
+    }
   }
 
   /// Resolves each activity's own stated [ItineraryActivity.location] to a
@@ -600,6 +1088,134 @@ class AiRepository {
         'The AI returned an itinerary in an unexpected format. Please try again.',
       );
     }
+  }
+
+  /// Names the single specific Philippine destination (city/municipality +
+  /// province, e.g. "Baguio, Benguet") [message] is about, if any — a
+  /// small, fast, isolated completion (never the full chat history, and
+  /// never mixed into the main reply) so a chat screen can ground its next
+  /// reply in real Places data for that exact destination *before*
+  /// generating it.
+  ///
+  /// Deliberately an LLM call rather than a raw Places text search on the
+  /// whole message: a free-text destination can be phrased any number of
+  /// ways (English, Taglish, casual, formal), and Places' own free-text
+  /// search on a whole sentence — extra words like "plan", "budget-
+  /// friendly", "for a couple" mixed in — can resolve to something ranked
+  /// as relevant for reasons that have nothing to do with the actual
+  /// destination meant (see `AiChatScreen._groundDestinationContext`'s doc
+  /// comment for the real bug this caused: "Baguio" resolving to an
+  /// unrelated town). Understanding what a sentence is actually about is
+  /// exactly what a language model does well; the caller still verifies the
+  /// resulting Places search result actually matches before trusting it.
+  ///
+  /// Returns null when the message doesn't clearly name one specific
+  /// destination, or the call fails for any reason (best-effort — the
+  /// caller falls back to ungrounded behavior, same as before this
+  /// existed).
+  Future<String?> extractDestination(String message) async {
+    try {
+      final reply = await _openAi.complete(
+        messages: [
+          {
+            'role': 'system',
+            'content':
+                'You extract the single specific Philippine destination (city or municipality, plus its province) a traveler\'s message is about. Reply with ONLY that, in exactly "City, Province" format (e.g. "Baguio, Benguet") — never explain, never add punctuation, quotes, or any other words. If the message doesn\'t clearly name one specific real destination, reply with exactly: NONE',
+          },
+          {'role': 'user', 'content': message},
+        ],
+        temperature: 0,
+        maxTokens: 20,
+      );
+      final trimmed = reply.trim();
+      if (trimmed.isEmpty || trimmed.toUpperCase() == 'NONE') return null;
+      return trimmed;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Regenerates a single activity for one day's time slot — used when a
+  /// traveler wants a fresh pick for just, say, "Morning" without touching
+  /// the rest of the day or trip. A much narrower ask than
+  /// [generateItinerary]: one JSON object, not a whole itinerary (see
+  /// [ItineraryPrompts.regenerateActivitySystem]).
+  ///
+  /// Geocoded the same best-effort way [_geocodeActivities] resolves any
+  /// activity's location, but never left coordinate-less: when the specific
+  /// place the AI named doesn't resolve to a real search result, this falls
+  /// back to [fallbackLatitude]/[fallbackLongitude] (the trip's own
+  /// destination coordinates, passed by the caller) instead — approximate,
+  /// but still a real point within the actual destination, not a fabricated
+  /// one, so the activity always gets a pin on the day route map rather
+  /// than silently having none. Only fully coordinate-less if the caller
+  /// has no destination coordinates to fall back to either.
+  Future<ItineraryActivity> regenerateActivity({
+    required String destinationName,
+    required String time,
+    required List<String> otherActivityTitles,
+    double? fallbackLatitude,
+    double? fallbackLongitude,
+  }) async {
+    final raw = await _openAi.complete(
+      messages: [
+        {
+          'role': 'system',
+          'content': ItineraryPrompts.regenerateActivitySystem(),
+        },
+        {
+          'role': 'user',
+          'content': ItineraryPrompts.regenerateActivityUser(
+            destinationName: destinationName,
+            time: time,
+            otherActivityTitles: otherActivityTitles,
+          ),
+        },
+      ],
+      temperature: 0.9,
+      maxTokens: 300,
+      jsonMode: true,
+    );
+
+    Map<String, dynamic> json;
+    try {
+      json = jsonDecode(_stripCodeFences(raw)) as Map<String, dynamic>;
+    } catch (_) {
+      throw const AiException(
+        'The AI returned an activity in an unexpected format. Please try again.',
+      );
+    }
+
+    final title = (json['title'] as String? ?? '').trim();
+    if (title.isEmpty) {
+      throw const AiException(
+        'The AI couldn\'t come up with a new activity. Please try again.',
+      );
+    }
+    final location = (json['location'] as String? ?? '').trim();
+    final rawIconKey = (json['iconKey'] as String? ?? '').trim();
+
+    final results = location.length >= _minGeocodableLocationLength
+        ? await _places.searchText(
+            textQuery: '$location, $destinationName',
+            maxResultCount: 1,
+            biasLatitude: fallbackLatitude,
+            biasLongitude: fallbackLongitude,
+          )
+        : const <Place>[];
+    final match = results.isNotEmpty && results.first.hasCoordinates
+        ? results.first
+        : null;
+
+    return ItineraryActivity(
+      time: time,
+      title: title,
+      description: (json['description'] as String? ?? '').trim(),
+      iconKey: rawIconKey.isEmpty ? 'landscape' : rawIconKey,
+      location: location,
+      latitude: match?.latitude ?? fallbackLatitude,
+      longitude: match?.longitude ?? fallbackLongitude,
+    );
   }
 
   /// Sends the conversation so far to the assistant and returns its reply.

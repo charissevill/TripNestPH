@@ -110,7 +110,12 @@ class ItineraryRepository {
           itinerary: itinerary,
           savedAt: DateTime.now(),
           memberNames: ownerName.isEmpty ? const {} : {userId: ownerName},
-          packingItems: PackingItem.suggestedFor(itinerary),
+          // A manual trip is entirely the traveler's own plan — no AI-picked
+          // weather-aware suggestions to seed it with, same reasoning as
+          // hiding Travel Tips/Budget Summary for it (see
+          // `Itinerary.isManuallyCreated`'s doc comment). They add their own
+          // via "Add Item" instead.
+          packingItems: itinerary.isManuallyCreated ? const [] : PackingItem.suggestedFor(itinerary),
           startDate: startDate,
         ).toMap(),
       );
@@ -144,6 +149,19 @@ class ItineraryRepository {
     try {
       await _collection.doc(itineraryId).update({
         'startDate': startDate != null ? Timestamp.fromDate(startDate) : null,
+      });
+    } catch (e) {
+      throw AppException.from(e);
+    }
+  }
+
+  /// Sets or clears (pass `null`) the trip's "marked as completed" flag —
+  /// self-reported by the owner (see [SavedItinerary.completedAt]'s doc
+  /// comment), not verified. Owner-only, enforced by rules.
+  Future<void> updateCompletedAt(String itineraryId, DateTime? completedAt) async {
+    try {
+      await _collection.doc(itineraryId).update({
+        'completedAt': completedAt != null ? Timestamp.fromDate(completedAt) : null,
       });
     } catch (e) {
       throw AppException.from(e);

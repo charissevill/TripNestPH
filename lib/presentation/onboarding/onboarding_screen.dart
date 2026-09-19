@@ -13,6 +13,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/widgets/buttons/animated_button.dart';
 import '../../core/widgets/layout/max_width_container.dart';
+import '../../core/widgets/media/image_error_placeholder.dart';
 
 class _OnboardingPageData {
   const _OnboardingPageData({required this.imageUrl, required this.title, required this.description});
@@ -152,7 +153,12 @@ class _OnboardingSlide extends StatelessWidget {
           Expanded(
             child: ClipRRect(
               borderRadius: BorderRadius.circular(AppRadius.xxl),
-              child: CachedNetworkImage(imageUrl: data.imageUrl, fit: BoxFit.cover, width: double.infinity),
+              child: CachedNetworkImage(
+                imageUrl: data.imageUrl,
+                fit: BoxFit.cover,
+                width: double.infinity,
+                errorWidget: (context, url, error) => const ImageErrorPlaceholder(width: double.infinity),
+              ),
             ),
           ).animate().fadeIn(duration: 420.ms).moveY(begin: 16, end: 0),
           const SizedBox(height: AppSpacing.xxl),

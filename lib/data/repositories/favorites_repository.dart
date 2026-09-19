@@ -6,7 +6,7 @@ import '../../domain/models/favorite_collection.dart';
 import '../../domain/models/place.dart';
 
 /// Which kind of listing a favorite points at.
-enum FavoriteType { destination, restaurant, festival, place }
+enum FavoriteType { destination, restaurant, festival, place, business }
 
 /// One favorite doc's type/id/collection membership — enough for
 /// [SavedScreen] to filter each tab by the selected [FavoriteCollection]
@@ -14,7 +14,11 @@ enum FavoriteType { destination, restaurant, festival, place }
 /// [FavoritesProvider]/each type's own repository, same as before this
 /// existed).
 class FavoriteDoc {
-  const FavoriteDoc({required this.type, required this.itemId, this.collectionId});
+  const FavoriteDoc({
+    required this.type,
+    required this.itemId,
+    this.collectionId,
+  });
 
   final FavoriteType type;
   final String itemId;
@@ -24,12 +28,15 @@ class FavoriteDoc {
 /// Firestore access for the `favorites` collection. One document per
 /// (user, type, item) with a deterministic id so toggling is idempotent.
 class FavoritesRepository {
-  FavoritesRepository({FirebaseFirestore? firestore}) : _db = firestore ?? FirebaseFirestore.instance;
+  FavoritesRepository({FirebaseFirestore? firestore})
+    : _db = firestore ?? FirebaseFirestore.instance;
 
   final FirebaseFirestore _db;
 
-  CollectionReference<Map<String, dynamic>> get _collection => _db.collection(FirestorePaths.favorites);
-  CollectionReference<Map<String, dynamic>> get _collectionsRef => _db.collection(FirestorePaths.favoriteCollections);
+  CollectionReference<Map<String, dynamic>> get _collection =>
+      _db.collection(FirestorePaths.favorites);
+  CollectionReference<Map<String, dynamic>> get _collectionsRef =>
+      _db.collection(FirestorePaths.favoriteCollections);
 
   /// A Google Places id (e.g. `places/ChIJ...`, used for [FavoriteType.place])
   /// contains a literal `/` — left as-is, that slash would make Firestore
@@ -44,7 +51,9 @@ class FavoritesRepository {
 
   /// Streams every favorite doc for [userId], grouped by type.
   Stream<Map<FavoriteType, Set<String>>> streamFavorites(String userId) {
-    return _collection.where('userId', isEqualTo: userId).snapshots().map((snapshot) {
+    return _collection.where('userId', isEqualTo: userId).snapshots().map((
+      snapshot,
+    ) {
       final result = {for (final t in FavoriteType.values) t: <String>{}};
       for (final doc in snapshot.docs) {
         final data = doc.data();
@@ -65,7 +74,12 @@ class FavoritesRepository {
   /// instead. Every other type only needs the plain id (destination/
   /// restaurant/festival all have their own Firestore collection to
   /// re-resolve against).
-  Future<void> add(String userId, FavoriteType type, String itemId, {Map<String, dynamic>? snapshot}) async {
+  Future<void> add(
+    String userId,
+    FavoriteType type,
+    String itemId, {
+    Map<String, dynamic>? snapshot,
+  }) async {
     try {
       await _collection.doc(_docId(userId, type, itemId)).set({
         ...?snapshot,
@@ -91,7 +105,11 @@ class FavoritesRepository {
         // `Place.toJson()`'s flat shape matches `fromCacheJson`'s expected
         // input, not `fromJson`'s (which expects Google's raw nested API
         // response shape — `displayName`/`location`/`photos`/etc.).
-        .map((snapshot) => snapshot.docs.map((doc) => Place.fromCacheJson(doc.data())).toList());
+        .map(
+          (snapshot) => snapshot.docs
+              .map((doc) => Place.fromCacheJson(doc.data()))
+              .toList(),
+        );
   }
 
   /// How many travelers have favorited [itemId] — requires reading other
@@ -116,14 +134,20 @@ class FavoritesRepository {
   /// the app just needs the simple "is this saved" membership check
   /// [streamFavorites] already provides).
   Stream<List<FavoriteDoc>> streamFavoriteDocs(String userId) {
-    return _collection.where('userId', isEqualTo: userId).snapshots().map((snapshot) {
+    return _collection.where('userId', isEqualTo: userId).snapshots().map((
+      snapshot,
+    ) {
       return snapshot.docs.map((doc) {
         final data = doc.data();
         final type = FavoriteType.values.firstWhere(
           (t) => t.name == data['itemType'],
           orElse: () => FavoriteType.destination,
         );
-        return FavoriteDoc(type: type, itemId: data['itemId'] as String, collectionId: data['collectionId'] as String?);
+        return FavoriteDoc(
+          type: type,
+          itemId: data['itemId'] as String,
+          collectionId: data['collectionId'] as String?,
+        );
       }).toList();
     });
   }
@@ -132,24 +156,42 @@ class FavoritesRepository {
   /// already-saved item belongs to — the item must already be favorited;
   /// this only ever changes the `collectionId` field, matching
   /// `firestore.rules`'s `onlyChangedFields(['collectionId'])` branch.
-  Future<void> setCollection(String userId, FavoriteType type, String itemId, String? collectionId) async {
+  Future<void> setCollection(
+    String userId,
+    FavoriteType type,
+    String itemId,
+    String? collectionId,
+  ) async {
     try {
-      await _collection.doc(_docId(userId, type, itemId)).update({'collectionId': collectionId});
+      await _collection.doc(_docId(userId, type, itemId)).update({
+        'collectionId': collectionId,
+      });
     } catch (e) {
       throw AppException.from(e);
     }
   }
 
   Stream<List<FavoriteCollection>> streamCollections(String userId) {
-    return _collectionsRef.where('userId', isEqualTo: userId).orderBy('createdAt').snapshots().map(
-      (s) => s.docs.map((d) => FavoriteCollection.fromMap(d.id, d.data())).toList(),
-    );
+    return _collectionsRef
+        .where('userId', isEqualTo: userId)
+        .orderBy('createdAt')
+        .snapshots()
+        .map(
+          (s) => s.docs
+              .map((d) => FavoriteCollection.fromMap(d.id, d.data()))
+              .toList(),
+        );
   }
 
   Future<String> createCollection(String userId, String name) async {
     try {
       final doc = await _collectionsRef.add(
-        FavoriteCollection(id: '', userId: userId, name: name, createdAt: DateTime.now()).toMap(),
+        FavoriteCollection(
+          id: '',
+          userId: userId,
+          name: name,
+          createdAt: DateTime.now(),
+        ).toMap(),
       );
       return doc.id;
     } catch (e) {
@@ -200,8 +242,12 @@ class FavoritesRepository {
   /// account.
   Future<void> deleteAllForUser(String userId) async {
     try {
-      final favorites = await _collection.where('userId', isEqualTo: userId).get();
-      final collections = await _collectionsRef.where('userId', isEqualTo: userId).get();
+      final favorites = await _collection
+          .where('userId', isEqualTo: userId)
+          .get();
+      final collections = await _collectionsRef
+          .where('userId', isEqualTo: userId)
+          .get();
       final batch = _db.batch();
       for (final doc in favorites.docs) {
         batch.delete(doc.reference);
@@ -221,7 +267,10 @@ class FavoritesRepository {
   /// that no longer resolves to anything.
   Future<void> deleteAllForItem(FavoriteType type, String itemId) async {
     try {
-      final snapshot = await _collection.where('itemType', isEqualTo: type.name).where('itemId', isEqualTo: itemId).get();
+      final snapshot = await _collection
+          .where('itemType', isEqualTo: type.name)
+          .where('itemId', isEqualTo: itemId)
+          .get();
       final batch = _db.batch();
       for (final doc in snapshot.docs) {
         batch.delete(doc.reference);

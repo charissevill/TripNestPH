@@ -55,6 +55,23 @@ class BusinessRepository {
     }
   }
 
+  /// Batched lookup by id — see `RestaurantRepository.getByIds` for the same
+  /// pattern. No `status` filter needed here (unlike that one): this
+  /// collection's read rule is evaluated per returned doc, so a since-
+  /// suspended/rejected listing just silently drops out of the result
+  /// instead of failing the whole query.
+  Future<List<Business>> getByIds(List<String> ids) async {
+    if (ids.isEmpty) return [];
+    try {
+      final snapshot = await _collection
+          .where(FieldPath.documentId, whereIn: ids.take(30).toList())
+          .get();
+      return snapshot.docs.map(_fromDoc).toList();
+    } catch (e) {
+      throw AppException.from(e);
+    }
+  }
+
   /// Every listing owned by [uid] — a business owner can have more than one.
   Stream<List<Business>> streamForOwner(String uid) {
     return _collection
@@ -88,6 +105,34 @@ class BusinessRepository {
   Future<void> incrementViewCount(String id) async {
     try {
       await _collection.doc(id).update({'viewCount': FieldValue.increment(1)});
+    } catch (e) {
+      throw AppException.from(e);
+    }
+  }
+
+  /// Atomically bumps `reviewCount` by [delta] (+1/-1) server-side — see
+  /// `DestinationRepository.adjustReviewCount` for the full reasoning;
+  /// called by `ReviewRepository` after a traveler writes/removes a review
+  /// targeting this listing (`ReviewTargetType.business`).
+  Future<void> adjustReviewCount(String id, int delta) async {
+    try {
+      await _collection.doc(id).update({
+        'reviewCount': FieldValue.increment(delta),
+      });
+    } catch (e) {
+      throw AppException.from(e);
+    }
+  }
+
+  /// Overwrites just the average — [ReviewRepository] owns `reviewCount`
+  /// separately via [adjustReviewCount], which is atomic and must never be
+  /// clobbered by a plain overwrite based on a possibly-stale read.
+  Future<void> updateAggregateRating(
+    String id, {
+    required double rating,
+  }) async {
+    try {
+      await _collection.doc(id).update({'rating': rating});
     } catch (e) {
       throw AppException.from(e);
     }
@@ -172,6 +217,33 @@ class BusinessRepository {
           .where('provinceId', isEqualTo: provinceId)
           .where('status', isEqualTo: 'approved')
           .get();
+      return snapshot.docs.map(_fromDoc).toList();
+    } catch (e) {
+      throw AppException.from(e);
+    }
+  }
+
+  /// Every approved listing across the whole country, optionally narrowed
+  /// to one province and/or [BusinessCategory] — backs Explore's
+  /// "Businesses" tab. [status] must stay an equality filter for
+  /// firestore.rules' `list` check to accept this query (same reasoning as
+  /// [getApprovedForProvince]), so this always fetches everything matching
+  /// in one shot rather than paginating.
+  Future<List<Business>> getAllApproved({
+    String? provinceId,
+    String? category,
+    int limit = 200,
+  }) async {
+    try {
+      Query<Map<String, dynamic>> query = _collection.where(
+        'status',
+        isEqualTo: 'approved',
+      );
+      if (provinceId != null)
+        query = query.where('provinceId', isEqualTo: provinceId);
+      if (category != null)
+        query = query.where('category', isEqualTo: category);
+      final snapshot = await query.limit(limit).get();
       return snapshot.docs.map(_fromDoc).toList();
     } catch (e) {
       throw AppException.from(e);

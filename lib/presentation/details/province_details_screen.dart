@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:smooth_page_indicator/smooth_page_indicator.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/routes/route_paths.dart';
 import '../../core/theme/app_colors.dart';
@@ -11,6 +10,7 @@ import '../../core/theme/app_spacing.dart';
 import '../../core/utils/app_exception.dart';
 import '../../core/utils/auto_advance_gallery_mixin.dart';
 import '../../core/utils/maps_launcher.dart';
+import '../../core/utils/safe_launch.dart';
 import '../../core/services/places_service.dart';
 import '../../core/widgets/buttons/animated_button.dart';
 import '../../core/widgets/cards/destination_card.dart';
@@ -18,6 +18,7 @@ import '../../core/widgets/cards/festival_card.dart';
 import '../../core/widgets/cards/restaurant_card.dart';
 import '../../core/widgets/cards/tag_chip.dart';
 import '../../core/widgets/carousels/nearby_places_section.dart';
+import '../../core/widgets/details/business_info_sheet.dart';
 import '../../core/widgets/details/info_stat_card.dart';
 import '../../core/widgets/layout/max_width_container.dart';
 import '../../core/widgets/layout/section_header.dart';
@@ -33,6 +34,7 @@ import '../../domain/models/destination.dart';
 import '../../domain/models/festival.dart';
 import '../../domain/models/province.dart';
 import '../../domain/models/restaurant.dart';
+import '../../core/widgets/media/image_error_placeholder.dart';
 
 /// Full detail view for a single province: overview, culture, budget and
 /// travel tips (once curated — see [Province.hasContent]), plus its
@@ -421,7 +423,7 @@ class _ProvinceDetailsBody extends StatelessWidget {
                 const SizedBox(height: AppSpacing.sm),
                 ...province.emergencyHotlines.map(
                   (hotline) => InkWell(
-                    onTap: () => launchUrl(Uri.parse('tel:${hotline.number}')),
+                    onTap: () => callNumber(hotline.number),
                     borderRadius: BorderRadius.circular(AppRadius.sm),
                     child: Padding(
                       padding: const EdgeInsets.symmetric(vertical: 4),
@@ -546,7 +548,11 @@ class _ProvinceGalleryState extends State<_ProvinceGallery>
             controller: _pageController,
             itemCount: images.length,
             itemBuilder: (context, index) =>
-                CachedNetworkImage(imageUrl: images[index], fit: BoxFit.cover),
+                CachedNetworkImage(
+                  imageUrl: images[index],
+                  fit: BoxFit.cover,
+                  errorWidget: (context, url, error) => const ImageErrorPlaceholder(),
+                ),
           )
         else
           FutureBuilder<String?>(
@@ -554,7 +560,11 @@ class _ProvinceGalleryState extends State<_ProvinceGallery>
             builder: (context, snapshot) {
               final url = snapshot.data;
               if (url == null || url.isEmpty) return fallbackTint;
-              return CachedNetworkImage(imageUrl: url, fit: BoxFit.cover);
+              return CachedNetworkImage(
+                imageUrl: url,
+                fit: BoxFit.cover,
+                errorWidget: (context, url, error) => const ImageErrorPlaceholder(),
+              );
             },
           ),
         IgnorePointer(
@@ -631,24 +641,12 @@ class _BusinessTile extends StatelessWidget {
 
   final Business business;
 
-  void _open(BuildContext context) {
-    // Best-effort, fire-and-forget — a failed count shouldn't block opening
-    // the sheet itself.
-    BusinessRepository().incrementViewCount(business.id).catchError((_) {});
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => _BusinessInfoSheet(business: business),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return InkWell(
       borderRadius: BorderRadius.circular(AppRadius.lg),
-      onTap: () => _open(context),
+      onTap: () => showBusinessInfoSheet(context, business),
       child: Container(
         margin: const EdgeInsets.only(bottom: AppSpacing.sm),
         padding: const EdgeInsets.all(AppSpacing.md),
@@ -727,138 +725,6 @@ class _BusinessTile extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-}
-
-/// Opened by tapping a [_BusinessTile] — the full, untruncated version of
-/// what the tile already shows, plus real tap-to-call/tap-to-open actions
-/// the tile's own plain text can't offer (a nested tap target there would
-/// fight the tile's own onTap over the same gesture).
-class _BusinessInfoSheet extends StatelessWidget {
-  const _BusinessInfoSheet({required this.business});
-
-  final Business business;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Material(
-      color: theme.colorScheme.surface,
-      borderRadius: const BorderRadius.vertical(
-        top: Radius.circular(AppRadius.xxl),
-      ),
-      child: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(
-            AppSpacing.lg,
-            AppSpacing.sm,
-            AppSpacing.lg,
-            AppSpacing.xl,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 44,
-                  height: 5,
-                  margin: const EdgeInsets.only(bottom: AppSpacing.lg),
-                  decoration: BoxDecoration(
-                    color: AppColors.border,
-                    borderRadius: BorderRadius.circular(AppRadius.pill),
-                  ),
-                ),
-              ),
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      business.name,
-                      style: theme.textTheme.headlineSmall,
-                    ),
-                  ),
-                  TagChip(
-                    label: BusinessCategory.label(business.category),
-                    color: theme.colorScheme.primary,
-                  ),
-                ],
-              ),
-              if (business.description.isNotEmpty) ...[
-                const SizedBox(height: AppSpacing.sm),
-                Text(
-                  business.description,
-                  style: theme.textTheme.bodyMedium?.copyWith(height: 1.5),
-                ),
-              ],
-              if (business.openingHours.isNotEmpty) ...[
-                const SizedBox(height: AppSpacing.md),
-                _InfoRow(
-                  icon: Symbols.schedule_rounded,
-                  text: business.openingHours,
-                ),
-              ],
-              if (business.address.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(top: AppSpacing.sm),
-                  child: InkWell(
-                    onTap: () => MapsLauncher.openPlaceSearch(business.address),
-                    child: _InfoRow(
-                      icon: Symbols.location_on_rounded,
-                      text: business.address,
-                    ),
-                  ),
-                ),
-              if (business.contactNumber.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(top: AppSpacing.sm),
-                  child: InkWell(
-                    onTap: () =>
-                        launchUrl(Uri.parse('tel:${business.contactNumber}')),
-                    child: _InfoRow(
-                      icon: Symbols.call_rounded,
-                      text: business.contactNumber,
-                    ),
-                  ),
-                ),
-              if (business.websiteUrl.isNotEmpty) ...[
-                const SizedBox(height: AppSpacing.md),
-                AnimatedButton(
-                  label: 'Visit Website',
-                  icon: Symbols.open_in_new_rounded,
-                  filled: false,
-                  onPressed: () => launchUrl(
-                    Uri.parse(business.websiteUrl),
-                    mode: LaunchMode.externalApplication,
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _InfoRow extends StatelessWidget {
-  const _InfoRow({required this.icon, required this.text});
-
-  final IconData icon;
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(icon, size: 16, color: AppColors.textTertiary),
-        const SizedBox(width: 6),
-        Expanded(child: Text(text, style: theme.textTheme.bodyMedium)),
-      ],
     );
   }
 }

@@ -16,11 +16,26 @@ class OtpService {
 
   final FunctionCaller _call;
 
+  /// Codes whose message these functions author themselves as user-facing
+  /// text ("Incorrect code. Please try again.", "This code has expired…").
+  /// Every other code — including anything the platform or a dependency
+  /// raises — is mapped to a generic message instead of echoing the server.
+  static const _curatedMessageCodes = {'invalid-argument', 'resource-exhausted', 'failed-precondition'};
+
+  AppException _friendly(FirebaseFunctionsException e) {
+    logTechnicalError(e);
+    final serverMessage = e.message?.trim();
+    if (_curatedMessageCodes.contains(e.code) && serverMessage != null && serverMessage.isNotEmpty) {
+      return AppException(serverMessage);
+    }
+    return AppException(functionsMessage(e.code));
+  }
+
   Future<void> requestPasswordResetCode(String email) async {
     try {
       await _call('requestPasswordResetCode', {'email': email.trim()});
     } on FirebaseFunctionsException catch (e) {
-      throw AppException(e.message ?? 'Something went wrong. Please try again.');
+      throw _friendly(e);
     }
   }
 
@@ -36,7 +51,7 @@ class OtpService {
         'newPassword': newPassword,
       });
     } on FirebaseFunctionsException catch (e) {
-      throw AppException(e.message ?? 'Something went wrong. Please try again.');
+      throw _friendly(e);
     }
   }
 
@@ -47,7 +62,7 @@ class OtpService {
       final result = await _call('requestEmailVerificationCode', const {});
       return result['alreadyVerified'] == true;
     } on FirebaseFunctionsException catch (e) {
-      throw AppException(e.message ?? 'Something went wrong. Please try again.');
+      throw _friendly(e);
     }
   }
 
@@ -55,7 +70,7 @@ class OtpService {
     try {
       await _call('verifyEmailVerificationCode', {'code': code.trim()});
     } on FirebaseFunctionsException catch (e) {
-      throw AppException(e.message ?? 'Something went wrong. Please try again.');
+      throw _friendly(e);
     }
   }
 }

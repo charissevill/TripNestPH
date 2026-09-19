@@ -53,7 +53,8 @@ class _AdminFestivalListScreenState extends State<AdminFestivalListScreen> {
   /// `AdminProvinceListScreen._admin`.
   AdminUser? _admin;
 
-  bool get _isLguScoped => _admin?.role == AdminRole.lgu && _admin?.provinceId != null;
+  bool get _isLguScoped =>
+      _admin?.role == AdminRole.lgu && _admin?.provinceId != null;
 
   @override
   void initState() {
@@ -138,6 +139,11 @@ class _AdminFestivalListScreenState extends State<AdminFestivalListScreen> {
     try {
       await _repository.delete(festival.id);
       setState(_load);
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('"${festival.name}" deleted.')));
+      }
     } catch (e) {
       if (mounted)
         ScaffoldMessenger.of(
@@ -278,7 +284,11 @@ class _AdminFestivalListScreenState extends State<AdminFestivalListScreen> {
                       );
                     }
                     final festivals = allFestivals
-                        .where((f) => !_isLguScoped || f.provinceId == _admin!.provinceId)
+                        .where(
+                          (f) =>
+                              !_isLguScoped ||
+                              f.provinceId == _admin!.provinceId,
+                        )
                         .where(
                           (f) => f.name.toLowerCase().contains(
                             _query.toLowerCase(),

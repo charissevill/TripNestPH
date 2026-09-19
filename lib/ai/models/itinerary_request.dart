@@ -1,3 +1,6 @@
+import '../../domain/models/place.dart';
+import '../../domain/models/restaurant.dart';
+
 /// Everything the AI Planner form collects, handed to [AiRepository] to
 /// build a grounded prompt. Kept separate from [Itinerary] itself since this
 /// is the *request*, not the generated result.
@@ -20,6 +23,7 @@ class AiItineraryRequest {
     this.accommodationLatitude,
     this.accommodationLongitude,
     this.priorConversationContext,
+    this.priorConversationEntities = const [],
     this.refinementInstruction,
     this.tripPace,
   });
@@ -62,6 +66,20 @@ class AiItineraryRequest {
   /// restaurants/attractions than the ones the traveler just read. Null for
   /// a Planner-form-built request, which has no prior conversation to match.
   final String? priorConversationContext;
+
+  /// The real [Place]/[Restaurant] objects the chat reply above actually
+  /// named (already resolved there via `AiChatScreen._matchedKnownEntities`
+  /// — never a coincidence or hallucinated match). [AiRepository] merges
+  /// these into its own freshly-fetched restaurant/attraction candidate
+  /// lists before prompting, so [priorConversationContext]'s "reuse the
+  /// same places" instruction has something to actually reuse — without
+  /// this, a place the chat named but that fell outside the fresh
+  /// province/distance-limited query couldn't be picked at all, no matter
+  /// what the prompt asked for, since the model is separately told to pick
+  /// restaurants/attractions "from these only." A [Business] the chat
+  /// matched isn't included here — it has no [Restaurant]/[PlaceRecommendation]-
+  /// shaped equivalent to merge into those candidate lists.
+  final List<Object> priorConversationEntities;
 
   /// Set by "Refine with AI" on an already-generated itinerary — a specific,
   /// free-text change the traveler wants (e.g. "make day 2 cheaper", "swap

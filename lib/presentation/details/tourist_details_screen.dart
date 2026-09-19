@@ -5,7 +5,6 @@ import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/providers/auth_provider.dart';
 import '../../core/providers/favorites_provider.dart';
@@ -15,6 +14,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/utils/app_exception.dart';
 import '../../core/utils/maps_launcher.dart';
+import '../../core/utils/safe_launch.dart';
 import '../../core/utils/share_text.dart';
 import '../../core/widgets/buttons/animated_button.dart';
 import '../../core/widgets/cards/destination_card.dart';
@@ -333,9 +333,7 @@ class _TouristDetailsBody extends StatelessWidget {
                     _InfoRow(
                       icon: Symbols.call_rounded,
                       text: destination.phoneNumber,
-                      onTap: () => launchUrl(
-                        Uri.parse('tel:${destination.phoneNumber}'),
-                      ),
+                      onTap: () => callNumber(destination.phoneNumber),
                     ),
                 ],
                 if (destination.websiteUrl.isNotEmpty ||
@@ -499,7 +497,7 @@ class _TouristDetailsBody extends StatelessWidget {
               Expanded(
                 flex: 2,
                 child: AnimatedButton(
-                  label: 'Plan a Trip Here',
+                  label: 'Plan a Trip Nearby',
                   icon: Symbols.auto_awesome_rounded,
                   onPressed: () => context.go(RoutePaths.planner),
                 ),

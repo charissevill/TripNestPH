@@ -34,17 +34,18 @@ import '../../presentation/details/province_details_screen.dart';
 import '../../presentation/details/restaurant_details_screen.dart';
 import '../../presentation/details/tourist_details_screen.dart';
 import '../../presentation/explore/explore_screen.dart';
-import '../../presentation/home/home_screen.dart';
+import '../../presentation/shell/home_or_business_dashboard_tab.dart';
 import '../../presentation/itineraries/saved_itineraries_screen.dart';
 import '../../presentation/itineraries/trip_calendar_screen.dart';
+import '../../presentation/shell/saved_or_my_business_tab.dart';
 import '../../presentation/notifications/notifications_screen.dart';
 import '../../presentation/onboarding/onboarding_screen.dart';
 import '../../presentation/festivals/upcoming_festivals_screen.dart';
 import '../../presentation/places/nearby_places_screen.dart';
 import '../../presentation/profile/edit_profile_screen.dart';
+import '../../presentation/profile/my_reviews_screen.dart';
 import '../../presentation/profile/profile_screen.dart';
 import '../../presentation/profile/recently_viewed_screen.dart';
-import '../../presentation/saved/saved_screen.dart';
 import '../../presentation/search/search_screen.dart';
 import '../constants/legal_content.dart';
 import '../../presentation/settings/faq_screen.dart';
@@ -101,7 +102,9 @@ GoRouter buildAppRouter(AuthProvider authProvider) {
         // needs the same pass-through verifyEmail itself already gets, or
         // this redirect would bounce straight back to Verify Email before
         // it ever renders.
-        return _preVerifyRoutes.contains(location) ? null : RoutePaths.verifyEmail;
+        return _preVerifyRoutes.contains(location)
+            ? null
+            : RoutePaths.verifyEmail;
       }
       if (_authOnlyRoutes.contains(location) ||
           location == RoutePaths.verifyEmail) {
@@ -124,7 +127,8 @@ GoRouter buildAppRouter(AuthProvider authProvider) {
       ),
       GoRoute(
         path: RoutePaths.register,
-        builder: (context, state) => RegisterScreen(wantsBusinessOwner: state.extra == true),
+        builder: (context, state) =>
+            RegisterScreen(wantsBusinessOwner: state.extra == true),
       ),
       GoRoute(
         path: RoutePaths.forgotPassword,
@@ -169,6 +173,10 @@ GoRouter buildAppRouter(AuthProvider authProvider) {
         builder: (context, state) => const RecentlyViewedScreen(),
       ),
       GoRoute(
+        path: RoutePaths.myReviews,
+        builder: (context, state) => const MyReviewsScreen(),
+      ),
+      GoRoute(
         path: RoutePaths.savedItineraries,
         builder: (context, state) => const SavedItinerariesScreen(),
       ),
@@ -198,39 +206,6 @@ GoRouter buildAppRouter(AuthProvider authProvider) {
             // instead of silently substituting sample trip data.
             itinerary: extra?['itinerary'] as Itinerary,
             savedItineraryId: extra?['savedId'] as String?,
-          );
-        },
-      ),
-      GoRoute(
-        path: RoutePaths.tripExpenses,
-        builder: (context, state) {
-          final extra = state.extra as Map<String, dynamic>?;
-          return GeneratedItineraryScreen(
-            itinerary: extra?['itinerary'] as Itinerary,
-            savedItineraryId: extra?['savedId'] as String?,
-            initialSection: ItinerarySection.budget,
-          );
-        },
-      ),
-      GoRoute(
-        path: RoutePaths.tripPacking,
-        builder: (context, state) {
-          final extra = state.extra as Map<String, dynamic>?;
-          return GeneratedItineraryScreen(
-            itinerary: extra?['itinerary'] as Itinerary,
-            savedItineraryId: extra?['savedId'] as String?,
-            initialSection: ItinerarySection.packing,
-          );
-        },
-      ),
-      GoRoute(
-        path: RoutePaths.tripPolls,
-        builder: (context, state) {
-          final extra = state.extra as Map<String, dynamic>?;
-          return GeneratedItineraryScreen(
-            itinerary: extra?['itinerary'] as Itinerary,
-            savedItineraryId: extra?['savedId'] as String?,
-            initialSection: ItinerarySection.polls,
           );
         },
       ),
@@ -341,7 +316,8 @@ GoRouter buildAppRouter(AuthProvider authProvider) {
       ),
       GoRoute(
         path: RoutePaths.adminBusinessOwnerApplications,
-        builder: (context, state) => const AdminBusinessOwnerApplicationsScreen(),
+        builder: (context, state) =>
+            const AdminBusinessOwnerApplicationsScreen(),
       ),
       GoRoute(
         path: RoutePaths.adminTeam,
@@ -366,7 +342,7 @@ GoRouter buildAppRouter(AuthProvider authProvider) {
             routes: [
               GoRoute(
                 path: RoutePaths.home,
-                builder: (context, state) => const HomeScreen(),
+                builder: (context, state) => const HomeOrBusinessDashboardTab(),
               ),
             ],
           ),
@@ -392,7 +368,7 @@ GoRouter buildAppRouter(AuthProvider authProvider) {
             routes: [
               GoRoute(
                 path: RoutePaths.saved,
-                builder: (context, state) => const SavedScreen(),
+                builder: (context, state) => const SavedOrMyBusinessTab(),
               ),
             ],
           ),

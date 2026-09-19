@@ -10,19 +10,32 @@ import 'nav_tab_data.dart';
 /// same 5 tabs from the same [kMainNavTabs] source, just chrome shaped for
 /// a desktop/web window instead of a phone screen.
 class AppNavSidebar extends StatelessWidget {
-  const AppNavSidebar({super.key, required this.currentIndex, required this.onTap});
+  const AppNavSidebar({
+    super.key,
+    required this.currentIndex,
+    required this.onTap,
+    this.isBusinessOwner = false,
+  });
 
   final int currentIndex;
   final ValueChanged<int> onTap;
 
+  /// See [mainNavTabsFor] — swaps the "Saved" tab for "My Business".
+  final bool isBusinessOwner;
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final tabs = mainNavTabsFor(isBusinessOwner: isBusinessOwner);
     return Container(
       width: 240,
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
-        border: Border(right: BorderSide(color: theme.colorScheme.outline.withValues(alpha: 0.4))),
+        border: Border(
+          right: BorderSide(
+            color: theme.colorScheme.outline.withValues(alpha: 0.4),
+          ),
+        ),
       ),
       child: SafeArea(
         right: false,
@@ -31,12 +44,17 @@ class AppNavSidebar extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Padding(
-              padding: EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.xl, AppSpacing.lg, AppSpacing.xl),
+              padding: EdgeInsets.fromLTRB(
+                AppSpacing.lg,
+                AppSpacing.xl,
+                AppSpacing.lg,
+                AppSpacing.xl,
+              ),
               child: AppLogo(size: 36),
             ),
-            for (var i = 0; i < kMainNavTabs.length; i++)
+            for (var i = 0; i < tabs.length; i++)
               _SidebarTab(
-                tab: kMainNavTabs[i],
+                tab: tabs[i],
                 selected: i == currentIndex,
                 onTap: () => onTap(i),
               ),
@@ -48,7 +66,11 @@ class AppNavSidebar extends StatelessWidget {
 }
 
 class _SidebarTab extends StatelessWidget {
-  const _SidebarTab({required this.tab, required this.selected, required this.onTap});
+  const _SidebarTab({
+    required this.tab,
+    required this.selected,
+    required this.onTap,
+  });
 
   final NavTabData tab;
   final bool selected;
@@ -58,7 +80,10 @@ class _SidebarTab extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: 2),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.sm,
+        vertical: 2,
+      ),
       child: Material(
         color: selected ? theme.colorScheme.primary : Colors.transparent,
         borderRadius: BorderRadius.circular(AppRadius.lg),
@@ -66,15 +91,24 @@ class _SidebarTab extends StatelessWidget {
           onTap: onTap,
           borderRadius: BorderRadius.circular(AppRadius.lg),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.md,
+              vertical: AppSpacing.sm,
+            ),
             child: Row(
               children: [
-                Icon(tab.icon, size: 22, color: selected ? Colors.white : AppColors.textSecondary),
+                Icon(
+                  tab.icon,
+                  size: 22,
+                  color: selected ? Colors.white : AppColors.textSecondary,
+                ),
                 const SizedBox(width: AppSpacing.sm),
                 Text(
                   tab.label,
                   style: theme.textTheme.labelLarge?.copyWith(
-                    color: selected ? Colors.white : theme.colorScheme.onSurface,
+                    color: selected
+                        ? Colors.white
+                        : theme.colorScheme.onSurface,
                     fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
                   ),
                 ),

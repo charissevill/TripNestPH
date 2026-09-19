@@ -374,12 +374,19 @@ class _SavedItineraryTile extends StatelessWidget {
                     style: theme.textTheme.bodySmall,
                   ),
                   if (trip.itinerary.totalBudget > 0 ||
-                      trip.packingItems.isNotEmpty) ...[
+                      trip.packingItems.isNotEmpty ||
+                      trip.isCompleted) ...[
                     const SizedBox(height: 4),
                     Wrap(
                       spacing: AppSpacing.sm,
                       runSpacing: 4,
                       children: [
+                        if (trip.isCompleted)
+                          const _MetricPill(
+                            icon: Symbols.check_circle_rounded,
+                            label: 'Completed',
+                            color: AppColors.success,
+                          ),
                         if (trip.itinerary.totalBudget > 0)
                           _BudgetProgressPill(trip: trip),
                         if (trip.packingItems.isNotEmpty)
@@ -442,57 +449,6 @@ class _SavedItineraryTile extends StatelessWidget {
                         ],
                       ),
                     ),
-                  PopupMenuItem(
-                    value: () => context.push(
-                      RoutePaths.tripExpenses,
-                      extra: {'itinerary': trip.itinerary, 'savedId': trip.id},
-                    ),
-                    child: const Row(
-                      children: [
-                        Icon(
-                          Symbols.payments_rounded,
-                          size: 18,
-                          color: AppColors.textSecondary,
-                        ),
-                        SizedBox(width: AppSpacing.sm),
-                        Text('Expenses'),
-                      ],
-                    ),
-                  ),
-                  PopupMenuItem(
-                    value: () => context.push(
-                      RoutePaths.tripPacking,
-                      extra: {'itinerary': trip.itinerary, 'savedId': trip.id},
-                    ),
-                    child: const Row(
-                      children: [
-                        Icon(
-                          Symbols.checklist_rounded,
-                          size: 18,
-                          color: AppColors.textSecondary,
-                        ),
-                        SizedBox(width: AppSpacing.sm),
-                        Text('Packing List'),
-                      ],
-                    ),
-                  ),
-                  PopupMenuItem(
-                    value: () => context.push(
-                      RoutePaths.tripPolls,
-                      extra: {'itinerary': trip.itinerary, 'savedId': trip.id},
-                    ),
-                    child: const Row(
-                      children: [
-                        Icon(
-                          Symbols.how_to_vote_rounded,
-                          size: 18,
-                          color: AppColors.textSecondary,
-                        ),
-                        SizedBox(width: AppSpacing.sm),
-                        Text('Group Polls'),
-                      ],
-                    ),
-                  ),
                   PopupMenuItem(
                     value: onDuplicate,
                     child: const Row(

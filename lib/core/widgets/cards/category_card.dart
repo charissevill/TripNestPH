@@ -45,7 +45,13 @@ class CategoryCard extends StatelessWidget {
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  CachedNetworkImage(imageUrl: category.imageUrl, fit: BoxFit.cover),
+                  CachedNetworkImage(
+                    imageUrl: category.imageUrl,
+                    fit: BoxFit.cover,
+                    // The white category icon sits on top, so fall back to a
+                    // solid brand color instead of a light placeholder.
+                    errorWidget: (context, url, error) => ColoredBox(color: Theme.of(context).colorScheme.primary),
+                  ),
                   Container(color: Colors.black.withValues(alpha: 0.22)),
                   Center(child: Icon(category.icon, color: Colors.white, size: size * 0.36)),
                 ],

@@ -100,7 +100,13 @@ class _HeroSlide extends StatelessWidget {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            CachedNetworkImage(imageUrl: item.imageUrl, fit: BoxFit.cover),
+            CachedNetworkImage(
+              imageUrl: item.imageUrl,
+              fit: BoxFit.cover,
+              // Text/scrim sit on top of this image, so the fallback is a
+              // solid brand color rather than the light neutral placeholder.
+              errorWidget: (context, url, error) => ColoredBox(color: Theme.of(context).colorScheme.primary),
+            ),
             DecoratedBox(
               decoration: BoxDecoration(
                 gradient: LinearGradient(

@@ -2,14 +2,15 @@ import 'dart:async';
 
 import 'package:cloud_functions/cloud_functions.dart';
 
+import '../../core/utils/app_exception.dart';
 import '../../core/utils/function_caller.dart';
 
 /// Thrown for every AI-call failure mode so callers can show one friendly
-/// message without inspecting error codes themselves.
-class AiException implements Exception {
-  const AiException(this.message, {this.isConfigError = false, this.retryable = false});
-
-  final String message;
+/// message without inspecting error codes themselves. Extends
+/// [AppException] so `AppException.from(e)` at any call site keeps the AI-
+/// specific message instead of collapsing it to the generic fallback.
+class AiException extends AppException {
+  const AiException(super.message, {this.isConfigError = false, this.retryable = false});
 
   /// True when the problem is a missing/invalid API key — the app should
   /// point the user at a graceful fallback (see [AiRepository]) rather than
@@ -98,20 +99,25 @@ class OpenAiService {
     throw const AiException('Something went wrong reaching the AI service. Please try again.');
   }
 
+  /// Maps by error code only — never `e.message`, since `aiComplete` relays
+  /// the upstream provider's own error text (e.g. API-key problems) verbatim,
+  /// which is not something a traveler should ever see.
   AiException _mapException(FirebaseFunctionsException e) {
+    logTechnicalError(e);
     switch (e.code) {
       case 'unauthenticated':
-        return AiException(e.message ?? 'Sign in to use AI features.', isConfigError: true);
+        return const AiException('Sign in to use AI features.', isConfigError: true);
       case 'failed-precondition':
-        return AiException(e.message ?? 'AI features aren\'t set up yet.', isConfigError: true);
+        return const AiException('AI features aren\'t set up yet.', isConfigError: true);
       case 'resource-exhausted':
         return const AiException('Too many requests right now. Please wait a moment and try again.', retryable: true);
       case 'invalid-argument':
-        return AiException(e.message ?? 'The AI could not process that request.');
+        return const AiException('The AI could not process that request. Please try rephrasing and try again.');
       case 'unavailable':
+      case 'deadline-exceeded':
         return const AiException('The AI service is temporarily unavailable. Please try again shortly.', retryable: true);
       default:
-        return AiException(e.message ?? 'The AI service returned an unexpected error.');
+        return const AiException('The AI service ran into a problem. Please try again.');
     }
   }
 }

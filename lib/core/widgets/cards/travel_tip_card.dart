@@ -27,7 +27,11 @@ class TravelTipCard extends StatelessWidget {
           color: theme.colorScheme.surface,
           borderRadius: BorderRadius.circular(AppRadius.lg),
           boxShadow: [
-            BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 14, offset: const Offset(0, 6)),
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 14,
+              offset: const Offset(0, 6),
+            ),
           ],
         ),
         child: Column(
@@ -43,7 +47,12 @@ class TravelTipCard extends StatelessWidget {
               child: Icon(tip.icon, color: tip.accentColor, size: 22),
             ),
             const SizedBox(height: AppSpacing.sm),
-            Text(tip.title, maxLines: 2, overflow: TextOverflow.ellipsis, style: theme.textTheme.titleMedium),
+            Text(
+              tip.title,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.titleMedium,
+            ),
             const SizedBox(height: 4),
             Text(
               tip.description,
@@ -63,6 +72,10 @@ void _showTravelTipSheet(BuildContext context, TravelTip tip) {
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
+    // See trip_calendar_screen.dart's showModalBottomSheet for why this
+    // matters — without it, the floating AI Chat FAB floats visibly on
+    // top of this sheet instead of being covered by it.
+    useRootNavigator: true,
     builder: (context) => _TravelTipSheet(tip: tip),
   );
 }
@@ -77,13 +90,22 @@ class _TravelTipSheet extends StatelessWidget {
     final theme = Theme.of(context);
     return SafeArea(
       child: Container(
-        constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.8),
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.sizeOf(context).height * 0.8,
+        ),
         decoration: BoxDecoration(
           color: theme.colorScheme.surface,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadius.xxl)),
+          borderRadius: const BorderRadius.vertical(
+            top: Radius.circular(AppRadius.xxl),
+          ),
         ),
         child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.sm, AppSpacing.lg, AppSpacing.xxl),
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.lg,
+            AppSpacing.sm,
+            AppSpacing.lg,
+            AppSpacing.xxl,
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -92,7 +114,10 @@ class _TravelTipSheet extends StatelessWidget {
                   width: 44,
                   height: 5,
                   margin: const EdgeInsets.only(bottom: AppSpacing.lg),
-                  decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(AppRadius.pill)),
+                  decoration: BoxDecoration(
+                    color: AppColors.border,
+                    borderRadius: BorderRadius.circular(AppRadius.pill),
+                  ),
                 ),
               ),
               Container(
@@ -107,7 +132,10 @@ class _TravelTipSheet extends StatelessWidget {
               const SizedBox(height: AppSpacing.md),
               Text(tip.title, style: theme.textTheme.headlineSmall),
               const SizedBox(height: AppSpacing.sm),
-              Text(tip.description, style: theme.textTheme.bodyMedium?.copyWith(height: 1.6)),
+              Text(
+                tip.description,
+                style: theme.textTheme.bodyMedium?.copyWith(height: 1.6),
+              ),
             ],
           ),
         ),

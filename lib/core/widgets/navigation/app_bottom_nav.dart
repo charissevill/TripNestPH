@@ -8,22 +8,42 @@ import 'nav_tab_data.dart';
 /// The floating, rounded bottom navigation bar shared by every top-level
 /// tab (Home, Explore, AI Planner, Saved, Profile).
 class AppBottomNav extends StatelessWidget {
-  const AppBottomNav({super.key, required this.currentIndex, required this.onTap});
+  const AppBottomNav({
+    super.key,
+    required this.currentIndex,
+    required this.onTap,
+    this.isBusinessOwner = false,
+  });
 
   final int currentIndex;
   final ValueChanged<int> onTap;
+
+  /// See [mainNavTabsFor] — swaps the "Saved" tab for "My Business".
+  final bool isBusinessOwner;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Container(
-      margin: const EdgeInsets.fromLTRB(AppSpacing.md, 0, AppSpacing.md, AppSpacing.md),
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
+      margin: const EdgeInsets.fromLTRB(
+        AppSpacing.md,
+        0,
+        AppSpacing.md,
+        AppSpacing.md,
+      ),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.sm,
+        vertical: AppSpacing.xs,
+      ),
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(AppRadius.xxl),
         boxShadow: [
-          BoxShadow(color: Colors.black.withValues(alpha: 0.10), blurRadius: 24, offset: const Offset(0, 10)),
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.10),
+            blurRadius: 24,
+            offset: const Offset(0, 10),
+          ),
         ],
       ),
       child: SafeArea(
@@ -36,15 +56,21 @@ class AppBottomNav extends StatelessWidget {
           gap: 4,
           activeColor: Colors.white,
           iconSize: 20,
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs, vertical: 10),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.xs,
+            vertical: 10,
+          ),
           duration: const Duration(milliseconds: 320),
           curve: Curves.easeOutCubic,
           tabBackgroundColor: theme.colorScheme.primary,
           color: AppColors.textSecondary,
-          textStyle: theme.textTheme.labelSmall?.copyWith(color: Colors.white, fontWeight: FontWeight.w700),
-          tabs: kMainNavTabs
-              .map((tab) => GButton(icon: tab.icon, text: tab.label))
-              .toList(),
+          textStyle: theme.textTheme.labelSmall?.copyWith(
+            color: Colors.white,
+            fontWeight: FontWeight.w700,
+          ),
+          tabs: mainNavTabsFor(
+            isBusinessOwner: isBusinessOwner,
+          ).map((tab) => GButton(icon: tab.icon, text: tab.label)).toList(),
         ),
       ),
     );

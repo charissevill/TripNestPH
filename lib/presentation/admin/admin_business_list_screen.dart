@@ -1,26 +1,35 @@
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:provider/provider.dart';
+import '../../core/utils/maps_launcher.dart';
 
+import '../../core/providers/auth_provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/utils/app_exception.dart';
 import '../../core/widgets/dialogs/confirmation_dialog.dart';
 import '../../core/widgets/states/empty_state_widget.dart';
 import '../../core/widgets/states/loading_widget.dart';
+import '../../data/repositories/admin_repository.dart';
 import '../../data/repositories/business_repository.dart';
 import '../../data/repositories/favorites_repository.dart';
 import '../../data/repositories/notification_repository.dart';
 import '../../data/repositories/restaurant_repository.dart';
 import '../../data/repositories/review_repository.dart';
+import '../../domain/models/admin_user.dart';
 import '../../domain/models/app_notification.dart';
 import '../../domain/models/business.dart';
 import '../../domain/models/business_permit.dart';
 import '../../domain/models/review.dart';
 
-/// Admin-only approval queue for `businessOwner` self-service listings —
-/// approve, reject (with a reason the owner sees), suspend an already
-/// -approved listing, or remove one outright.
+/// Approval queue for `businessOwner` self-service listings — approve,
+/// reject (with a reason the owner sees), suspend an already-approved
+/// listing, or (admin only) remove one outright. An `admin` account sees
+/// and can act on every listing nationwide; an `lgu` account only sees —
+/// and can only approve/reject/suspend/reactivate — listings in their own
+/// assigned province (real-world business permits are LGU-issued, not a
+/// central admin's call), enforced server-side via `canManageProvince` in
+/// firestore.rules, not just this screen's own filtering.
 class AdminBusinessListScreen extends StatefulWidget {
   const AdminBusinessListScreen({super.key});
 
@@ -34,6 +43,26 @@ class _AdminBusinessListScreenState extends State<AdminBusinessListScreen> {
   final RestaurantRepository _restaurantRepository = RestaurantRepository();
   final ReviewRepository _reviewRepository = ReviewRepository();
   final FavoritesRepository _favoritesRepository = FavoritesRepository();
+
+  /// Re-fetched live rather than trusted from the caller, same reasoning as
+  /// `AdminProvinceListScreen._admin`.
+  AdminUser? _admin;
+
+  bool get _isLguScoped =>
+      _admin?.role == AdminRole.lgu && _admin?.provinceId != null;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAdmin();
+  }
+
+  Future<void> _loadAdmin() async {
+    final uid = context.read<AuthProvider>().firebaseUser?.uid;
+    if (uid == null) return;
+    final admin = await AdminRepository().getById(uid);
+    if (mounted) setState(() => _admin = admin);
+  }
 
   /// For a [Business.isFoodAndDining] listing, materializes (or
   /// re-publishes) its mirrored `restaurants` doc *before* the business
@@ -136,7 +165,7 @@ class _AdminBusinessListScreenState extends State<AdminBusinessListScreen> {
         title: 'Listing approved',
         body: '"${business.name}" is now live for travelers to see.',
       );
-    });
+    }, successMessage: '"${business.name}" approved.');
   }
 
   Future<void> _reject(Business business) async {
@@ -157,7 +186,7 @@ class _AdminBusinessListScreenState extends State<AdminBusinessListScreen> {
         title: 'Listing rejected',
         body: '"${business.name}" needs changes: $reason',
       );
-    });
+    }, successMessage: '"${business.name}" rejected.');
   }
 
   Future<void> _suspend(Business business) async {
@@ -181,7 +210,7 @@ class _AdminBusinessListScreenState extends State<AdminBusinessListScreen> {
         title: 'Listing suspended',
         body: '"${business.name}" was suspended: $reason',
       );
-    });
+    }, successMessage: '"${business.name}" suspended.');
   }
 
   Future<void> _reactivate(Business business) async {
@@ -201,7 +230,7 @@ class _AdminBusinessListScreenState extends State<AdminBusinessListScreen> {
         title: 'Listing reactivated',
         body: '"${business.name}" is visible to travelers again.',
       );
-    });
+    }, successMessage: '"${business.name}" reactivated.');
   }
 
   Future<void> _delete(Business business) async {
@@ -221,15 +250,29 @@ class _AdminBusinessListScreenState extends State<AdminBusinessListScreen> {
         // id that no longer resolves to anything, surfaced only
         // defensively elsewhere (e.g. the moderation queue's "This review
         // no longer exists").
-        await _reviewRepository.deleteAllForTarget(business.restaurantId, ReviewTargetType.restaurant);
-        await _favoritesRepository.deleteAllForItem(FavoriteType.restaurant, business.restaurantId);
+        await _reviewRepository.deleteAllForTarget(
+          business.restaurantId,
+          ReviewTargetType.restaurant,
+        );
+        await _favoritesRepository.deleteAllForItem(
+          FavoriteType.restaurant,
+          business.restaurantId,
+        );
       }
-    });
+    }, successMessage: '"${business.name}" deleted.');
   }
 
-  Future<void> _run(Future<void> Function() action) async {
+  Future<void> _run(
+    Future<void> Function() action, {
+    String? successMessage,
+  }) async {
     try {
       await action();
+      if (mounted && successMessage != null) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(successMessage)));
+      }
     } catch (e) {
       if (mounted)
         ScaffoldMessenger.of(
@@ -263,7 +306,11 @@ class _AdminBusinessListScreenState extends State<AdminBusinessListScreen> {
                 children: List.generate(4, (_) => LoadingWidget.cardBlock()),
               );
             }
-            final businesses = snapshot.data ?? const [];
+            final businesses = (snapshot.data ?? const [])
+                .where(
+                  (b) => !_isLguScoped || b.provinceId == _admin!.provinceId,
+                )
+                .toList();
             if (businesses.isEmpty) {
               return const EmptyStateWidget(
                 icon: Symbols.storefront_rounded,
@@ -368,13 +415,17 @@ class _AdminBusinessListScreenState extends State<AdminBusinessListScreen> {
                                 onPressed: () => _reactivate(business),
                                 child: const Text('Reactivate'),
                               ),
-                            IconButton(
-                              icon: const Icon(
-                                Symbols.delete_outline_rounded,
-                                color: AppColors.error,
+                            // Deleting a listing outright stays admin-only
+                            // (firestore.rules) — an LGU's authority here is
+                            // approve/reject/suspend/reactivate, not removal.
+                            if (!_isLguScoped)
+                              IconButton(
+                                icon: const Icon(
+                                  Symbols.delete_outline_rounded,
+                                  color: AppColors.error,
+                                ),
+                                onPressed: () => _delete(business),
                               ),
-                              onPressed: () => _delete(business),
-                            ),
                           ],
                         ),
                       ],
@@ -417,11 +468,17 @@ class _PermitSection extends StatelessWidget {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Symbols.info_rounded, size: 16, color: AppColors.textTertiary),
+                const Icon(
+                  Symbols.info_rounded,
+                  size: 16,
+                  color: AppColors.textTertiary,
+                ),
                 const SizedBox(width: 4),
                 Text(
                   'No permit submitted',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textTertiary),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppColors.textTertiary,
+                  ),
                 ),
               ],
             ),
@@ -432,14 +489,15 @@ class _PermitSection extends StatelessWidget {
           children: [
             const SizedBox(height: AppSpacing.sm),
             InkWell(
-              onTap: () => launchUrl(
-                Uri.parse(permit.permitUrl),
-                webOnlyWindowName: '_blank',
-              ),
+              onTap: () => MapsLauncher.openUrl(permit.permitUrl),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Symbols.description_rounded, size: 16, color: AppColors.primary),
+                  const Icon(
+                    Symbols.description_rounded,
+                    size: 16,
+                    color: AppColors.primary,
+                  ),
                   const SizedBox(width: 4),
                   Text(
                     'View submitted permit',
@@ -455,8 +513,9 @@ class _PermitSection extends StatelessWidget {
               const SizedBox(height: AppSpacing.sm),
               Text(
                 'Extracted text (OCR) — verify against the actual photo',
-                style: Theme.of(context).textTheme.labelSmall
-                    ?.copyWith(color: AppColors.textTertiary),
+                style: Theme.of(
+                  context,
+                ).textTheme.labelSmall?.copyWith(color: AppColors.textTertiary),
               ),
               const SizedBox(height: 4),
               Container(

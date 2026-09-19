@@ -111,6 +111,10 @@ class LoadingWidget {
           AppSpacing.lg,
           AppSpacing.huge,
         ),
+        // shrinkWrap so this also works sized to its own content inside an
+        // unbounded-height scrollable (e.g. Explore's single-scrollable
+        // body), not just inside a bounded Expanded region like before.
+        shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: 2,

@@ -24,6 +24,7 @@ import '../../data/repositories/user_repository.dart';
 import '../../domain/models/admin_invite.dart';
 import '../../domain/models/admin_user.dart';
 import '../../domain/models/destination.dart';
+import '../../core/widgets/media/image_error_placeholder.dart';
 
 /// Traveler profile: live stats, favorite destinations, travel preferences
 /// and the entry point into account-level settings — all backed by
@@ -179,6 +180,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               ? CachedNetworkImage(
                                   imageUrl: user!.photoUrl,
                                   fit: BoxFit.cover,
+                                  errorWidget: (context, url, error) =>
+                                      const ImageErrorPlaceholder(
+                                        icon: Symbols.person_rounded,
+                                      ),
                                 )
                               : Container(
                                   color: Colors.white.withValues(alpha: 0.2),
@@ -250,6 +255,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           icon: Symbols.map_rounded,
                           value: '${stats?.tripsPlanned ?? 0}',
                           label: 'Trips',
+                          onTap: () =>
+                              context.push(RoutePaths.savedItineraries),
                         ),
                       ),
                       const SizedBox(width: AppSpacing.sm),
@@ -258,6 +265,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           icon: Symbols.bookmark_rounded,
                           value: '${saved.totalSavedCount}',
                           label: 'Saved',
+                          onTap: () => context.push(RoutePaths.saved),
                         ),
                       ),
                       const SizedBox(width: AppSpacing.sm),
@@ -266,6 +274,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           icon: Symbols.reviews_rounded,
                           value: '${stats?.reviewsWritten ?? 0}',
                           label: 'Reviews',
+                          onTap: () => context.push(RoutePaths.myReviews),
                         ),
                       ),
                     ],
@@ -620,6 +629,13 @@ class _PendingInviteBannerState extends State<_PendingInviteBanner> {
 /// side. Renders nothing while loading/absent rather than a placeholder,
 /// since "no admin access" should look identical to "menu item doesn't
 /// exist" for a traveler account.
+///
+/// Also hidden for an active `businessOwner` specifically — that role now
+/// has direct bottom-nav access (the Home tab's dashboard and the "My
+/// Business" tab, see `HomeOrBusinessDashboardTab`/`SavedOrMyBusinessTab`),
+/// so this second, buried entry point into the exact same screen is just
+/// redundant for them. `admin`/`lgu` still need it — neither has a
+/// dedicated tab of their own.
 class _AdminPortalMenuTile extends StatelessWidget {
   const _AdminPortalMenuTile({required this.uid});
 
@@ -632,7 +648,11 @@ class _AdminPortalMenuTile extends StatelessWidget {
       stream: AdminRepository().streamSelf(uid!),
       builder: (context, snapshot) {
         final admin = snapshot.data;
-        if (admin == null || !admin.isActive) return const SizedBox.shrink();
+        if (admin == null ||
+            !admin.isActive ||
+            admin.role == AdminRole.businessOwner) {
+          return const SizedBox.shrink();
+        }
         return _MenuTile(
           icon: Symbols.admin_panel_settings_rounded,
           label: 'Admin Portal',

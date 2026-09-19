@@ -4,7 +4,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
 import '../../core/routes/route_paths.dart';
@@ -21,7 +20,6 @@ import '../../core/widgets/cards/category_card.dart';
 import '../../core/widgets/cards/festival_card.dart';
 import '../../core/widgets/cards/place_card.dart';
 import '../../core/widgets/cards/restaurant_card.dart';
-import '../../core/widgets/details/explore_map_view.dart';
 import '../../core/widgets/details/place_details_sheet.dart';
 import '../../core/widgets/dialogs/active_filter_chips.dart';
 import '../../core/widgets/dialogs/search_filter_sheet.dart';
@@ -29,18 +27,22 @@ import '../../core/widgets/inputs/search_bar_widget.dart';
 import '../../core/widgets/layout/max_width_container.dart';
 import '../../core/widgets/states/empty_state_widget.dart';
 import '../../core/widgets/states/loading_widget.dart';
+import '../../core/widgets/cards/business_card.dart';
+import '../../core/widgets/details/business_info_sheet.dart';
 import '../../data/mock/mock_categories.dart';
+import '../../data/repositories/business_repository.dart';
 import '../../data/repositories/festival_repository.dart';
 import '../../data/repositories/province_repository.dart';
 import '../../data/repositories/region_repository.dart';
 import '../../data/repositories/restaurant_repository.dart';
+import '../../domain/models/business.dart';
 import '../../domain/models/festival.dart';
 import '../../domain/models/place.dart';
 import '../../domain/models/province.dart';
 import '../../domain/models/region.dart';
 import '../../domain/models/restaurant.dart';
 
-enum _ExploreTab { destinations, restaurants, festivals }
+enum _ExploreTab { destinations, restaurants, festivals, businesses }
 
 /// Image height used for every card in the two-column grid, kept in sync
 /// with [_gridCellExtent] so card content never overflows its grid cell.
@@ -81,6 +83,7 @@ class ExploreScreen extends StatefulWidget {
     this.festivalRepository,
     this.regionRepository,
     this.provinceRepository,
+    this.businessRepository,
   });
 
   final String? initialCategoryId;
@@ -94,6 +97,7 @@ class ExploreScreen extends StatefulWidget {
   final FestivalRepository? festivalRepository;
   final RegionRepository? regionRepository;
   final ProvinceRepository? provinceRepository;
+  final BusinessRepository? businessRepository;
 
   @override
   State<ExploreScreen> createState() => _ExploreScreenState();
@@ -108,11 +112,12 @@ class _ExploreScreenState extends State<ExploreScreen> {
       widget.regionRepository ?? RegionRepository();
   late final ProvinceRepository _provinceRepository =
       widget.provinceRepository ?? ProvinceRepository();
+  late final BusinessRepository _businessRepository =
+      widget.businessRepository ?? BusinessRepository();
   late final PlacesService _places = widget.placesService ?? PlacesService();
 
   _ExploreTab _tab = _ExploreTab.destinations;
   String? _selectedCategory;
-  bool _mapMode = false;
   Timer? _categoryDebounce;
 
   String? _regionId;
@@ -129,22 +134,46 @@ class _ExploreScreenState extends State<ExploreScreen> {
   List<Region> _regions = [];
   List<Province> _provinces = [];
   bool get _hasFilters =>
-      _provinceId != null || _minRating != null || _priceTier != null || _maxDistanceKm != null || _accessibilityTag != null;
+      _provinceId != null ||
+      _minRating != null ||
+      _priceTier != null ||
+      _maxDistanceKm != null ||
+      _accessibilityTag != null;
 
   List<Place>? get _filteredDestinationPlaces => _destinationPlaces?.where((p) {
-    return (_priceTier == null || priceTierFromPlacesLevel(p.priceLevel) == _priceTier) &&
-        withinDistance(lat: p.latitude, lng: p.longitude, origin: _userPosition, maxKm: _maxDistanceKm) &&
+    return (_priceTier == null ||
+            priceTierFromPlacesLevel(p.priceLevel) == _priceTier) &&
+        withinDistance(
+          lat: p.latitude,
+          lng: p.longitude,
+          origin: _userPosition,
+          maxKm: _maxDistanceKm,
+        ) &&
         matchesAccessibilityTag(const [], _accessibilityTag);
   }).toList();
 
   List<Object>? get _filteredRestaurantItems => _restaurantItems?.where((item) {
     return switch (item) {
-      Place p => (_priceTier == null || priceTierFromPlacesLevel(p.priceLevel) == _priceTier) &&
-          withinDistance(lat: p.latitude, lng: p.longitude, origin: _userPosition, maxKm: _maxDistanceKm) &&
-          matchesAccessibilityTag(const [], _accessibilityTag),
-      Restaurant r => (_priceTier == null || priceTierFromPesoSigns(r.priceRange) == _priceTier) &&
-          withinDistance(lat: r.latitude, lng: r.longitude, origin: _userPosition, maxKm: _maxDistanceKm) &&
-          matchesAccessibilityTag(r.accessibilityTags, _accessibilityTag),
+      Place p =>
+        (_priceTier == null ||
+                priceTierFromPlacesLevel(p.priceLevel) == _priceTier) &&
+            withinDistance(
+              lat: p.latitude,
+              lng: p.longitude,
+              origin: _userPosition,
+              maxKm: _maxDistanceKm,
+            ) &&
+            matchesAccessibilityTag(const [], _accessibilityTag),
+      Restaurant r =>
+        (_priceTier == null ||
+                priceTierFromPesoSigns(r.priceRange) == _priceTier) &&
+            withinDistance(
+              lat: r.latitude,
+              lng: r.longitude,
+              origin: _userPosition,
+              maxKm: _maxDistanceKm,
+            ) &&
+            matchesAccessibilityTag(r.accessibilityTags, _accessibilityTag),
       Object() => true,
     };
   }).toList();
@@ -152,7 +181,14 @@ class _ExploreScreenState extends State<ExploreScreen> {
   // Festivals carry no per-listing price data, so the budget filter simply
   // doesn't apply to this tab — only distance narrows it.
   List<Festival>? get _filteredFestivals => _festivals
-      ?.where((f) => withinDistance(lat: f.latitude, lng: f.longitude, origin: _userPosition, maxKm: _maxDistanceKm))
+      ?.where(
+        (f) => withinDistance(
+          lat: f.latitude,
+          lng: f.longitude,
+          origin: _userPosition,
+          maxKm: _maxDistanceKm,
+        ),
+      )
       .toList();
 
   List<Place>? _destinationPlaces;
@@ -179,29 +215,59 @@ class _ExploreScreenState extends State<ExploreScreen> {
   Object? _festivalsError;
   int _festivalsRequestId = 0;
 
-  List<Object>? get _restaurantItems =>
-      _restaurants == null ? null : [..._liveRestaurantPlaces, ..._restaurants!];
+  List<Business>? _businesses;
+  bool _loadingBusinesses = false;
+  Object? _businessesError;
+  int _businessesRequestId = 0;
+  // Tab-local — Business's own category vocabulary (Accommodation/Food &
+  // Dining/etc.) doesn't overlap with _selectedCategory's Places-search
+  // phrases, so this needs to stay a separate filter.
+  String? _businessCategory;
+
+  // Business has no coordinates and no per-listing rating to narrow by —
+  // only price and accessibility (both real fields on the model) apply.
+  List<Business>? get _filteredBusinesses => _businesses?.where((b) {
+    return (_priceTier == null ||
+            priceTierFromPesoSigns(b.priceRange) == _priceTier) &&
+        matchesAccessibilityTag(b.accessibilityTags, _accessibilityTag);
+  }).toList();
+
+  List<Object>? get _restaurantItems => _restaurants == null
+      ? null
+      : [..._liveRestaurantPlaces, ..._restaurants!];
 
   String _destinationsTextQuery() {
-    final phrase = _placesCategoryPhrase[_selectedCategory] ?? 'top tourist attractions';
-    return _provinceName != null ? '$phrase in $_provinceName, Philippines' : '$phrase in the Philippines';
+    final phrase =
+        _placesCategoryPhrase[_selectedCategory] ?? 'top tourist attractions';
+    return _provinceName != null
+        ? '$phrase in $_provinceName, Philippines'
+        : '$phrase in the Philippines';
   }
 
-  String _restaurantsTextQuery() =>
-      _provinceName != null ? 'restaurants in $_provinceName, Philippines' : 'best restaurants in the Philippines';
+  String _restaurantsTextQuery() => _provinceName != null
+      ? 'restaurants in $_provinceName, Philippines'
+      : 'best restaurants in the Philippines';
 
   /// Drops any live result whose own address doesn't name [areaName] — a
   /// fixed-radius/area text search can resolve into a neighboring city or
   /// province (the exact "Guimaras search returning Iloilo City hotels" leak
   /// found and fixed in `search_screen.dart`) — then drops any live result
   /// that's a near-duplicate of an already-curated name.
-  List<Place> _filterLivePlaces(List<Place> places, {required String? areaName, required Set<String> curatedNamesLower}) {
+  List<Place> _filterLivePlaces(
+    List<Place> places, {
+    required String? areaName,
+    required Set<String> curatedNamesLower,
+  }) {
     var filtered = places;
     if (areaName != null) {
       final areaLower = areaName.toLowerCase();
-      filtered = filtered.where((p) => p.address.toLowerCase().contains(areaLower)).toList();
+      filtered = filtered
+          .where((p) => p.address.toLowerCase().contains(areaLower))
+          .toList();
     }
-    return filtered.where((p) => !isDuplicateOfCurated(p.name, curatedNamesLower)).toList();
+    return filtered
+        .where((p) => !isDuplicateOfCurated(p.name, curatedNamesLower))
+        .toList();
   }
 
   @override
@@ -250,19 +316,29 @@ class _ExploreScreenState extends State<ExploreScreen> {
       maxDistanceKm: _maxDistanceKm,
       accessibilityTag: _accessibilityTag,
       showCategoryFilter: false,
-      onApply: (regionId, provinceId, r, priceTier, maxDistanceKm, accessibilityTag, _) => setState(() {
-        _regionId = regionId;
-        _provinceId = provinceId;
-        final matches = _provinces.where((p) => p.id == provinceId);
-        _provinceName = matches.isEmpty ? null : matches.first.name;
-        _minRating = r;
-        _priceTier = priceTier;
-        _maxDistanceKm = maxDistanceKm;
-        _accessibilityTag = accessibilityTag;
-      }),
+      onApply:
+          (
+            regionId,
+            provinceId,
+            r,
+            priceTier,
+            maxDistanceKm,
+            accessibilityTag,
+            _,
+          ) => setState(() {
+            _regionId = regionId;
+            _provinceId = provinceId;
+            final matches = _provinces.where((p) => p.id == provinceId);
+            _provinceName = matches.isEmpty ? null : matches.first.name;
+            _minRating = r;
+            _priceTier = priceTier;
+            _maxDistanceKm = maxDistanceKm;
+            _accessibilityTag = accessibilityTag;
+          }),
     );
     if (applied != true) return;
-    if (_maxDistanceKm != null && _userPosition == null) await _resolveUserPosition();
+    if (_maxDistanceKm != null && _userPosition == null)
+      await _resolveUserPosition();
     // The distance/budget filters are applied client-side against
     // already-loaded items, not baked into the fetch itself — but the fetch
     // still needs to widen its page size (see _hasFilters), so a reload is
@@ -276,7 +352,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
   Future<void> _resolveUserPosition() async {
     try {
       final result = await LocationService().resolveCurrentPosition();
-      if (mounted && result.isGranted) setState(() => _userPosition = result.position);
+      if (mounted && result.isGranted)
+        setState(() => _userPosition = result.position);
     } catch (_) {}
   }
 
@@ -336,6 +413,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
       _festivals = null;
       _festivalsCursor = null;
       _festivalsHasMore = true;
+      _businesses = null;
     });
     // Forces a fresh load for the active tab regardless of whether a
     // previous request is still in flight — _ensureLoaded's "only if not
@@ -348,6 +426,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
         _loadRestaurants(reset: true);
       case _ExploreTab.festivals:
         _loadFestivals(reset: true);
+      case _ExploreTab.businesses:
+        _loadBusinesses(reset: true);
     }
   }
 
@@ -383,6 +463,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
         if (_restaurants == null) _loadRestaurants();
       case _ExploreTab.festivals:
         if (_festivals == null) _loadFestivals();
+      case _ExploreTab.businesses:
+        if (_businesses == null) _loadBusinesses();
     }
   }
 
@@ -412,8 +494,12 @@ class _ExploreScreenState extends State<ExploreScreen> {
       final filtered = _provinceName == null
           ? places
           : places
-              .where((p) => p.address.toLowerCase().contains(_provinceName!.toLowerCase()))
-              .toList();
+                .where(
+                  (p) => p.address.toLowerCase().contains(
+                    _provinceName!.toLowerCase(),
+                  ),
+                )
+                .toList();
 
       if (!mounted || requestId != _destinationsRequestId) return;
       setState(() {
@@ -445,13 +531,16 @@ class _ExploreScreenState extends State<ExploreScreen> {
     });
     try {
       final livePlacesFuture = needsLiveFetch
-          ? _places.searchText(textQuery: _restaurantsTextQuery(), maxResultCount: 20)
+          ? _places.searchText(
+              textQuery: _restaurantsTextQuery(),
+              maxResultCount: 20,
+            )
           : Future.value(_liveRestaurantPlaces);
 
       List<Restaurant> page;
       DocumentSnapshot<Map<String, dynamic>>? cursor;
       bool hasMore;
-      if (_hasFilters || _mapMode) {
+      if (_hasFilters) {
         page = await _restaurantRepository.filter(
           provinceId: _provinceId,
           minRating: _minRating,
@@ -470,7 +559,10 @@ class _ExploreScreenState extends State<ExploreScreen> {
       }
 
       var livePlaces = await livePlacesFuture;
-      final List<Restaurant> allRestaurants = [...(_restaurants ?? []), ...page];
+      final List<Restaurant> allRestaurants = [
+        ...(_restaurants ?? []),
+        ...page,
+      ];
       // Re-run every time, not just on a fresh fetch: a "Load More" tap
       // pages in more curated restaurants, and a live Places result shown
       // earlier can duplicate one of those — re-filtering against the now-
@@ -479,7 +571,9 @@ class _ExploreScreenState extends State<ExploreScreen> {
       livePlaces = _filterLivePlaces(
         livePlaces,
         areaName: _provinceName,
-        curatedNamesLower: allRestaurants.map((r) => r.name.toLowerCase()).toSet(),
+        curatedNamesLower: allRestaurants
+            .map((r) => r.name.toLowerCase())
+            .toSet(),
       );
 
       if (!mounted || requestId != _restaurantsRequestId) return;
@@ -515,7 +609,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
       List<Festival> page;
       DocumentSnapshot<Map<String, dynamic>>? cursor;
       bool hasMore;
-      if (_hasFilters || _mapMode) {
+      if (_hasFilters) {
         page = await _festivalRepository.filter(
           provinceId: _provinceId,
           minRating: _minRating,
@@ -548,6 +642,54 @@ class _ExploreScreenState extends State<ExploreScreen> {
     }
   }
 
+  /// Businesses is 100% Firestore, no live-Places blend and no coordinates
+  /// to plot on a map — a single bounded fetch (province + [_businessCategory]
+  /// pushed server-side, price/accessibility filtered client-side via
+  /// [_filteredBusinesses]) rather than the cursor-paginated shape the other
+  /// three tabs use.
+  Future<void> _loadBusinesses({bool reset = false}) async {
+    if (_loadingBusinesses && !reset) return;
+    final requestId = ++_businessesRequestId;
+    setState(() {
+      _loadingBusinesses = true;
+      _businessesError = null;
+      if (reset) _businesses = null;
+    });
+    try {
+      final page = await _businessRepository.getAllApproved(
+        provinceId: _provinceId,
+        category: _businessCategory,
+      );
+      if (!mounted || requestId != _businessesRequestId) return;
+      setState(() {
+        _businesses = page;
+        _loadingBusinesses = false;
+      });
+    } catch (e) {
+      if (!mounted || requestId != _businessesRequestId) return;
+      setState(() {
+        _businessesError = e;
+        _loadingBusinesses = false;
+      });
+    }
+  }
+
+  /// Pull-to-refresh reloads whichever tab is actually visible — the body
+  /// is now one shared scrollable (see [build]'s doc comment on why), so
+  /// there's a single [RefreshIndicator] instead of one per tab.
+  Future<void> _refreshActiveTab() {
+    switch (_tab) {
+      case _ExploreTab.destinations:
+        return _loadDestinations(reset: true);
+      case _ExploreTab.restaurants:
+        return _loadRestaurants(reset: true);
+      case _ExploreTab.festivals:
+        return _loadFestivals(reset: true);
+      case _ExploreTab.businesses:
+        return _loadBusinesses(reset: true);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -555,296 +697,292 @@ class _ExploreScreenState extends State<ExploreScreen> {
 
     return Scaffold(
       body: SafeArea(
-        child: Column(
-          children: [
-            Padding(
-              padding: EdgeInsets.fromLTRB(
-                sidePadding,
-                AppSpacing.sm,
-                sidePadding,
-                AppSpacing.md,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Explore', style: theme.textTheme.displayMedium),
-                  const SizedBox(height: 2),
-                  Text(
-                    'Find your next Philippine adventure',
-                    style: theme.textTheme.bodyMedium,
-                  ),
-                  const SizedBox(height: AppSpacing.lg),
-                  SearchBarWidget(
-                    readOnly: true,
-                    onTap: () => context.push(RoutePaths.search),
-                    onFilterTap: _openFilterSheet,
-                  ),
-                  if (_hasFilters) ...[
-                    const SizedBox(height: AppSpacing.sm),
-                    ActiveFilterChips(
-                      provinceName: _provinceName,
-                      minRating: _minRating,
-                      onRemoveProvince: _removeProvinceFilter,
-                      onRemoveMinRating: _removeMinRatingFilter,
-                      onClearAll: _clearFilters,
-                      priceTier: _priceTier,
-                      onRemovePriceTier: _removePriceTierFilter,
-                      maxDistanceKm: _maxDistanceKm,
-                      onRemoveDistance: _removeDistanceFilter,
-                      accessibilityTag: _accessibilityTag,
-                      onRemoveAccessibilityTag: _removeAccessibilityTagFilter,
-                    ),
-                  ],
-                ],
-              ),
-            ),
-            Row(
+        // A plain Column of fixed-height sections (header, tabs, category
+        // row) plus an Expanded grid overflows on a short viewport — a
+        // landscape phone has far less height than portrait, and those
+        // fixed sections alone can already exceed it before the grid gets
+        // a chance to size down. Folding everything into one scrollable
+        // (grid included, via shrinkWrap in _buildGrid) means the whole
+        // page scrolls instead of erroring when height is tight, exactly
+        // like it already did for width via the responsive column count.
+        child: RefreshIndicator(
+          onRefresh: _refreshActiveTab,
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            child: Column(
               children: [
-                Expanded(
-                  child: SizedBox(
+                Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    sidePadding,
+                    AppSpacing.sm,
+                    sidePadding,
+                    AppSpacing.md,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Explore', style: theme.textTheme.displayMedium),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Find your next Philippine adventure',
+                        style: theme.textTheme.bodyMedium,
+                      ),
+                      const SizedBox(height: AppSpacing.lg),
+                      SearchBarWidget(
+                        readOnly: true,
+                        onTap: () => context.push(RoutePaths.search),
+                        onFilterTap: _openFilterSheet,
+                      ),
+                      if (_hasFilters) ...[
+                        const SizedBox(height: AppSpacing.sm),
+                        ActiveFilterChips(
+                          provinceName: _provinceName,
+                          minRating: _minRating,
+                          onRemoveProvince: _removeProvinceFilter,
+                          onRemoveMinRating: _removeMinRatingFilter,
+                          onClearAll: _clearFilters,
+                          priceTier: _priceTier,
+                          onRemovePriceTier: _removePriceTierFilter,
+                          maxDistanceKm: _maxDistanceKm,
+                          onRemoveDistance: _removeDistanceFilter,
+                          accessibilityTag: _accessibilityTag,
+                          onRemoveAccessibilityTag:
+                              _removeAccessibilityTagFilter,
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                SizedBox(
+                  height: 56,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    padding: EdgeInsets.symmetric(horizontal: sidePadding),
+                    itemCount: _ExploreTab.values.length,
+                    separatorBuilder: (_, _) =>
+                        const SizedBox(width: AppSpacing.lg),
+                    itemBuilder: (context, i) {
+                      final tab = _ExploreTab.values[i];
+                      return _MainTabButton(
+                        icon: switch (tab) {
+                          _ExploreTab.destinations => Symbols.landscape_rounded,
+                          _ExploreTab.restaurants => Symbols.restaurant_rounded,
+                          _ExploreTab.festivals => Symbols.celebration_rounded,
+                          _ExploreTab.businesses => Symbols.storefront_rounded,
+                        },
+                        label: switch (tab) {
+                          _ExploreTab.destinations => 'Destinations',
+                          _ExploreTab.restaurants => 'Restaurants',
+                          _ExploreTab.festivals => 'Festivals',
+                          _ExploreTab.businesses => 'Local Finds',
+                        },
+                        selected: _tab == tab,
+                        onTap: () {
+                          setState(() => _tab = tab);
+                          _ensureLoaded(tab);
+                        },
+                      );
+                    },
+                  ),
+                ),
+                if (_tab == _ExploreTab.businesses) ...[
+                  const SizedBox(height: AppSpacing.md),
+                  SizedBox(
                     height: 40,
                     child: ListView.separated(
                       scrollDirection: Axis.horizontal,
                       padding: EdgeInsets.symmetric(horizontal: sidePadding),
-                      itemCount: _ExploreTab.values.length,
+                      itemCount: BusinessCategory.all.length,
                       separatorBuilder: (_, _) =>
                           const SizedBox(width: AppSpacing.sm),
                       itemBuilder: (context, i) {
-                        final tab = _ExploreTab.values[i];
+                        final category = BusinessCategory.all[i];
                         return _TabChip(
-                          label: switch (tab) {
-                            _ExploreTab.destinations => 'Destinations',
-                            _ExploreTab.restaurants => 'Restaurants',
-                            _ExploreTab.festivals => 'Festivals',
-                          },
-                          selected: _tab == tab,
+                          label: BusinessCategory.label(category),
+                          selected: _businessCategory == category,
                           onTap: () {
-                            setState(() => _tab = tab);
-                            _ensureLoaded(tab);
+                            setState(
+                              () => _businessCategory =
+                                  _businessCategory == category
+                                  ? null
+                                  : category,
+                            );
+                            _loadBusinesses(reset: true);
                           },
                         );
                       },
                     ),
                   ),
-                ),
-                const SizedBox(width: AppSpacing.xs),
-                Padding(
-                  padding: EdgeInsets.only(right: sidePadding),
-                  child: IconButton(
-                    icon: Icon(_mapMode ? Symbols.view_list_rounded : Symbols.map_rounded),
-                    tooltip: _mapMode ? 'Show as list' : 'Show as map',
-                    onPressed: () {
-                      setState(() => _mapMode = !_mapMode);
-                      _invalidateAllTabsAndReload();
-                    },
-                  ),
-                ),
-              ],
-            ),
-            if (_tab == _ExploreTab.destinations) ...[
-              const SizedBox(height: AppSpacing.md),
-              SizedBox(
-                height: 106,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  padding: EdgeInsets.symmetric(horizontal: sidePadding),
-                  itemCount: mockCategories.length,
-                  separatorBuilder: (_, _) =>
-                      const SizedBox(width: AppSpacing.md),
-                  itemBuilder: (context, i) {
-                    final category = mockCategories[i];
-                    return CategoryCard(
-                      category: category,
-                      isSelected: _selectedCategory == category.id,
-                      onTap: () {
-                        // Food/Festivals have no Places search phrase (see
-                        // _placesCategoryPhrase) — they're not Destinations
-                        // filters at all, they're a shortcut to the other
-                        // two tabs, exactly like _applyInitialCategory
-                        // already treats them coming in from a deep link.
-                        // Filtering by them here used to silently no-op.
-                        if (category.id == 'food' || category.id == 'festivals') {
-                          setState(() {
-                            _tab = category.id == 'food' ? _ExploreTab.restaurants : _ExploreTab.festivals;
-                            _selectedCategory = null;
-                          });
-                          _ensureLoaded(_tab);
-                          return;
-                        }
-                        setState(
-                          () => _selectedCategory =
-                              _selectedCategory == category.id
-                              ? null
-                              : category.id,
-                        );
-                        // Debounced — each tap fires a billed Places call,
-                        // so rapidly tapping through categories should only
-                        // query the final selection, not every intermediate
-                        // one (same shape as search_screen.dart's own
-                        // typing debounce).
-                        _categoryDebounce?.cancel();
-                        _categoryDebounce = Timer(
-                          const Duration(milliseconds: 350),
-                          () => _loadDestinations(reset: true),
+                ],
+                if (_tab == _ExploreTab.destinations) ...[
+                  const SizedBox(height: AppSpacing.md),
+                  SizedBox(
+                    height: 106,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      padding: EdgeInsets.symmetric(horizontal: sidePadding),
+                      itemCount: mockCategories.length,
+                      separatorBuilder: (_, _) =>
+                          const SizedBox(width: AppSpacing.md),
+                      itemBuilder: (context, i) {
+                        final category = mockCategories[i];
+                        return CategoryCard(
+                          category: category,
+                          isSelected: _selectedCategory == category.id,
+                          onTap: () {
+                            // Food/Festivals have no Places search phrase (see
+                            // _placesCategoryPhrase) — they're not Destinations
+                            // filters at all, they're a shortcut to the other
+                            // two tabs, exactly like _applyInitialCategory
+                            // already treats them coming in from a deep link.
+                            // Filtering by them here used to silently no-op.
+                            if (category.id == 'food' ||
+                                category.id == 'festivals') {
+                              setState(() {
+                                _tab = category.id == 'food'
+                                    ? _ExploreTab.restaurants
+                                    : _ExploreTab.festivals;
+                                _selectedCategory = null;
+                              });
+                              _ensureLoaded(_tab);
+                              return;
+                            }
+                            setState(
+                              () => _selectedCategory =
+                                  _selectedCategory == category.id
+                                  ? null
+                                  : category.id,
+                            );
+                            // Debounced — each tap fires a billed Places call,
+                            // so rapidly tapping through categories should only
+                            // query the final selection, not every intermediate
+                            // one (same shape as search_screen.dart's own
+                            // typing debounce).
+                            _categoryDebounce?.cancel();
+                            _categoryDebounce = Timer(
+                              const Duration(milliseconds: 350),
+                              () => _loadDestinations(reset: true),
+                            );
+                          },
                         );
                       },
-                    );
-                  },
-                ),
-              ),
-            ],
-            const SizedBox(height: AppSpacing.md),
-            Expanded(
-              child: _mapMode
-                  ? switch (_tab) {
-                      _ExploreTab.destinations => _buildMap(
-                        items: _filteredDestinationPlaces,
-                        isLoading: _loadingDestinations,
-                        error: _destinationsError,
-                        onRetry: () => _loadDestinations(reset: true),
-                        emptyMessage: _hasFilters
-                            ? 'No destinations match your filters — try widening them.'
-                            : 'No mapped destinations yet.',
-                        markerFor: (p) => !p.hasCoordinates
-                            ? null
-                            : Marker(
-                                markerId: MarkerId('place-${p.id}'),
-                                position: LatLng(p.latitude!, p.longitude!),
-                                icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueViolet),
-                                infoWindow: InfoWindow(
-                                  title: p.name,
-                                  onTap: () => showPlaceDetailsSheet(context, place: p, placesService: _places),
-                                ),
-                              ),
+                    ),
+                  ),
+                ],
+                const SizedBox(height: AppSpacing.md),
+                switch (_tab) {
+                  _ExploreTab.destinations => _buildGrid(
+                    items: _filteredDestinationPlaces,
+                    isLoading: _loadingDestinations,
+                    error: _destinationsError,
+                    // Google's 20-result cap is the whole result set —
+                    // there's no further page to load, unlike the
+                    // curated-catalog "Load More" the Restaurants tab
+                    // still has.
+                    hasMore: false,
+                    onLoadMore: _loadDestinations,
+                    onRetry: () => _loadDestinations(reset: true),
+                    emptyMessage: _hasFilters
+                        ? 'No destinations match your filters — try widening them.'
+                        : 'No destinations in this category yet — try another one.',
+                    itemBuilder: (context, width, p) => PlaceCard(
+                      place: p,
+                      width: width,
+                      imageHeight: _gridImageHeight,
+                      imageUrl: p.photoNames.isNotEmpty
+                          ? _places.photoUrl(p.photoNames.first)
+                          : '',
+                      onTap: () => showPlaceDetailsSheet(
+                        context,
+                        place: p,
+                        placesService: _places,
                       ),
-                      _ExploreTab.restaurants => _buildMap(
-                        items: _filteredRestaurantItems,
-                        isLoading: _loadingRestaurants,
-                        error: _restaurantsError,
-                        onRetry: () => _loadRestaurants(reset: true),
-                        emptyMessage: _hasFilters
-                            ? 'No restaurants match your filters — try widening them.'
-                            : 'No mapped restaurants yet.',
-                        markerFor: (item) => switch (item) {
-                          Restaurant r when r.hasCoordinates => Marker(
-                            markerId: MarkerId('restaurant-${r.id}'),
-                            position: LatLng(r.latitude!, r.longitude!),
-                            infoWindow: InfoWindow(
-                              title: r.name,
-                              onTap: () => context.push(RoutePaths.restaurantDetails(r.id)),
-                            ),
-                          ),
-                          Place p when p.hasCoordinates => Marker(
-                            markerId: MarkerId('place-${p.id}'),
-                            position: LatLng(p.latitude!, p.longitude!),
-                            icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueViolet),
-                            infoWindow: InfoWindow(
-                              title: p.name,
-                              onTap: () => showPlaceDetailsSheet(context, place: p, placesService: _places),
-                            ),
-                          ),
-                          Object() => null,
-                        },
+                    ),
+                  ),
+                  _ExploreTab.restaurants => _buildGrid(
+                    items: _filteredRestaurantItems,
+                    isLoading: _loadingRestaurants,
+                    error: _restaurantsError,
+                    hasMore: _restaurantsHasMore,
+                    onLoadMore: _loadRestaurants,
+                    onRetry: () => _loadRestaurants(reset: true),
+                    emptyMessage: _hasFilters
+                        ? 'No restaurants match your filters — try widening them.'
+                        : 'No restaurants found.',
+                    itemBuilder: (context, width, item) => switch (item) {
+                      Restaurant r => RestaurantCard(
+                        restaurant: r,
+                        width: width,
+                        imageHeight: _gridImageHeight,
+                        onTap: () =>
+                            context.push(RoutePaths.restaurantDetails(r.id)),
                       ),
-                      _ExploreTab.festivals => _buildMap(
-                        items: _filteredFestivals,
-                        isLoading: _loadingFestivals,
-                        error: _festivalsError,
-                        onRetry: () => _loadFestivals(reset: true),
-                        emptyMessage: _hasFilters
-                            ? 'No festivals match your filters — try widening them.'
-                            : 'No mapped festivals yet.',
-                        markerFor: (item) => !item.hasCoordinates
-                            ? null
-                            : Marker(
-                                markerId: MarkerId('festival-${item.id}'),
-                                position: LatLng(item.latitude!, item.longitude!),
-                                infoWindow: InfoWindow(
-                                  title: item.name,
-                                  onTap: () => context.push(RoutePaths.festivalDetails(item.id)),
-                                ),
-                              ),
-                      ),
-                    }
-                  : switch (_tab) {
-                      _ExploreTab.destinations => _buildGrid(
-                        items: _filteredDestinationPlaces,
-                        isLoading: _loadingDestinations,
-                        error: _destinationsError,
-                        // Google's 20-result cap is the whole result set —
-                        // there's no further page to load, unlike the
-                        // curated-catalog "Load More" the Restaurants tab
-                        // still has.
-                        hasMore: false,
-                        onLoadMore: _loadDestinations,
-                        onRetry: () => _loadDestinations(reset: true),
-                        onRefresh: () => _loadDestinations(reset: true),
-                        emptyMessage: _hasFilters
-                            ? 'No destinations match your filters — try widening them.'
-                            : 'No destinations in this category yet — try another one.',
-                        itemBuilder: (context, width, p) => PlaceCard(
+                      Place p => PlaceCard(
+                        place: p,
+                        width: width,
+                        imageHeight: _gridImageHeight,
+                        imageUrl: p.photoNames.isNotEmpty
+                            ? _places.photoUrl(p.photoNames.first)
+                            : '',
+                        onTap: () => showPlaceDetailsSheet(
+                          context,
                           place: p,
-                          width: width,
-                          imageHeight: _gridImageHeight,
-                          imageUrl: p.photoNames.isNotEmpty ? _places.photoUrl(p.photoNames.first) : '',
-                          onTap: () => showPlaceDetailsSheet(context, place: p, placesService: _places),
+                          placesService: _places,
                         ),
                       ),
-                      _ExploreTab.restaurants => _buildGrid(
-                        items: _filteredRestaurantItems,
-                        isLoading: _loadingRestaurants,
-                        error: _restaurantsError,
-                        hasMore: _restaurantsHasMore,
-                        onLoadMore: _loadRestaurants,
-                        onRetry: () => _loadRestaurants(reset: true),
-                        onRefresh: () => _loadRestaurants(reset: true),
-                        emptyMessage: _hasFilters
-                            ? 'No restaurants match your filters — try widening them.'
-                            : 'No restaurants found.',
-                        itemBuilder: (context, width, item) => switch (item) {
-                          Restaurant r => RestaurantCard(
-                            restaurant: r,
-                            width: width,
-                            imageHeight: _gridImageHeight,
-                            onTap: () => context.push(RoutePaths.restaurantDetails(r.id)),
-                          ),
-                          Place p => PlaceCard(
-                            place: p,
-                            width: width,
-                            imageHeight: _gridImageHeight,
-                            imageUrl: p.photoNames.isNotEmpty ? _places.photoUrl(p.photoNames.first) : '',
-                            onTap: () => showPlaceDetailsSheet(context, place: p, placesService: _places),
-                          ),
-                          Object() => const SizedBox.shrink(),
-                        },
-                      ),
-                      _ExploreTab.festivals => _buildGrid(
-                        items: _filteredFestivals,
-                        isLoading: _loadingFestivals,
-                        error: _festivalsError,
-                        hasMore: _festivalsHasMore,
-                        onLoadMore: _loadFestivals,
-                        onRetry: () => _loadFestivals(reset: true),
-                        onRefresh: () => _loadFestivals(reset: true),
-                        emptyMessage: _hasFilters
-                            ? 'No festivals match your filters — try widening them.'
-                            : 'No festivals found.',
-                        itemBuilder: (context, width, item) => FestivalCard(
-                          festival: item,
-                          width: width,
-                          imageHeight: _gridImageHeight,
-                          onTap: () =>
-                              context.push(RoutePaths.festivalDetails(item.id)),
-                        ),
-                      ),
+                      Object() => const SizedBox.shrink(),
                     },
+                  ),
+                  _ExploreTab.festivals => _buildGrid(
+                    items: _filteredFestivals,
+                    isLoading: _loadingFestivals,
+                    error: _festivalsError,
+                    hasMore: _festivalsHasMore,
+                    onLoadMore: _loadFestivals,
+                    onRetry: () => _loadFestivals(reset: true),
+                    emptyMessage: _hasFilters
+                        ? 'No festivals match your filters — try widening them.'
+                        : 'No festivals found.',
+                    itemBuilder: (context, width, item) => FestivalCard(
+                      festival: item,
+                      width: width,
+                      imageHeight: _gridImageHeight,
+                      onTap: () =>
+                          context.push(RoutePaths.festivalDetails(item.id)),
+                    ),
+                  ),
+                  _ExploreTab.businesses => _buildGrid(
+                    items: _filteredBusinesses,
+                    isLoading: _loadingBusinesses,
+                    error: _businessesError,
+                    // One-shot fetch (see _loadBusinesses) — there's no
+                    // further page to load.
+                    hasMore: false,
+                    onLoadMore: _loadBusinesses,
+                    onRetry: () => _loadBusinesses(reset: true),
+                    emptyMessage: (_hasFilters || _businessCategory != null)
+                        ? 'No local finds match your filters — try widening them.'
+                        : 'No local finds yet.',
+                    itemBuilder: (context, width, b) => BusinessCard(
+                      business: b,
+                      width: width,
+                      imageHeight: _gridImageHeight,
+                      onTap: () => showBusinessInfoSheet(context, b),
+                    ),
+                  ),
+                },
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
   }
 
+  /// Renders one tab's content. Never independently scrollable — [build]
+  /// now owns the one scrollable for the whole page (see its doc comment),
+  /// so the grid here is `shrinkWrap`ped to its natural content size
+  /// instead of filling an `Expanded` region of its own.
   Widget _buildGrid<T>({
     required List<T>? items,
     required bool isLoading,
@@ -852,106 +990,11 @@ class _ExploreScreenState extends State<ExploreScreen> {
     required bool hasMore,
     required Future<void> Function() onLoadMore,
     required VoidCallback onRetry,
-    required Future<void> Function() onRefresh,
     required String emptyMessage,
     required Widget Function(BuildContext, double width, T item) itemBuilder,
   }) {
     if (items == null && isLoading) {
       return LoadingWidget.grid();
-    }
-    if (items == null && error != null) {
-      return RefreshIndicator(
-        onRefresh: onRefresh,
-        child: ListView(
-          children: [
-            EmptyStateWidget(
-              icon: Symbols.error_outline_rounded,
-              title: 'Couldn\'t load this',
-              message: AppException.from(error).message,
-              actionLabel: 'Retry',
-              onActionTap: onRetry,
-            ),
-          ],
-        ),
-      );
-    }
-    final list = items ?? const [];
-    if (list.isEmpty) {
-      return RefreshIndicator(
-        onRefresh: onRefresh,
-        child: ListView(
-          children: [
-            EmptyStateWidget(
-              icon: Symbols.travel_explore_rounded,
-              title: 'Nothing here yet',
-              message: emptyMessage,
-            ),
-          ],
-        ),
-      );
-    }
-    return RefreshIndicator(
-      onRefresh: onRefresh,
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final columns = context.gridColumns;
-          final side = MaxWidthContainer.sidePadding(context, maxWidth: 1400);
-          final cardWidth =
-              (constraints.maxWidth - side * 2 - AppSpacing.md * (columns - 1)) / columns;
-          return GridView.builder(
-            padding: EdgeInsets.fromLTRB(
-              side,
-              0,
-              side,
-              // Taller than AppSpacing.huge alone — this tab also has the
-              // floating AI Chat FAB (`_AiChatFab` in `MainShellScreen`)
-              // hovering above the bottom nav bar, which the plain nav-bar
-              // clearance doesn't account for, letting the last row sit
-              // right behind it.
-              AppSpacing.huge + AppSpacing.xxxl,
-            ),
-            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: columns,
-              crossAxisSpacing: AppSpacing.md,
-              mainAxisSpacing: AppSpacing.lg,
-              mainAxisExtent: _gridCellExtent,
-            ),
-            itemCount: list.length + (hasMore ? 1 : 0),
-            itemBuilder: (context, i) {
-              if (i >= list.length) {
-                return Padding(
-                  padding: const EdgeInsets.only(top: AppSpacing.sm),
-                  child: AnimatedButton(
-                    label: 'Load More',
-                    filled: false,
-                    isLoading: isLoading,
-                    onPressed: isLoading ? null : onLoadMore,
-                  ),
-                );
-              }
-              return itemBuilder(context, cardWidth, list[i]);
-            },
-          );
-        },
-      ),
-    );
-  }
-
-  /// Mirrors [_buildGrid]'s loading/error handling, but renders every
-  /// coordinate-bearing item as a pin on one [ExploreMapView] instead of a
-  /// paginated grid — [items] here is the map-mode batch loaded by
-  /// `_load*`'s `_mapMode` branch (see those methods), not the paginated
-  /// list-mode one.
-  Widget _buildMap<T>({
-    required List<T>? items,
-    required bool isLoading,
-    required Object? error,
-    required VoidCallback onRetry,
-    required String emptyMessage,
-    required Marker? Function(T item) markerFor,
-  }) {
-    if (items == null && isLoading) {
-      return const Center(child: CircularProgressIndicator());
     }
     if (items == null && error != null) {
       return EmptyStateWidget(
@@ -962,8 +1005,117 @@ class _ExploreScreenState extends State<ExploreScreen> {
         onActionTap: onRetry,
       );
     }
-    final markers = (items ?? const []).map(markerFor).whereType<Marker>().toSet();
-    return ExploreMapView(markers: markers, emptyMessage: emptyMessage);
+    final list = items ?? const [];
+    if (list.isEmpty) {
+      return EmptyStateWidget(
+        icon: Symbols.travel_explore_rounded,
+        title: 'Nothing here yet',
+        message: emptyMessage,
+      );
+    }
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final columns = context.gridColumns;
+        final side = MaxWidthContainer.sidePadding(context, maxWidth: 1400);
+        final cardWidth =
+            (constraints.maxWidth - side * 2 - AppSpacing.md * (columns - 1)) /
+            columns;
+        return GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          padding: EdgeInsets.fromLTRB(
+            side,
+            0,
+            side,
+            // Taller than AppSpacing.huge alone — this tab also has the
+            // floating AI Chat FAB (`_AiChatFab` in `MainShellScreen`)
+            // hovering above the bottom nav bar, which the plain nav-bar
+            // clearance doesn't account for, letting the last row sit
+            // right behind it.
+            AppSpacing.huge + AppSpacing.xxxl,
+          ),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: columns,
+            crossAxisSpacing: AppSpacing.md,
+            mainAxisSpacing: AppSpacing.lg,
+            mainAxisExtent: _gridCellExtent,
+          ),
+          itemCount: list.length + (hasMore ? 1 : 0),
+          itemBuilder: (context, i) {
+            if (i >= list.length) {
+              return Padding(
+                padding: const EdgeInsets.only(top: AppSpacing.sm),
+                child: AnimatedButton(
+                  label: 'Load More',
+                  filled: false,
+                  isLoading: isLoading,
+                  onPressed: isLoading ? null : onLoadMore,
+                ),
+              );
+            }
+            return itemBuilder(context, cardWidth, list[i]);
+          },
+        );
+      },
+    );
+  }
+}
+
+/// One of the four main Explore tabs (Destinations/Restaurants/Festivals/
+/// Local Finds) — deliberately styled as a real tab (icon + label,
+/// underline indicator when selected) rather than a filled pill, unlike
+/// [_TabChip]'s filter-chip look used for the category/sub-filter rows
+/// below it. Same enum-driven `_tab` state either way, just a different
+/// widget for the top-level navigation row than the ones for narrowing
+/// what's shown within a tab.
+class _MainTabButton extends StatelessWidget {
+  const _MainTabButton({
+    required this.icon,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final color = selected
+        ? theme.colorScheme.primary
+        : theme.colorScheme.onSurfaceVariant;
+    return InkWell(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+        decoration: BoxDecoration(
+          border: Border(
+            bottom: BorderSide(
+              color: selected ? theme.colorScheme.primary : Colors.transparent,
+              width: 2,
+            ),
+          ),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 20, color: color),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              style: theme.textTheme.labelMedium?.copyWith(
+                color: color,
+                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 

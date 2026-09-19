@@ -138,8 +138,13 @@ class AuthProvider extends ChangeNotifier {
       // Backfills the Google profile photo for accounts created before this
       // was wired up (or that signed up with email and later linked Google) —
       // never overwrites a photo the traveler chose in-app.
+      // Both backfills are best-effort: a failed write here (offline,
+      // permission-denied) must not skip the `_status = loaded` below, or the
+      // app would sit on its loading state for a profile that already loaded.
       if (profile != null && profile.photoUrl.isEmpty && (user.photoURL ?? '').isNotEmpty) {
-        await _userRepository.updateProfile(user.uid, {'photoUrl': user.photoURL});
+        try {
+          await _userRepository.updateProfile(user.uid, {'photoUrl': user.photoURL});
+        } catch (_) {}
       }
       // Mirrors a confirmed email change into Firestore. changeEmail() uses
       // verifyBeforeUpdateEmail, so Firebase Auth's own email only updates
@@ -148,9 +153,18 @@ class AuthProvider extends ChangeNotifier {
       // catches the mismatch on the next sign-in/token-refresh instead of
       // leaving the Firestore profile permanently stale.
       if (profile != null && user.email != null && user.email!.isNotEmpty && profile.email != user.email) {
-        await _userRepository.updateProfile(user.uid, {'email': user.email});
+        try {
+          await _userRepository.updateProfile(user.uid, {'email': user.email});
+        } catch (_) {}
       }
       _appUser = profile;
+      _status = ViewStatus.loaded;
+      notifyListeners();
+    }, onError: (Object e) {
+      // A profile-stream failure (permission-denied, dropped connection)
+      // would otherwise be an unhandled async error that leaves _status on
+      // ViewStatus.loading forever.
+      errorMessage = AppException.from(e).message;
       _status = ViewStatus.loaded;
       notifyListeners();
     });

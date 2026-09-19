@@ -6,7 +6,6 @@ import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/providers/auth_provider.dart';
 import '../../core/providers/favorites_provider.dart';
@@ -15,6 +14,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/utils/app_exception.dart';
 import '../../core/utils/maps_launcher.dart';
+import '../../core/utils/safe_launch.dart';
 import '../../core/utils/share_text.dart';
 import '../../core/widgets/buttons/animated_button.dart';
 import '../../core/widgets/cards/destination_card.dart';
@@ -38,6 +38,7 @@ import '../../data/repositories/user_repository.dart';
 import '../../domain/models/destination.dart';
 import '../../domain/models/restaurant.dart';
 import '../../domain/models/review.dart';
+import '../../core/widgets/media/image_error_placeholder.dart';
 
 /// Full detail view for a restaurant: gallery, key facts, menu highlights,
 /// description, nearby attractions in the same area, and reviews — loaded
@@ -466,9 +467,7 @@ class _RestaurantDetailsBody extends StatelessWidget {
                   icon: Symbols.call_rounded,
                   filled: false,
                   onPressed: restaurant.phoneNumber.isNotEmpty
-                      ? () => launchUrl(
-                          Uri.parse('tel:${restaurant.phoneNumber}'),
-                        )
+                      ? () => callNumber(restaurant.phoneNumber)
                       : null,
                 ),
               ),
@@ -528,6 +527,11 @@ class _MenuItemTile extends StatelessWidget {
               height: 96,
               width: double.infinity,
               fit: BoxFit.cover,
+              errorWidget: (context, url, error) =>
+                  const ImageErrorPlaceholder(
+                    width: double.infinity,
+                    height: 96,
+                  ),
             ),
           ),
           Padding(

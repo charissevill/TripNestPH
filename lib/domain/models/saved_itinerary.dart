@@ -15,6 +15,7 @@ class SavedItinerary {
     this.memberNames = const {},
     this.packingItems = const [],
     this.startDate,
+    this.completedAt,
   });
 
   final String id;
@@ -51,12 +52,21 @@ class SavedItinerary {
 
   DateTime? get endDate => startDate?.add(Duration(days: itinerary.totalDays - 1));
 
+  /// Set by the owner tapping "Mark as completed" — self-reported, not
+  /// verified (no location check-in), same trust level as every other
+  /// traveler-entered field on this trip. Null means not marked complete.
+  final DateTime? completedAt;
+
+  bool get isCompleted => completedAt != null;
+
   SavedItinerary copyWith({
     List<String>? collaboratorIds,
     Map<String, String>? memberNames,
     List<PackingItem>? packingItems,
     DateTime? startDate,
     bool clearStartDate = false,
+    DateTime? completedAt,
+    bool clearCompletedAt = false,
   }) {
     return SavedItinerary(
       id: id,
@@ -68,12 +78,14 @@ class SavedItinerary {
       memberNames: memberNames ?? this.memberNames,
       packingItems: packingItems ?? this.packingItems,
       startDate: clearStartDate ? null : (startDate ?? this.startDate),
+      completedAt: clearCompletedAt ? null : (completedAt ?? this.completedAt),
     );
   }
 
   factory SavedItinerary.fromMap(String id, Map<String, dynamic> map) {
     final timestamp = map['savedAt'];
     final startTimestamp = map['startDate'];
+    final completedTimestamp = map['completedAt'];
     return SavedItinerary(
       id: id,
       userId: map['userId'] as String? ?? '',
@@ -84,6 +96,7 @@ class SavedItinerary {
       memberNames: Map<String, String>.from(map['memberNames'] as Map? ?? const {}),
       packingItems: _packingItemsFromRaw(map['packingItems']),
       startDate: startTimestamp is Timestamp ? startTimestamp.toDate() : null,
+      completedAt: completedTimestamp is Timestamp ? completedTimestamp.toDate() : null,
     );
   }
 
@@ -114,6 +127,7 @@ class SavedItinerary {
       // A map keyed by item id, not a list — see _packingItemsFromRaw.
       'packingItems': {for (final p in packingItems) p.id: p.toMap()},
       'startDate': startDate != null ? Timestamp.fromDate(startDate!) : null,
+      'completedAt': completedAt != null ? Timestamp.fromDate(completedAt!) : null,
     };
   }
 }

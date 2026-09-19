@@ -14,6 +14,10 @@ Future<void> showChatSessionsSheet(BuildContext context) {
     context: context,
     backgroundColor: Colors.transparent,
     isScrollControlled: true,
+    // See trip_calendar_screen.dart's showModalBottomSheet for why this
+    // matters — without it, the floating AI Chat FAB floats visibly on
+    // top of this sheet instead of being covered by it.
+    useRootNavigator: true,
     builder: (_) => const _ChatSessionsSheet(),
   );
 }
@@ -47,7 +51,9 @@ class _ChatSessionsSheet extends StatelessWidget {
       builder: (context, scrollController) {
         return Material(
           color: theme.colorScheme.surface,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadius.xxl)),
+          borderRadius: const BorderRadius.vertical(
+            top: Radius.circular(AppRadius.xxl),
+          ),
           child: Column(
             children: [
               const SizedBox(height: AppSpacing.sm),
@@ -60,7 +66,12 @@ class _ChatSessionsSheet extends StatelessWidget {
                 ),
               ),
               Padding(
-                padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.lg, AppSpacing.lg, AppSpacing.md),
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.lg,
+                  AppSpacing.lg,
+                  AppSpacing.lg,
+                  AppSpacing.md,
+                ),
                 child: Align(
                   alignment: Alignment.centerLeft,
                   child: Text('Chats', style: theme.textTheme.headlineSmall),
@@ -75,18 +86,26 @@ class _ChatSessionsSheet extends StatelessWidget {
                   },
                   borderRadius: BorderRadius.circular(AppRadius.lg),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.md),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.md,
+                      vertical: AppSpacing.md,
+                    ),
                     decoration: BoxDecoration(
                       color: theme.colorScheme.primary.withValues(alpha: 0.08),
                       borderRadius: BorderRadius.circular(AppRadius.lg),
                     ),
                     child: Row(
                       children: [
-                        Icon(Symbols.add_comment_rounded, color: theme.colorScheme.primary),
+                        Icon(
+                          Symbols.add_comment_rounded,
+                          color: theme.colorScheme.primary,
+                        ),
                         const SizedBox(width: AppSpacing.sm),
                         Text(
                           'New Chat',
-                          style: theme.textTheme.titleSmall?.copyWith(color: theme.colorScheme.primary),
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            color: theme.colorScheme.primary,
+                          ),
                         ),
                       ],
                     ),
@@ -97,26 +116,39 @@ class _ChatSessionsSheet extends StatelessWidget {
               Expanded(
                 child: sessions.isEmpty
                     ? Center(
-                        child: Text('No past chats yet', style: theme.textTheme.bodyMedium),
+                        child: Text(
+                          'No past chats yet',
+                          style: theme.textTheme.bodyMedium,
+                        ),
                       )
                     : ListView.builder(
                         controller: scrollController,
-                        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.xs),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.md,
+                          vertical: AppSpacing.xs,
+                        ),
                         itemCount: sessions.length,
                         itemBuilder: (context, i) {
                           final session = sessions[i];
                           final isActive = session.id == chat.currentSessionId;
                           return ListTile(
                             onTap: () {
-                              context.read<AiChatProvider>().switchToSession(session.id);
+                              context.read<AiChatProvider>().switchToSession(
+                                session.id,
+                              );
                               Navigator.of(context).pop();
                             },
                             selected: isActive,
-                            selectedTileColor: theme.colorScheme.primary.withValues(alpha: 0.06),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.lg)),
+                            selectedTileColor: theme.colorScheme.primary
+                                .withValues(alpha: 0.06),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(AppRadius.lg),
+                            ),
                             leading: Icon(
                               Symbols.forum_rounded,
-                              color: isActive ? theme.colorScheme.primary : theme.colorScheme.onSurfaceVariant,
+                              color: isActive
+                                  ? theme.colorScheme.primary
+                                  : theme.colorScheme.onSurfaceVariant,
                             ),
                             title: Text(
                               session.title,
@@ -126,18 +158,24 @@ class _ChatSessionsSheet extends StatelessWidget {
                             ),
                             subtitle: Text(_relativeLabel(session.updatedAt)),
                             trailing: IconButton(
-                              icon: const Icon(Symbols.delete_outline_rounded, size: 20),
+                              icon: const Icon(
+                                Symbols.delete_outline_rounded,
+                                size: 20,
+                              ),
                               tooltip: 'Delete chat',
                               onPressed: () async {
                                 final confirmed = await showConfirmationDialog(
                                   context,
                                   title: 'Delete this chat?',
-                                  message: '"${session.title}" will be permanently deleted.',
+                                  message:
+                                      '"${session.title}" will be permanently deleted.',
                                   confirmLabel: 'Delete',
                                   isDestructive: true,
                                 );
                                 if (confirmed && context.mounted) {
-                                  context.read<AiChatProvider>().deleteSession(session.id);
+                                  context.read<AiChatProvider>().deleteSession(
+                                    session.id,
+                                  );
                                 }
                               },
                             ),

@@ -6,6 +6,7 @@ import '../../core/constants/firestore_paths.dart';
 import '../../core/services/storage_service.dart';
 import '../../core/utils/app_exception.dart';
 import '../../domain/models/review.dart';
+import 'business_repository.dart';
 import 'destination_repository.dart';
 import 'festival_repository.dart';
 import 'restaurant_repository.dart';
@@ -19,35 +20,47 @@ class ReviewRepository {
     DestinationRepository? destinationRepository,
     RestaurantRepository? restaurantRepository,
     FestivalRepository? festivalRepository,
-  })  : _db = firestore ?? FirebaseFirestore.instance,
-        _storageOverride = storageService,
-        _destinationRepository = destinationRepository ?? DestinationRepository(),
-        _restaurantRepository = restaurantRepository ?? RestaurantRepository(),
-        _festivalRepository = festivalRepository ?? FestivalRepository();
+    BusinessRepository? businessRepository,
+  }) : _db = firestore ?? FirebaseFirestore.instance,
+       _storageOverride = storageService,
+       _destinationRepository =
+           destinationRepository ?? DestinationRepository(),
+       _restaurantRepository = restaurantRepository ?? RestaurantRepository(),
+       _festivalRepository = festivalRepository ?? FestivalRepository(),
+       _businessRepository = businessRepository ?? BusinessRepository();
 
   final FirebaseFirestore _db;
   final DestinationRepository _destinationRepository;
   final RestaurantRepository _restaurantRepository;
   final FestivalRepository _festivalRepository;
+  final BusinessRepository _businessRepository;
 
   // Lazy: only reviews with photos ever touch Firebase Storage, so a plain
   // text-only review (or a test using a Firestore-only fake) never pays for
   // constructing it.
   final StorageService? _storageOverride;
   StorageService? _storageInstance;
-  StorageService get _storage => _storageOverride ?? (_storageInstance ??= StorageService());
+  StorageService get _storage =>
+      _storageOverride ?? (_storageInstance ??= StorageService());
 
-  CollectionReference<Map<String, dynamic>> get _collection => _db.collection(FirestorePaths.reviews);
+  CollectionReference<Map<String, dynamic>> get _collection =>
+      _db.collection(FirestorePaths.reviews);
 
   /// One review per traveler per listing, enforced structurally rather than
   /// just by UI convention: the doc id is deterministic, so a second
   /// "Write a Review" for the same person+listing overwrites their existing
   /// review instead of creating a duplicate — the same pattern
   /// `FavoritesRepository` already uses for exactly this reason.
-  String _docId({required String userId, required String targetId, required ReviewTargetType targetType}) =>
-      '${userId}_${targetType.name}_$targetId';
+  String _docId({
+    required String userId,
+    required String targetId,
+    required ReviewTargetType targetType,
+  }) => '${userId}_${targetType.name}_$targetId';
 
-  Stream<List<Review>> streamForTarget(String targetId, ReviewTargetType targetType) {
+  Stream<List<Review>> streamForTarget(
+    String targetId,
+    ReviewTargetType targetType,
+  ) {
     return _collection
         .where('targetId', isEqualTo: targetId)
         .where('targetType', isEqualTo: targetType.name)
@@ -72,8 +85,10 @@ class ReviewRepository {
 
   Future<List<Review>> getByUser(String userId) async {
     try {
-      final snapshot =
-          await _collection.where('userId', isEqualTo: userId).orderBy('createdAt', descending: true).get();
+      final snapshot = await _collection
+          .where('userId', isEqualTo: userId)
+          .orderBy('createdAt', descending: true)
+          .get();
       return snapshot.docs.map((d) => Review.fromMap(d.id, d.data())).toList();
     } catch (e) {
       throw AppException.from(e);
@@ -84,8 +99,15 @@ class ReviewRepository {
   /// have one (the deterministic id already exists — see [_docId]), this
   /// overwrites it in place instead of creating a duplicate; the review
   /// count only changes for a genuinely new review.
-  Future<void> addReview({required Review review, List<File> photos = const []}) async {
-    final id = _docId(userId: review.userId, targetId: review.targetId, targetType: review.targetType);
+  Future<void> addReview({
+    required Review review,
+    List<File> photos = const [],
+  }) async {
+    final id = _docId(
+      userId: review.userId,
+      targetId: review.targetId,
+      targetType: review.targetType,
+    );
     try {
       final existing = await _collection.doc(id).get();
       var photoUrls = review.photoUrls;
@@ -97,7 +119,9 @@ class ReviewRepository {
         );
       }
       try {
-        await _collection.doc(id).set(review.toMap()..['photoUrls'] = photoUrls);
+        await _collection
+            .doc(id)
+            .set(review.toMap()..['photoUrls'] = photoUrls);
       } catch (e) {
         // The photo(s) above already uploaded successfully — without this,
         // a failure right here (dropped connection, rules mismatch) would
@@ -145,7 +169,9 @@ class ReviewRepository {
   }) async {
     try {
       final kept = keptPhotoUrls ?? review.photoUrls;
-      final removed = review.photoUrls.where((url) => !kept.contains(url)).toList();
+      final removed = review.photoUrls
+          .where((url) => !kept.contains(url))
+          .toList();
       var photoUrls = kept;
       List<String> uploaded = const [];
       if (newPhotos.isNotEmpty) {
@@ -191,7 +217,11 @@ class ReviewRepository {
       // caller re-hiding an already-hidden review (or restoring an
       // already-visible one) double-counting.
       if (review.isHidden != hidden) {
-        await _adjustReviewCount(review.targetId, review.targetType, hidden ? -1 : 1);
+        await _adjustReviewCount(
+          review.targetId,
+          review.targetType,
+          hidden ? -1 : 1,
+        );
       }
       await _recalculateRating(review.targetId, review.targetType);
     } catch (e) {
@@ -238,7 +268,10 @@ class ReviewRepository {
   /// e.g. the moderation queue's "This review no longer exists"). No
   /// aggregate recalculation needed after — the target document is gone
   /// too.
-  Future<void> deleteAllForTarget(String targetId, ReviewTargetType targetType) async {
+  Future<void> deleteAllForTarget(
+    String targetId,
+    ReviewTargetType targetType,
+  ) async {
     try {
       final snapshot = await _collection
           .where('targetId', isEqualTo: targetId)
@@ -267,7 +300,11 @@ class ReviewRepository {
   /// could silently clobber the other and leave the count permanently
   /// wrong. Self-migrating: works correctly against existing documents that
   /// already carry a real `reviewCount`, no backfill needed.
-  Future<void> _adjustReviewCount(String targetId, ReviewTargetType targetType, int delta) async {
+  Future<void> _adjustReviewCount(
+    String targetId,
+    ReviewTargetType targetType,
+    int delta,
+  ) async {
     switch (targetType) {
       case ReviewTargetType.destination:
         await _destinationRepository.adjustReviewCount(targetId, delta);
@@ -275,6 +312,8 @@ class ReviewRepository {
         await _restaurantRepository.adjustReviewCount(targetId, delta);
       case ReviewTargetType.festival:
         await _festivalRepository.adjustReviewCount(targetId, delta);
+      case ReviewTargetType.business:
+        await _businessRepository.adjustReviewCount(targetId, delta);
     }
   }
 
@@ -284,24 +323,43 @@ class ReviewRepository {
   /// writes. Unlike `reviewCount` (now atomic, see [_adjustReviewCount]),
   /// that's a self-correcting, sub-decimal display value rather than a
   /// permanently wrong number of reviews.
-  Future<void> _recalculateRating(String targetId, ReviewTargetType targetType) async {
+  Future<void> _recalculateRating(
+    String targetId,
+    ReviewTargetType targetType,
+  ) async {
     final snapshot = await _collection
         .where('targetId', isEqualTo: targetId)
         .where('targetType', isEqualTo: targetType.name)
         .where('isHidden', isEqualTo: false)
         .get();
-    final ratings = snapshot.docs.map((d) => (d.data()['rating'] as num?)?.toDouble() ?? 0).toList();
+    final ratings = snapshot.docs
+        .map((d) => (d.data()['rating'] as num?)?.toDouble() ?? 0)
+        .toList();
     final count = ratings.length;
     final average = count == 0 ? 0.0 : ratings.reduce((a, b) => a + b) / count;
     final rounded = double.parse(average.toStringAsFixed(1));
 
     switch (targetType) {
       case ReviewTargetType.destination:
-        await _destinationRepository.updateAggregateRating(targetId, rating: rounded);
+        await _destinationRepository.updateAggregateRating(
+          targetId,
+          rating: rounded,
+        );
       case ReviewTargetType.restaurant:
-        await _restaurantRepository.updateAggregateRating(targetId, rating: rounded);
+        await _restaurantRepository.updateAggregateRating(
+          targetId,
+          rating: rounded,
+        );
       case ReviewTargetType.festival:
-        await _festivalRepository.updateAggregateRating(targetId, rating: rounded);
+        await _festivalRepository.updateAggregateRating(
+          targetId,
+          rating: rounded,
+        );
+      case ReviewTargetType.business:
+        await _businessRepository.updateAggregateRating(
+          targetId,
+          rating: rounded,
+        );
     }
   }
 }

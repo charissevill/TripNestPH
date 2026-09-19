@@ -31,7 +31,7 @@ service cloud.firestore {
     function isValidReview() {
       return request.resource.data.userId == request.auth.uid
         && request.resource.data.targetId is string && request.resource.data.targetId.size() > 0
-        && request.resource.data.targetType in ['destination', 'restaurant', 'festival']
+        && request.resource.data.targetType in ['destination', 'restaurant', 'festival', 'business']
         && request.resource.data.rating is number && request.resource.data.rating >= 1 && request.resource.data.rating <= 5
         && request.resource.data.comment is string && request.resource.data.comment.size() <= 2000
         && isValidVerifiedClaim();
@@ -581,7 +581,8 @@ service cloud.firestore {
     // their owner or an admin.
     match /businesses/{businessId} {
       allow read: if isSignedIn() && (
-        resource.data.status == 'approved' || resource.data.ownerId == request.auth.uid || hasAdminRole(['admin'])
+        resource.data.status == 'approved' || resource.data.ownerId == request.auth.uid
+        || canManageProvince(resource.data.provinceId)
       );
       allow create: if hasAdminRole(['businessOwner'])
                     && request.resource.data.ownerId == request.auth.uid
@@ -603,16 +604,29 @@ service cloud.firestore {
                         !request.resource.data.diff(resource.data).affectedKeys().hasAny(['status', 'rejectionReason', 'ownerId', 'restaurantId'])
                         || (resource.data.status == 'rejected' && request.resource.data.status == 'pending' && request.resource.data.rejectionReason == '')
                       ))
-                    // Admin: status/rejectionReason for approve/reject/suspend, and
-                    // restaurantId the one time a foodAndDining listing is first
-                    // approved (see AdminBusinessListScreen._syncRestaurantBeforeApproval).
-                    || (hasAdminRole(['admin']) && onlyChangedFields(['status', 'rejectionReason', 'restaurantId']))
+                    // Admin (any province) or the LGU whose province this
+                    // listing belongs to: status/rejectionReason for
+                    // approve/reject/suspend, and restaurantId the one time a
+                    // foodAndDining listing is first approved (see
+                    // AdminBusinessListScreen._syncRestaurantBeforeApproval).
+                    // Real-world business permits are LGU-issued, not a
+                    // central admin's call — same province-scoped authority
+                    // canManageProvince already grants over tourist_spots/
+                    // festivals. resource.data.provinceId (not the request's)
+                    // since provinceId itself isn't one of the changed fields
+                    // here.
+                    || (canManageProvince(resource.data.provinceId) && onlyChangedFields(['status', 'rejectionReason', 'restaurantId']))
                     // Any signed-in traveler viewing this listing (province
                     // page tile or, for a linked restaurant, the restaurant
                     // details screen) — never the owner's own field-edit
                     // path, which goes through toInfoMap() and never
                     // includes viewCount.
-                    || (isSignedIn() && onlyChangedFields(['viewCount']) && isValidViewCountIncrement());
+                    || (isSignedIn() && onlyChangedFields(['viewCount']) && isValidViewCountIncrement())
+                    // rating/reviewCount recalculation after a traveler
+                    // writes/edits/removes a review on this listing — same
+                    // ReviewRepository-driven aggregate-update pattern
+                    // restaurants/destinations/festivals already allow.
+                    || (isSignedIn() && isValidAggregateUpdate());
       allow delete: if hasAdminRole(['admin']);
     }
 
@@ -631,7 +645,15 @@ service cloud.firestore {
         return isSignedIn()
           && get(/databases/$(database)/documents/businesses/$(businessId)).data.ownerId == request.auth.uid;
       }
-      allow read: if ownsParentBusiness() || hasAdminRole(['admin']);
+      // The reviewing LGU/admin needs to see the actual permit photo before
+      // approving — same canManageProvince authority as the parent
+      // business's own approve/reject/suspend branch.
+      function canManageParentBusinessProvince() {
+        return canManageProvince(
+          get(/databases/$(database)/documents/businesses/$(businessId)).data.provinceId
+        );
+      }
+      allow read: if ownsParentBusiness() || canManageParentBusinessProvince();
       allow create: if hasAdminRole(['businessOwner']) && ownsParentBusiness()
                     && request.resource.data.keys().hasOnly(['permitUrl']);
       allow update: if hasAdminRole(['businessOwner']) && ownsParentBusiness()

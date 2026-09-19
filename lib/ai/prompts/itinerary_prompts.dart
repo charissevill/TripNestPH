@@ -115,7 +115,10 @@ The traveler already discussed this exact trip with our AI Travel Assistant, whi
 """
 $priorConversationContext
 """
-Build this itinerary to genuinely match that reply — reuse the same specific real places for activities wherever they fit, instead of substituting different ones. Only pick something else for a slot if nothing already mentioned fits the traveler's stated budget/interests, or if the lists below don't include a good match.
+This itinerary MUST match that reply, not just loosely resemble it:
+- Every specific real place that reply named (restaurant, attraction, hotel) has already been added to the candidate lists below specifically so you can use it here — actually use it, don't substitute a different real place for a slot that reply already filled. Only pick something else for a slot if that reply genuinely didn't name anything for it.
+- If that reply broke the plan down by day ("Day 1", "Day 2", etc.), keep each place on the SAME day number here — a place that reply put on Day 2 belongs in "days[1]" here (0-indexed by position, 1-indexed "dayNumber"/"dateLabel"), not shuffled to a different day. Match its Morning/Afternoon/Evening slot too when the reply specified one.
+- If that reply only gave a single day or a general list (no per-day breakdown), distribute those places across the requested trip length in whatever order makes a sane route, same as you would with no prior conversation.
 
 ''' : ''}
 Plan a trip with these details:
@@ -137,6 +140,113 @@ Top-rated hotels near this destination, already chosen and shown to the traveler
 The restaurant/attraction lists above are already sorted by distance from ${accommodationName != null && accommodationName.isNotEmpty ? 'where the traveler is staying ($accommodationName)' : request.destinationName} — prefer picks near the top of each list when they still fit the traveler's interests and budget. Within a single day, prefer activities that are close to each other over ones further down either list, so the day doesn't zigzag back and forth across the destination — a realistic day trades a small amount of "best possible pick" for one that's actually a sane route to follow in order.
 
 Weather forecast for the trip: ${weatherForecast.isEmpty ? 'not available — plan without weather-based adjustments' : weatherForecast.map((w) => '${w.dayLabel}: ${w.condition}, ${w.lowTemp}–${w.highTemp}°C').join('; ')}
+
+Real safety/budget facts on file for ${request.provinceName} — use these instead of inventing generic ones:
+- Emergency hotlines: ${emergencyHotlines.isEmpty ? 'none on file — give general Philippines emergency guidance (e.g. 911) and note that the traveler should confirm the local hotline on arrival' : emergencyHotlines.map((h) => '${h.label}: ${h.number}').join(', ')}
+- Typical daily budget guide for this province: ${(provinceBudgetMin != null && provinceBudgetMin > 0 && provinceBudgetMax != null && provinceBudgetMax > 0) ? '₱${provinceBudgetMin.toStringAsFixed(0)}–₱${provinceBudgetMax.toStringAsFixed(0)} per day' : 'not on file'}
+- Official TripNest PH travel tips on file: ${provinceTravelTips.isEmpty ? 'none' : provinceTravelTips.join('; ')}
+
+Respond with the JSON object only.
+''';
+  }
+
+  /// Companion to [system]/[user] for a chat-derived itinerary (see
+  /// `AiRepository.generateItineraryFromChatPlan`): the day-by-day plan
+  /// there is already fixed — parsed straight from the chat reply itself,
+  /// not model-picked — so this only ever asks the model to cost it out and
+  /// write tips for it, never to choose or move a place. Keeps the same
+  /// JSON shape/rules as [system]'s budgetBreakdown/travelTips fields so a
+  /// chat-derived itinerary looks exactly as detailed as a Planner-form one.
+  static String budgetAndTipsSystem() {
+    return '''
+You are the trip-budgeting and travel-tips engine inside TripNest PH, a Philippine tourism app. A traveler's day-by-day itinerary is already finalized (given to you below) — your only job is to estimate its budget breakdown and write travel tips for it. Do not suggest changing, adding, removing, or reordering any activity or place; that isn't what you're being asked for.
+
+You must respond with ONLY a single JSON object — no prose before or after it, no markdown code fences. It must match this exact shape:
+
+{
+  "budgetBreakdown": [
+    {"label": "Transportation", "amount": 0, "iconKey": "directions_boat", "colorKey": "primary", "items": [{"name": "Habal-habal ride", "price": 0, "place": ""}]},
+    {"label": "Food", "amount": 0, "iconKey": "restaurant", "colorKey": "secondary", "items": [{"name": "Chicken Inasal meal", "price": 0, "place": "exact place name from the itinerary below, or a specific named spot/vendor type"}]},
+    {"label": "Entrance Fees", "amount": 0, "iconKey": "payments", "colorKey": "accent", "items": [{"name": "Chocolate Hills entrance fee", "price": 0, "place": "exact place name from the itinerary below"}]},
+    {"label": "Accommodation", "amount": 0, "iconKey": "hotel", "colorKey": "primaryDark", "items": [{"name": "1 night stay", "price": 0, "place": "exact hotel name if one is given, else empty"}]},
+    {"label": "Miscellaneous", "amount": 0, "iconKey": "shopping_bag", "colorKey": "secondaryDark", "items": []}
+  ],
+  "totalBudget": 0,
+  "travelTips": ["short, punchy, single-sentence strings — see categories below"]
+}
+
+Rules:
+- "iconKey" must be one of: ${iconKeys.join(', ')}.
+- "colorKey" must be one of: ${colorKeys.join(', ')}.
+- "totalBudget" must roughly equal the sum of "budgetBreakdown" amounts, in Philippine pesos (numbers only, no currency symbol), and must fit the traveler's stated budget tier. If a real daily-budget guide for the province is given below, sanity-check your numbers against it.
+- The "Food" entry must include 2-4 "items": concrete, specific things the traveler could actually order/buy at the meal-slot places already in the itinerary below, each with its own realistic peso price. Every item's "place" must be one of those exact itinerary place names when the item is from there, otherwise a specific, realistic named spot; never leave "place" blank.
+- The "Entrance Fees" entry must include 1-3 "items" for specific attractions already in the itinerary below and their real entrance fee, "place" copied verbatim from the itinerary; never leave "place" blank here either. Omit this category (empty "items") if nothing in the itinerary plausibly charges one.
+- The "Transportation" entry may include 1-3 "items" for transport costs actually relevant to this trip — "place" has no single real place to point at, leave it as an empty string.
+- The "Accommodation" entry should include 1 "item" — a realistic per-night rate for wherever the traveler is staying, named like "1 night stay". If a real hotel is given below, use it and set "place" to its exact name; otherwise give a realistic per-night estimate for this destination/budget tier and leave "place" blank.
+- "Miscellaneous" should keep "items" as an empty array.
+- "travelTips" must include, in this order, one entry per category (skip a category only if genuinely not applicable): a suggested local delicacy/dish to try, a hidden gem worth a detour (only if not already one of the itinerary's own places), the best visiting hours/time of day to avoid crowds, a practical travel reminder, a safety reminder specific to the destination, and an eco-friendly travel tip. Prefix each with a short bold-ish label like "Local delicacy:", "Hidden gem:", "Best time to visit:", "Reminder:", "Safety:", "Eco tip:". For "Safety:": if real emergency hotline data is given below, cite the actual label/number verbatim; only fall back to general Philippines emergency guidance if none is given.
+- Keep every string concise and mobile-friendly — this renders in a scrollable card UI, not a document.
+''';
+  }
+
+  /// Companion to [regenerateActivityUser] — asks for exactly ONE
+  /// replacement activity for a single time slot the traveler wants
+  /// reshuffled, instead of [system]'s whole-itinerary shape. Used by
+  /// `AiRepository.regenerateActivity`, wired to a per-activity
+  /// "Regenerate" button on `GeneratedItineraryScreen` so a traveler who
+  /// only dislikes their Morning pick doesn't have to redo the whole trip.
+  static String regenerateActivitySystem() {
+    return '''
+You are the trip-planning engine inside TripNest PH, a Philippine tourism app. A traveler wants a fresh replacement for ONE activity in their existing day-by-day itinerary — everything else about their trip stays exactly as it is; you're only picking a new activity for this one time slot.
+
+You must respond with ONLY a single JSON object — no prose before or after it, no markdown code fences. It must match this exact shape:
+
+{"title": "...", "description": "1-2 sentences, concrete and specific", "iconKey": "one of the allowed keys", "location": "specific real place name"}
+
+Rules:
+- "iconKey" must be one of: ${iconKeys.join(', ')}.
+- "location" must be a specific, real, named place — never vague (e.g. "a local restaurant").
+- Pick something clearly different from the other activities already planned for this same day, listed below — no duplicates or near-duplicates.
+- Keep it realistic and appropriate for the stated time of day.
+- Keep every string concise and mobile-friendly — this renders in a scrollable card UI, not a document.
+- Never suggest anything illegal, unsafe, or environmentally destructive.
+''';
+  }
+
+  static String regenerateActivityUser({
+    required String destinationName,
+    required String time,
+    required List<String> otherActivityTitles,
+  }) {
+    return '''
+Destination: $destinationName, Philippines
+Time slot to fill: $time
+Other activities already planned for this same day (pick something clearly different from all of these): ${otherActivityTitles.isEmpty ? 'none' : otherActivityTitles.join(', ')}
+
+Respond with the JSON object only.
+''';
+  }
+
+  static String budgetAndTipsUser({
+    required AiItineraryRequest request,
+    required String dayPlanSummary,
+    List<EmergencyHotline> emergencyHotlines = const [],
+    List<String> provinceTravelTips = const [],
+    double? provinceBudgetMin,
+    double? provinceBudgetMax,
+    String? accommodationName,
+  }) {
+    return '''
+Trip details:
+- Destination: ${request.destinationName}, ${request.provinceName}, Philippines
+- Trip length: ${request.days} day(s)
+- Number of travelers: ${request.travelers}
+- Traveler type: ${request.travelerType}
+- Budget tier: ${request.budgetTierLabel} (${request.budgetRange} total for the whole trip, all travelers combined)
+- Accommodation: ${accommodationName != null && accommodationName.isNotEmpty ? accommodationName : 'not specified — estimate a realistic stay for this destination/budget tier'}
+
+The already-finalized day-by-day itinerary to cost out (do not change this):
+$dayPlanSummary
 
 Real safety/budget facts on file for ${request.provinceName} — use these instead of inventing generic ones:
 - Emergency hotlines: ${emergencyHotlines.isEmpty ? 'none on file — give general Philippines emergency guidance (e.g. 911) and note that the traveler should confirm the local hotline on arrival' : emergencyHotlines.map((h) => '${h.label}: ${h.number}').join(', ')}

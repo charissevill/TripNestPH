@@ -2,7 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 
 /// What kind of listing a [Review] was written for.
-enum ReviewTargetType { destination, restaurant, festival }
+enum ReviewTargetType { destination, restaurant, festival, business }
 
 ReviewTargetType reviewTargetTypeFromString(String value) {
   return ReviewTargetType.values.firstWhere(
@@ -75,7 +75,9 @@ class Review {
       id: id,
       userId: map['userId'] as String? ?? '',
       targetId: map['targetId'] as String? ?? '',
-      targetType: reviewTargetTypeFromString(map['targetType'] as String? ?? 'destination'),
+      targetType: reviewTargetTypeFromString(
+        map['targetType'] as String? ?? 'destination',
+      ),
       authorName: map['authorName'] as String? ?? 'Traveler',
       authorAvatarUrl: map['authorAvatarUrl'] as String? ?? '',
       rating: (map['rating'] as num?)?.toDouble() ?? 0,

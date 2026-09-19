@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import '../../core/utils/app_exception.dart';
 import '../../core/utils/view_status.dart';
 import '../../domain/models/itinerary.dart';
 import '../../domain/models/place.dart';
@@ -75,6 +76,7 @@ class AiPlannerProvider extends ChangeNotifier {
       return itinerary;
     } catch (e) {
       if (version != _requestVersion) return null;
+      logTechnicalError(e);
       status = ViewStatus.error;
       errorMessage = e is AiException ? e.message : 'Couldn\'t generate your itinerary. Please try again.';
       notifyListeners();

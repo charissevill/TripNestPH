@@ -1,6 +1,7 @@
 import 'package:url_launcher/url_launcher.dart';
 
 import 'itinerary_route_matcher.dart';
+import 'safe_launch.dart';
 
 /// Opens coordinates in the device's Google Maps app (or maps.google.com on
 /// platforms without it installed).
@@ -10,8 +11,13 @@ class MapsLauncher {
   static Future<void> openDirections({required double latitude, required double longitude, String? label}) async {
     final query = label != null ? '$latitude,$longitude($label)' : '$latitude,$longitude';
     final uri = Uri.parse('https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(query)}');
-    await launchUrl(uri, mode: LaunchMode.externalApplication);
+    await _open(uri, _mapsFailure);
   }
+
+  static const _mapsFailure = 'Couldn\'t open Maps. Please check that a maps or browser app is installed.';
+
+  static Future<void> _open(Uri uri, String failureMessage) =>
+      launchSafely(uri, mode: LaunchMode.externalApplication, failureMessage: failureMessage);
 
   /// Opens turn-by-turn directions through every [stops] entry in order —
   /// the first stop as the origin, the last as the destination, and
@@ -28,7 +34,7 @@ class MapsLauncher {
       if (waypoints.isNotEmpty) 'waypoints': waypoints,
     };
     final uri = Uri.https('www.google.com', '/maps/dir/', params);
-    await launchUrl(uri, mode: LaunchMode.externalApplication);
+    await _open(uri, _mapsFailure);
   }
 
   /// Opens a plain text place search in Google Maps — for places (like a
@@ -36,13 +42,13 @@ class MapsLauncher {
   /// resolves the name itself, same as typing it into the Maps search bar.
   static Future<void> openPlaceSearch(String query) async {
     final uri = Uri.parse('https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(query)}');
-    await launchUrl(uri, mode: LaunchMode.externalApplication);
+    await _open(uri, _mapsFailure);
   }
 
   static Future<void> openUrl(String url) async {
     if (url.isEmpty) return;
     final uri = Uri.tryParse(url);
     if (uri == null) return;
-    await launchUrl(uri, mode: LaunchMode.externalApplication);
+    await _open(uri, 'Couldn\'t open that link. Please check that a browser app is installed.');
   }
 }

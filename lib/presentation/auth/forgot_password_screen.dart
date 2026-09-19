@@ -46,7 +46,10 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   }
 
   Future<void> _requestCode() async {
-    if (!_emailFormKey.currentState!.validate()) return;
+    // "Resend code" calls this from the code step, where the email Form isn't
+    // in the tree (its key has no state) — the address was already validated
+    // when the first code was requested, so only validate while it's showing.
+    if (_emailFormKey.currentState?.validate() == false) return;
     final auth = context.read<AuthProvider>();
     final ok = await auth.requestPasswordResetCode(_emailController.text);
     if (ok && mounted) setState(() => _step = _Step.enterCode);

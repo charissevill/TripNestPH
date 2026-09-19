@@ -19,5 +19,16 @@ Future<DateTime?> pickReminderDateTime(BuildContext context, {DateTime? initialD
   );
   if (time == null) return null;
 
-  return DateTime(date.year, date.month, date.day, time.hour, time.minute);
+  final picked = DateTime(date.year, date.month, date.day, time.hour, time.minute);
+  // The date picker allows today, so an earlier time today would otherwise
+  // be scheduled in the past and still report "Reminder set".
+  if (!picked.isAfter(DateTime.now())) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Pick a time in the future.')),
+      );
+    }
+    return null;
+  }
+  return picked;
 }

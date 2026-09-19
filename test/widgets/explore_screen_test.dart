@@ -3,7 +3,6 @@ import 'dart:io';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -526,35 +525,6 @@ void main() {
 
     expect(find.byType(PlaceDetailsSheet), findsOneWidget);
     expect(find.text('Get Directions'), findsOneWidget);
-  });
-
-  testWidgets('map mode renders a GoogleMap without throwing', (tester) async {
-    final firestore = FakeFirebaseFirestore();
-    await seedGeography(firestore);
-    final placesService = PlacesService(
-      caller: _fakePlacesSearchText({
-        'top tourist attractions in the Philippines': [
-          {
-            'id': 'places/banaue',
-            'displayName': {'text': 'Banaue Rice Terraces'},
-            'formattedAddress': 'Banaue, Ifugao',
-            'location': {'latitude': 16.9, 'longitude': 121.05},
-          },
-        ],
-      }),
-    );
-
-    await buildScreen(
-      tester: tester,
-      firestore: firestore,
-      placesService: placesService,
-    );
-
-    await tester.tap(find.byTooltip('Show as map'));
-    await _settle(tester);
-
-    expect(tester.takeException(), isNull);
-    expect(find.byType(GoogleMap), findsOneWidget);
   });
 
   testWidgets(

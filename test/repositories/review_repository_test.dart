@@ -1,6 +1,7 @@
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:tripnest_ph/data/repositories/business_repository.dart';
 import 'package:tripnest_ph/data/repositories/destination_repository.dart';
 import 'package:tripnest_ph/data/repositories/festival_repository.dart';
 import 'package:tripnest_ph/data/repositories/restaurant_repository.dart';
@@ -34,6 +35,7 @@ void main() {
       destinationRepository: destinationRepository,
       restaurantRepository: RestaurantRepository(firestore: firestore),
       festivalRepository: FestivalRepository(firestore: firestore),
+      businessRepository: BusinessRepository(firestore: firestore),
     );
     await firestore.collection('tourist_spots').doc('dest-1').set({
       'name': 'Test Destination',

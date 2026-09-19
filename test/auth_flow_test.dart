@@ -9,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:tripnest_ph/core/providers/auth_provider.dart';
 import 'package:tripnest_ph/core/providers/favorites_provider.dart';
 import 'package:tripnest_ph/core/services/auth_service.dart';
+import 'package:tripnest_ph/core/services/otp_service.dart';
 import 'package:tripnest_ph/data/repositories/destination_repository.dart';
 import 'package:tripnest_ph/data/repositories/favorites_repository.dart';
 import 'package:tripnest_ph/core/widgets/branding/app_logo.dart';
@@ -51,6 +52,8 @@ void main() {
       final firestore = FakeFirebaseFirestore();
       final authProvider = AuthProvider(
         authService: AuthService(auth: mockAuth),
+        // Verify Email sends a numeric code through a Cloud Function — fake it.
+        otpService: OtpService(caller: (name, data) async => {'success': true, 'alreadyVerified': false}),
         userRepository: UserRepository(firestore: firestore, destinationRepository: DestinationRepository(firestore: firestore)),
       );
       final favoritesProvider = FavoritesProvider(repository: FavoritesRepository(firestore: firestore));
@@ -77,6 +80,10 @@ void main() {
       // either, both resolve to the same on-screen location.
       await tester.tap(find.text('Sign Up').first);
       await _settle(tester);
+
+      // Sign Up first asks "just exploring" vs. "business owner".
+      await tester.tap(find.text('Just Exploring'));
+      await _settle(tester);
       expect(find.text('Create your account'), findsOneWidget);
 
       // Fill out and submit the registration form (First Name, Last Name,
@@ -97,11 +104,11 @@ void main() {
       expect(find.text('Verify your email'), findsOneWidget);
       expect(find.textContaining('alex.traveler@example.com'), findsOneWidget);
 
-      // Resending the verification email should succeed silently (the mock
-      // user's sendEmailVerification is a no-op) and show the confirmation.
-      await tester.tap(find.text('Resend Email'));
+      // Requesting a verification code should succeed (faked Cloud Function)
+      // and show the confirmation plus the code field.
+      await tester.tap(find.text('Send Verification Code'));
       await _settle(tester);
-      expect(find.text('Verification email resent.'), findsOneWidget);
+      expect(find.text('Verification code sent.'), findsOneWidget);
     },
   );
 }

@@ -101,7 +101,7 @@ class AppException implements Exception {
       case 'permission-denied':
       case 'unauthorized':
       case 'unauthenticated':
-        return 'You don\'t have permission to do that.';
+        return 'You don\'t have permission to perform this action.';
       case 'unavailable':
       case 'network-request-failed':
         return _networkMessage;
@@ -149,7 +149,7 @@ String functionsMessage(String code) {
     case 'unauthenticated':
       return 'Please sign in to continue.';
     case 'permission-denied':
-      return 'You don\'t have permission to do that.';
+      return 'You don\'t have permission to perform this action.';
     case 'resource-exhausted':
       return 'Too many requests right now. Please wait a moment and try again.';
     case 'unavailable':

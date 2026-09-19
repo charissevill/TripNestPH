@@ -38,7 +38,7 @@ void main() {
         code: 'permission-denied',
         message: '[cloud_firestore/permission-denied] Missing or insufficient permissions.',
       );
-      expect(AppException.from(e).message, 'You don\'t have permission to do that.');
+      expect(AppException.from(e).message, 'You don\'t have permission to perform this action.');
     });
 
     test('unknown Firestore/Auth codes fall back to a generic message', () {

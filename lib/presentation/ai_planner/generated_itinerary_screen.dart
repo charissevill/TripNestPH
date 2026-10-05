@@ -16,6 +16,7 @@ import '../../ai/planner_options.dart';
 import '../../ai/providers/ai_planner_provider.dart';
 import '../../ai/repositories/ai_repository.dart';
 import '../../core/providers/auth_provider.dart';
+import '../../core/routes/back_navigation.dart';
 import '../../core/routes/route_paths.dart';
 import '../../core/services/itinerary_offline_service.dart';
 import '../../core/services/local_preferences_service.dart';
@@ -2359,7 +2360,7 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen>
                       padding: const EdgeInsets.only(left: AppSpacing.md),
                       child: _CircleButton(
                         icon: Symbols.arrow_back_rounded,
-                        onTap: () => context.pop(),
+                        onTap: () => context.popOrGo(RoutePaths.planner),
                       ),
                     ),
                     actions: [

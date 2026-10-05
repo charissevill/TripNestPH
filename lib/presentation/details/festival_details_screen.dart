@@ -8,6 +8,7 @@ import 'package:share_plus/share_plus.dart';
 
 import '../../core/providers/auth_provider.dart';
 import '../../core/providers/favorites_provider.dart';
+import '../../core/routes/back_navigation.dart';
 import '../../core/routes/route_paths.dart';
 import '../../core/services/notification_service.dart';
 import '../../core/theme/app_colors.dart';
@@ -122,7 +123,7 @@ class _FestivalDetailsScreenState extends State<FestivalDetailsScreen> {
                   title: 'Couldn\'t load this festival',
                   message: AppException.from(snapshot.error!).message,
                   actionLabel: 'Go back',
-                  onActionTap: () => context.pop(),
+                  onActionTap: () => context.popOrGo(RoutePaths.home),
                 ),
               );
             }

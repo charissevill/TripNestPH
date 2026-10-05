@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
 import '../../core/constants/whats_new_content.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../domain/models/app_update.dart';
+import '../../core/routes/back_navigation.dart';
+import '../../core/routes/route_paths.dart';
 
 /// Version history — what's shipped in each release.
 class WhatsNewScreen extends StatelessWidget {
@@ -17,7 +18,7 @@ class WhatsNewScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
-        leading: IconButton(icon: const Icon(Symbols.arrow_back_rounded), onPressed: () => context.pop()),
+        leading: IconButton(icon: const Icon(Symbols.arrow_back_rounded), onPressed: () => context.popOrGo(RoutePaths.settings)),
         title: const Text('What\'s New'),
       ),
       body: ListView(

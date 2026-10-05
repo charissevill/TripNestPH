@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:smooth_page_indicator/smooth_page_indicator.dart';
 
+import '../../core/routes/back_navigation.dart';
 import '../../core/routes/route_paths.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
@@ -132,7 +133,7 @@ class _ProvinceDetailsScreenState extends State<ProvinceDetailsScreen> {
                   title: 'Couldn\'t load this province',
                   message: AppException.from(snapshot.error!).message,
                   actionLabel: 'Go back',
-                  onActionTap: () => context.pop(),
+                  onActionTap: () => context.popOrGo(RoutePaths.home),
                 ),
               );
             }
@@ -182,7 +183,7 @@ class _ProvinceDetailsBody extends StatelessWidget {
             padding: const EdgeInsets.only(left: AppSpacing.md),
             child: _CircleButton(
               icon: Symbols.arrow_back_rounded,
-              onTap: () => context.pop(),
+              onTap: () => context.popOrGo(RoutePaths.home),
             ),
           ),
           flexibleSpace: FlexibleSpaceBar(

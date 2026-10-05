@@ -4,6 +4,8 @@ import 'package:provider/provider.dart';
 import '../../core/utils/maps_launcher.dart';
 
 import '../../core/providers/auth_provider.dart';
+import '../../core/routes/back_navigation.dart';
+import '../../core/routes/route_paths.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/utils/app_exception.dart';
@@ -298,7 +300,16 @@ class _AdminBusinessListScreenState extends State<AdminBusinessListScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Businesses')),
+      appBar: AppBar(
+        // Explicit rather than the implied arrow, which vanished whenever
+        // the desktop sidebar opened this screen with `go` — every other
+        // admin section keeps its Back button there.
+        leading: IconButton(
+          icon: const Icon(Symbols.arrow_back_rounded),
+          onPressed: () => context.popOrGo(RoutePaths.adminHome),
+        ),
+        title: const Text('Businesses'),
+      ),
       body: SafeArea(
         child: StreamBuilder<List<Business>>(
           stream: _repository.streamAllForAdmin(),

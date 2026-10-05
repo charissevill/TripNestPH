@@ -1,7 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:provider/provider.dart';
@@ -25,6 +24,8 @@ import '../../domain/models/admin_user.dart';
 import '../../domain/models/analytics_snapshot.dart';
 import '../../domain/models/destination.dart';
 import '../../domain/models/province.dart';
+import '../../core/routes/back_navigation.dart';
+import '../../core/routes/route_paths.dart';
 
 /// Admin-only read-only stats view — the "dashboard" `firestore.rules`
 /// already anticipated (its own comments cite "Most Saved Places" and
@@ -209,7 +210,7 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Symbols.arrow_back_rounded),
-          onPressed: () => context.pop(),
+          onPressed: () => context.popOrGo(RoutePaths.adminHome),
         ),
         title: const Text('Analytics'),
       ),

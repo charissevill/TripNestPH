@@ -108,6 +108,13 @@ GoRouter buildAdminRouter(AuthProvider authProvider) {
           ),
           GoRoute(
             path: RoutePaths.adminTouristSpotForm,
+            // The province only travels via `extra`, which a web refresh or
+            // browser back/forward drops — go to the list instead of
+            // crashing on the cast below.
+            redirect: (context, state) =>
+                (state.extra as Map?)?['province'] is Province
+                    ? null
+                    : RoutePaths.adminTouristSpots,
             builder: (context, state) {
               final extra = state.extra as Map<String, dynamic>?;
               return AdminTouristSpotFormScreen(

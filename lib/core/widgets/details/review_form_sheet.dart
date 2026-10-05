@@ -9,6 +9,7 @@ import '../../theme/app_colors.dart';
 import '../../theme/app_spacing.dart';
 import '../../utils/validators.dart';
 import '../buttons/animated_button.dart';
+import '../dialogs/discard_changes_scope.dart';
 import '../media/image_error_placeholder.dart';
 
 /// The bottom sheet used to write or edit a review: star rating, comment
@@ -84,6 +85,12 @@ class _ReviewFormSheetState extends State<_ReviewFormSheet> {
 
   int get _totalPhotoCount => _keptPhotoUrls.length + _newPhotos.length;
 
+  bool get _isDirty =>
+      _rating != widget.initialRating ||
+      _commentController.text != widget.initialComment ||
+      _newPhotos.isNotEmpty ||
+      _keptPhotoUrls.length != widget.initialPhotoUrls.length;
+
   Future<void> _pickPhoto() async {
     if (_totalPhotoCount >= _maxPhotos) return;
     final picked = await _picker.pickImage(
@@ -102,7 +109,13 @@ class _ReviewFormSheetState extends State<_ReviewFormSheet> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Padding(
+    // Back, a tap outside the sheet or a swipe down used to silently drop a
+    // half-written review; now each asks first, like the app's other forms.
+    return ListenableBuilder(
+      listenable: _commentController,
+      builder: (context, child) =>
+          DiscardChangesScope(isDirty: _isDirty, child: child!),
+      child: Padding(
       padding: EdgeInsets.only(
         bottom: MediaQuery.of(context).viewInsets.bottom,
       ),
@@ -305,6 +318,7 @@ class _ReviewFormSheetState extends State<_ReviewFormSheet> {
             ),
           ),
         ),
+      ),
       ),
     );
   }

@@ -10,6 +10,8 @@ import '../../core/widgets/dialogs/confirmation_dialog.dart';
 import '../../core/widgets/dialogs/discard_changes_scope.dart';
 import '../../data/repositories/notification_repository.dart';
 import '../../domain/models/app_notification.dart';
+import '../../core/routes/back_navigation.dart';
+import '../../core/routes/route_paths.dart';
 
 /// Compose an in-app announcement, delivered instantly to every traveler's
 /// notification bell. The write also triggers a real OS-level push via the
@@ -94,7 +96,7 @@ class _AdminBroadcastScreenState extends State<AdminBroadcastScreen> {
         appBar: AppBar(
           leading: IconButton(
             icon: const Icon(Symbols.arrow_back_rounded),
-            onPressed: () => context.pop(),
+            onPressed: () => context.popOrGo(RoutePaths.adminHome),
           ),
           title: const Text('Announcement'),
         ),

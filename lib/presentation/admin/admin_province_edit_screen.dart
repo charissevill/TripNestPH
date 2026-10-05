@@ -17,6 +17,8 @@ import '../../core/widgets/states/empty_state_widget.dart';
 import '../../core/widgets/states/loading_widget.dart';
 import '../../data/repositories/province_repository.dart';
 import '../../domain/models/province.dart';
+import '../../core/routes/back_navigation.dart';
+import '../../core/routes/route_paths.dart';
 
 /// LGU/admin form for a single province's page content — the in-app answer
 /// to Phase 1's "~68 provinces are still content coming soon" gap. Every
@@ -189,7 +191,7 @@ class _AdminProvinceEditScreenState extends State<AdminProvinceEditScreen> {
         appBar: AppBar(
           leading: IconButton(
             icon: const Icon(Symbols.arrow_back_rounded),
-            onPressed: () => context.pop(),
+            onPressed: () => context.popOrGo(RoutePaths.adminProvinces),
           ),
           title: const Text('Edit Province'),
         ),

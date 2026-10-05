@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
+import '../../core/routes/back_navigation.dart';
 import '../../core/routes/route_paths.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
@@ -162,7 +163,7 @@ class _AdminReportedReviewsScreenState
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Symbols.arrow_back_rounded),
-          onPressed: () => context.pop(),
+          onPressed: () => context.popOrGo(RoutePaths.adminHome),
         ),
         title: const Text('Reports'),
         bottom: TabBar(

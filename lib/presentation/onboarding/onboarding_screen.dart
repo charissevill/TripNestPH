@@ -87,7 +87,16 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Scaffold(
+    // Device back pages back through the slides first; only on the first
+    // slide does it leave (onboarding is a root route, so that exits).
+    return PopScope(
+      canPop: _index == 0,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) {
+          _controller.previousPage(duration: const Duration(milliseconds: 380), curve: Curves.easeOutCubic);
+        }
+      },
+      child: Scaffold(
       body: SafeArea(
         // The slide (image + copy) needs a minimum height to read properly.
         // A wide, short viewport (landscape phone) lays each slide out side by
@@ -153,6 +162,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             );
           },
         ),
+      ),
       ),
     );
   }

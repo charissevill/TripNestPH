@@ -18,6 +18,8 @@ import '../../data/mock/mock_categories.dart';
 import '../../data/repositories/destination_repository.dart';
 import '../../domain/models/destination.dart';
 import '../../domain/models/province.dart';
+import '../../core/routes/back_navigation.dart';
+import '../../core/routes/route_paths.dart';
 
 const List<String> _monthNames = [
   'January',
@@ -275,7 +277,7 @@ class _AdminTouristSpotFormScreenState
         appBar: AppBar(
           leading: IconButton(
             icon: const Icon(Symbols.arrow_back_rounded),
-            onPressed: () => context.pop(),
+            onPressed: () => context.popOrGo(RoutePaths.adminTouristSpots),
           ),
           title: Text(_isEditing ? 'Edit Tourist Spot' : 'New Tourist Spot'),
         ),

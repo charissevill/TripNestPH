@@ -11,6 +11,8 @@ import '../../core/widgets/buttons/animated_button.dart';
 import '../../core/widgets/layout/max_width_container.dart';
 import 'widgets/auth_header.dart';
 import 'widgets/auth_text_field.dart';
+import '../../core/routes/back_navigation.dart';
+import '../../core/routes/route_paths.dart';
 
 enum _Step { enterEmail, enterCode }
 
@@ -67,7 +69,13 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Password updated. Sign in with your new password.')),
       );
-      context.pop();
+      // A plain pop on purpose — the PopScope below would otherwise turn
+      // this into "back to the email step" while still on the code step.
+      if (context.canPop()) {
+        context.pop();
+      } else {
+        context.go(RoutePaths.login);
+      }
     }
   }
 
@@ -76,11 +84,18 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     final theme = Theme.of(context);
     final auth = context.watch<AuthProvider>();
 
-    return Scaffold(
+    // Device back on the code step steps back to the email step, same as
+    // the AppBar arrow, instead of leaving the screen mid-reset.
+    return PopScope(
+      canPop: _step == _Step.enterEmail,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) setState(() => _step = _Step.enterEmail);
+      },
+      child: Scaffold(
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Symbols.arrow_back_rounded),
-          onPressed: () => _step == _Step.enterCode ? setState(() => _step = _Step.enterEmail) : context.pop(),
+          onPressed: () => _step == _Step.enterCode ? setState(() => _step = _Step.enterEmail) : context.popOrGo(RoutePaths.login),
         ),
       ),
       body: SafeArea(
@@ -92,6 +107,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             child: _step == _Step.enterEmail ? _buildEmailStep(theme, auth) : _buildCodeStep(theme, auth),
           ),
         ),
+      ),
       ),
     );
   }

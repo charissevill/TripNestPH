@@ -20,6 +20,8 @@ import '../../core/widgets/dialogs/discard_changes_scope.dart';
 import '../../core/widgets/media/avatar_preview.dart';
 import '../../data/mock/mock_categories.dart';
 import '../../core/widgets/media/image_error_placeholder.dart';
+import '../../core/routes/back_navigation.dart';
+import '../../core/routes/route_paths.dart';
 
 const List<String> _travelPreferenceOptions = [
   'Beaches',
@@ -150,7 +152,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         appBar: AppBar(
           leading: IconButton(
             icon: const Icon(Symbols.arrow_back_rounded),
-            onPressed: () => context.pop(),
+            onPressed: () => context.popOrGo(RoutePaths.profile),
           ),
           title: const Text('Edit Profile'),
         ),

@@ -3,6 +3,8 @@ import 'package:material_symbols_icons/symbols.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/providers/auth_provider.dart';
+import '../../core/routes/back_navigation.dart';
+import '../../core/routes/route_paths.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/utils/app_exception.dart';
@@ -94,7 +96,16 @@ class _AdminBusinessOwnerApplicationsScreenState extends State<AdminBusinessOwne
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Business Applications')),
+      appBar: AppBar(
+        // Explicit rather than the implied arrow, which vanished whenever
+        // the desktop sidebar opened this screen with `go` — every other
+        // admin section keeps its Back button there.
+        leading: IconButton(
+          icon: const Icon(Symbols.arrow_back_rounded),
+          onPressed: () => context.popOrGo(RoutePaths.adminHome),
+        ),
+        title: const Text('Business Applications'),
+      ),
       body: SafeArea(
         child: StreamBuilder<List<BusinessOwnerApplication>>(
           stream: _repository.streamPendingForAdmin(),

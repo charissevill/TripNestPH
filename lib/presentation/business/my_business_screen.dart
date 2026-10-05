@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -26,6 +25,8 @@ import '../../domain/models/province.dart';
 import '../../domain/models/restaurant.dart' show MenuItem;
 import '../ai_planner/widgets/map_destination_picker.dart';
 import '../../core/widgets/media/image_error_placeholder.dart';
+import '../../core/routes/back_navigation.dart';
+import '../../core/routes/route_paths.dart';
 
 const List<String> _priceRanges = ['₱', '₱₱', '₱₱₱', '₱₱₱₱'];
 
@@ -550,7 +551,7 @@ class _BusinessFormState extends State<_BusinessForm> {
                         icon: const Icon(Symbols.arrow_back_rounded),
                         padding: EdgeInsets.zero,
                         constraints: const BoxConstraints(),
-                        onPressed: () => context.pop(),
+                        onPressed: () => context.popOrGo(RoutePaths.adminHome),
                       ),
                       const SizedBox(width: AppSpacing.sm),
                     ],

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:provider/provider.dart';
 
@@ -11,6 +10,8 @@ import '../../core/widgets/states/empty_state_widget.dart';
 import '../../core/widgets/states/loading_widget.dart';
 import '../../data/repositories/notification_repository.dart';
 import '../../domain/models/app_notification.dart';
+import '../../core/routes/back_navigation.dart';
+import '../../core/routes/route_paths.dart';
 
 /// Festival announcements, travel tips and featured-destination alerts —
 /// the in-app inbox backing push notifications.
@@ -60,7 +61,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Symbols.arrow_back_rounded),
-          onPressed: () => context.pop(),
+          onPressed: () => context.popOrGo(RoutePaths.home),
         ),
         title: const Text('Notifications'),
       ),

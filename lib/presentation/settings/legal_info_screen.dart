@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
 import '../../core/constants/app_strings.dart';
@@ -8,6 +7,8 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/widgets/branding/app_logo.dart';
 import '../../domain/models/legal_section.dart';
+import '../../core/routes/back_navigation.dart';
+import '../../core/routes/route_paths.dart';
 
 /// One of the three static legal/info documents reachable from Settings.
 enum LegalInfoTopic {
@@ -58,7 +59,7 @@ class LegalInfoScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
-        leading: IconButton(icon: const Icon(Symbols.arrow_back_rounded), onPressed: () => context.pop()),
+        leading: IconButton(icon: const Icon(Symbols.arrow_back_rounded), onPressed: () => context.popOrGo(RoutePaths.settings)),
         title: Text(topic.title),
       ),
       body: ListView(

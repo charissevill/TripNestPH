@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
+import '../../core/routes/back_navigation.dart';
 import '../../core/routes/route_paths.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/widgets/cards/festival_card.dart';
@@ -80,7 +81,7 @@ class _UpcomingFestivalsScreenState extends State<UpcomingFestivalsScreen> {
               child: Row(
                 children: [
                   InkWell(
-                    onTap: () => context.pop(),
+                    onTap: () => context.popOrGo(RoutePaths.home),
                     borderRadius: BorderRadius.circular(AppRadius.pill),
                     child: const Padding(
                       padding: EdgeInsets.all(AppSpacing.xs),

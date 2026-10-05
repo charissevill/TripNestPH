@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
 import '../../core/constants/legal_content.dart';
@@ -9,6 +8,8 @@ import '../../core/widgets/inputs/search_bar_widget.dart';
 import '../../core/widgets/states/empty_state_widget.dart';
 import '../../domain/models/legal_section.dart';
 
+import '../../core/routes/back_navigation.dart';
+import '../../core/routes/route_paths.dart';
 /// Frequently asked questions — searchable, grouped by category, and
 /// rendered as an expandable list rather than a wall of text, since most
 /// travelers are only looking for one answer.
@@ -65,7 +66,7 @@ class _FaqScreenState extends State<FaqScreen> {
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
-        leading: IconButton(icon: const Icon(Symbols.arrow_back_rounded), onPressed: () => context.pop()),
+        leading: IconButton(icon: const Icon(Symbols.arrow_back_rounded), onPressed: () => context.popOrGo(RoutePaths.settings)),
         title: const Text('FAQ'),
       ),
       body: Column(

@@ -198,6 +198,13 @@ GoRouter buildAppRouter(AuthProvider authProvider) {
       ),
       GoRoute(
         path: RoutePaths.generatedItinerary,
+        // The itinerary only ever travels in-memory via `extra`, which a web
+        // refresh or browser back/forward doesn't carry — land on the
+        // Planner instead of crashing on the cast below.
+        redirect: (context, state) =>
+            (state.extra as Map?)?['itinerary'] is Itinerary
+                ? null
+                : RoutePaths.planner,
         builder: (context, state) {
           final extra = state.extra as Map<String, dynamic>?;
           return GeneratedItineraryScreen(
@@ -265,6 +272,12 @@ GoRouter buildAppRouter(AuthProvider authProvider) {
       ),
       GoRoute(
         path: RoutePaths.adminTouristSpotForm,
+        // Same as generatedItinerary above: the province only travels via
+        // `extra`, which a web refresh or browser back/forward drops.
+        redirect: (context, state) =>
+            (state.extra as Map?)?['province'] is Province
+                ? null
+                : RoutePaths.adminTouristSpots,
         builder: (context, state) {
           final extra = state.extra as Map<String, dynamic>?;
           return AdminTouristSpotFormScreen(

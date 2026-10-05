@@ -6,12 +6,14 @@ import 'package:provider/provider.dart';
 
 import '../../ai/planner_options.dart';
 import '../../core/providers/auth_provider.dart';
+import '../../core/routes/back_navigation.dart';
 import '../../core/routes/route_paths.dart';
 import '../../core/services/weather_service.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/utils/app_exception.dart';
 import '../../core/widgets/buttons/animated_button.dart';
+import '../../core/widgets/dialogs/discard_changes_scope.dart';
 import '../../data/repositories/itinerary_repository.dart';
 import '../../domain/models/itinerary.dart';
 import 'widgets/map_destination_picker.dart';
@@ -141,7 +143,11 @@ class _ManualItineraryScreenState extends State<ManualItineraryScreen> {
         ownerName: auth.currentUser?.name ?? '',
       );
       if (!mounted) return;
-      context.push(RoutePaths.generatedItinerary, extra: {'itinerary': itinerary, 'savedId': savedId});
+      // Replaces this form rather than stacking on it: the trip is already
+      // saved, so Back from it should land on the Planner — returning to a
+      // still-filled form here just invited a second "Start Planning" tap
+      // that saved a duplicate trip.
+      context.pushReplacement(RoutePaths.generatedItinerary, extra: {'itinerary': itinerary, 'savedId': savedId});
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -157,11 +163,15 @@ class _ManualItineraryScreenState extends State<ManualItineraryScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final location = _location;
-    return Scaffold(
+    // A dropped pin and a picked date are real effort to redo, so leaving
+    // with either set asks first — same guard as the app's other forms.
+    return DiscardChangesScope(
+      isDirty: (location != null || _startDate != null) && !_submitting,
+      child: Scaffold(
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Symbols.arrow_back_rounded),
-          onPressed: () => context.pop(),
+          onPressed: () => context.popOrGo(RoutePaths.planner),
         ),
         title: const Text('Create Your Own Itinerary'),
       ),
@@ -295,6 +305,7 @@ class _ManualItineraryScreenState extends State<ManualItineraryScreen> {
             ],
           ),
         ),
+      ),
       ),
     );
   }

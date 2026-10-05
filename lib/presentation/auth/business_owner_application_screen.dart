@@ -10,6 +10,7 @@ import '../../core/theme/app_spacing.dart';
 import '../../core/utils/app_exception.dart';
 import '../../core/utils/validators.dart';
 import '../../core/widgets/buttons/animated_button.dart';
+import '../../core/widgets/dialogs/confirmation_dialog.dart';
 import '../../core/widgets/layout/max_width_container.dart';
 import '../../data/repositories/business_owner_application_repository.dart';
 import '../../domain/models/business.dart';
@@ -46,6 +47,29 @@ class _BusinessOwnerApplicationScreenState extends State<BusinessOwnerApplicatio
     super.dispose();
   }
 
+  bool get _hasUnsentInput =>
+      !_submitted &&
+      [_businessNameController, _phoneController, _descriptionController]
+          .any((c) => c.text.trim().isNotEmpty);
+
+  /// Shared by the AppBar arrow and device back. This screen replaced
+  /// Register (see the AppBar comment below), so device back used to close
+  /// the app outright; now both skip ahead to Verify Email, asking first if
+  /// there's a half-filled application that would be thrown away.
+  Future<void> _leave() async {
+    if (_hasUnsentInput) {
+      final confirmed = await showConfirmationDialog(
+        context,
+        title: 'Discard changes?',
+        message: 'You have unsaved changes that will be lost.',
+        confirmLabel: 'Discard',
+        isDestructive: true,
+      );
+      if (!confirmed || !mounted) return;
+    }
+    context.go(RoutePaths.verifyEmail);
+  }
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     final user = context.read<AuthProvider>().firebaseUser;
@@ -76,7 +100,12 @@ class _BusinessOwnerApplicationScreenState extends State<BusinessOwnerApplicatio
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Scaffold(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) _leave();
+      },
+      child: Scaffold(
       appBar: AppBar(
         // Reached via context.go from Register (replacing that route, not
         // pushed on top of it), so there's nothing behind this screen to
@@ -85,7 +114,7 @@ class _BusinessOwnerApplicationScreenState extends State<BusinessOwnerApplicatio
         // Exploring" choice on Register would have.
         leading: IconButton(
           icon: const Icon(Symbols.arrow_back_rounded),
-          onPressed: () => context.go(RoutePaths.verifyEmail),
+          onPressed: _leave,
         ),
         title: const Text('Business Owner Application'),
       ),
@@ -98,6 +127,7 @@ class _BusinessOwnerApplicationScreenState extends State<BusinessOwnerApplicatio
             child: _submitted ? _buildConfirmation(theme) : _buildForm(theme),
           ),
         ),
+      ),
       ),
     );
   }

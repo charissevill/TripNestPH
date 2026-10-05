@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
 import '../../core/services/places_service.dart';
@@ -15,6 +14,8 @@ import '../../core/widgets/states/loading_widget.dart';
 import '../../domain/models/place.dart';
 import '../../core/theme/breakpoints.dart';
 import '../../core/widgets/layout/max_width_container.dart';
+import '../../core/routes/back_navigation.dart';
+import '../../core/routes/route_paths.dart';
 
 enum _SortOption { relevance, distance, rating, reviewCount }
 
@@ -298,7 +299,7 @@ class _NearbyPlacesScreenState extends State<NearbyPlacesScreen> {
               child: Row(
                 children: [
                   InkWell(
-                    onTap: () => context.pop(),
+                    onTap: () => context.popOrGo(RoutePaths.home),
                     borderRadius: BorderRadius.circular(AppRadius.pill),
                     child: const Padding(
                       padding: EdgeInsets.all(AppSpacing.xs),

@@ -7,6 +7,8 @@ import '../../theme/app_spacing.dart';
 import '../../theme/breakpoints.dart';
 import '../../utils/auto_advance_gallery_mixin.dart';
 import '../buttons/bookmark_button.dart';
+import '../../routes/back_navigation.dart';
+import '../../routes/route_paths.dart';
 
 /// The shared sticky-header gallery used by all three Details screens
 /// (Tourist, Restaurant, Festival): a swipeable photo gallery that collapses
@@ -79,7 +81,7 @@ class _DetailsGalleryAppBarState extends State<DetailsGalleryAppBar> with AutoAd
       leadingWidth: 68,
       leading: Padding(
         padding: const EdgeInsets.only(left: AppSpacing.md),
-        child: _CircleIconButton(icon: Symbols.arrow_back_rounded, onTap: () => Navigator.of(context).maybePop()),
+        child: _CircleIconButton(icon: Symbols.arrow_back_rounded, onTap: () => context.popOrGo(RoutePaths.home)),
       ),
       title: Text(widget.title, maxLines: 1, overflow: TextOverflow.ellipsis),
       actions: [

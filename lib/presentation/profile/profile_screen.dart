@@ -265,7 +265,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           icon: Symbols.bookmark_rounded,
                           value: '${saved.totalSavedCount}',
                           label: 'Saved',
-                          onTap: () => context.push(RoutePaths.saved),
+                          // A tab switch, not a push — pushing a bottom-nav
+                          // tab's own path jumped the tab bar to Saved while
+                          // leaving nothing on the back stack to return to.
+                          onTap: () => context.go(RoutePaths.saved),
                         ),
                       ),
                       const SizedBox(width: AppSpacing.sm),

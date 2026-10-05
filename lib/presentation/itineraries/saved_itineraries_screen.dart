@@ -5,6 +5,7 @@ import 'package:material_symbols_icons/symbols.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/providers/auth_provider.dart';
+import '../../core/routes/back_navigation.dart';
 import '../../core/routes/route_paths.dart';
 import '../../core/services/itinerary_offline_service.dart';
 import '../../core/services/local_preferences_service.dart';
@@ -208,7 +209,7 @@ class _SavedItinerariesScreenState extends State<SavedItinerariesScreen> {
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Symbols.arrow_back_rounded),
-          onPressed: () => context.pop(),
+          onPressed: () => context.popOrGo(RoutePaths.profile),
         ),
         title: const Text('Saved Trips'),
         actions: [

@@ -6,6 +6,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
+import '../../core/routes/back_navigation.dart';
 import '../../core/routes/route_paths.dart';
 import '../../core/services/location_service.dart';
 import '../../core/services/places_service.dart';
@@ -846,7 +847,7 @@ class _SearchScreenState extends State<SearchScreen> {
               child: Row(
                 children: [
                   InkWell(
-                    onTap: () => context.pop(),
+                    onTap: () => context.popOrGo(RoutePaths.home),
                     borderRadius: BorderRadius.circular(AppRadius.pill),
                     child: const Padding(
                       padding: EdgeInsets.all(AppSpacing.xs),

@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
 import '../../core/theme/app_colors.dart';
@@ -14,6 +13,8 @@ import '../../core/widgets/states/loading_widget.dart';
 import '../../data/repositories/user_repository.dart';
 import '../../domain/models/app_user.dart';
 
+import '../../core/routes/back_navigation.dart';
+import '../../core/routes/route_paths.dart';
 const int _pageSize = 20;
 
 /// Admin-only: search and suspend/activate traveler accounts. Previously
@@ -187,7 +188,7 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Symbols.arrow_back_rounded),
-          onPressed: () => context.pop(),
+          onPressed: () => context.popOrGo(RoutePaths.adminHome),
         ),
         title: const Text('Travelers'),
       ),

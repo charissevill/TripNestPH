@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'package:csv/csv.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
 import '../../core/theme/app_colors.dart';
@@ -15,6 +14,8 @@ import '../../data/repositories/destination_repository.dart';
 import '../../data/repositories/province_repository.dart';
 import '../../domain/models/destination.dart';
 import '../../domain/models/province.dart';
+import '../../core/routes/back_navigation.dart';
+import '../../core/routes/route_paths.dart';
 
 /// One parsed CSV data row, either a ready-to-create [Destination] or a
 /// validation failure with a human-readable reason — never both, so the
@@ -242,7 +243,7 @@ class _AdminBulkImportScreenState extends State<AdminBulkImportScreen> {
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Symbols.arrow_back_rounded),
-          onPressed: () => context.pop(),
+          onPressed: () => context.popOrGo(RoutePaths.adminHome),
         ),
         title: const Text('Bulk Import Tourist Spots'),
       ),

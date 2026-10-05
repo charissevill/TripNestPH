@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'package:csv/csv.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
 import '../../core/theme/app_colors.dart';
@@ -12,6 +11,8 @@ import '../../core/utils/app_exception.dart';
 import '../../core/widgets/dialogs/confirmation_dialog.dart';
 import '../../data/repositories/province_repository.dart';
 import '../../domain/models/province.dart';
+import '../../core/routes/back_navigation.dart';
+import '../../core/routes/route_paths.dart';
 
 /// One parsed CSV data row — either a real, existing [Province] matched by
 /// id plus the new content to write onto it, or a validation failure with a
@@ -250,7 +251,7 @@ class _AdminBulkProvinceContentScreenState
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Symbols.arrow_back_rounded),
-          onPressed: () => context.pop(),
+          onPressed: () => context.popOrGo(RoutePaths.adminHome),
         ),
         title: const Text('Bulk Fill Province Content'),
       ),

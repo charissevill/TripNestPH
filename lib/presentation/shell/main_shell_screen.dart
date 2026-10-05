@@ -40,7 +40,17 @@ class MainShellScreen extends StatelessWidget {
 
     final uid = context.watch<AuthProvider>().firebaseUser?.uid;
 
-    return StreamBuilder<AdminUser?>(
+    // Device back on any tab but Home returns to Home (keeping its scroll
+    // and state) instead of closing the app — every tab is a root with
+    // nothing beneath it, so without this a single back press from
+    // Explore/Planner/Saved/Profile exited TripNest outright. Back on Home
+    // itself still exits, as Android users expect.
+    return PopScope(
+      canPop: navigationShell.currentIndex == 0,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) navigationShell.goBranch(0);
+      },
+      child: StreamBuilder<AdminUser?>(
       // Firestore rejects an empty document id outright, so this only ever
       // subscribes once there's a real uid — Stream.value(null) covers the
       // brief window before that (e.g. right as the shell first mounts).
@@ -94,6 +104,7 @@ class MainShellScreen extends StatelessWidget {
           ),
         );
       },
+      ),
     );
   }
 }

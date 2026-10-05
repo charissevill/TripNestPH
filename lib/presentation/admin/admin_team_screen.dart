@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
 import '../../core/theme/app_colors.dart';
@@ -14,6 +13,8 @@ import '../../data/repositories/province_repository.dart';
 import '../../domain/models/admin_invite.dart';
 import '../../domain/models/admin_user.dart';
 import '../../domain/models/province.dart';
+import '../../core/routes/back_navigation.dart';
+import '../../core/routes/route_paths.dart';
 
 /// Admin-only: the Admin Portal's own roster, plus staging invites for new
 /// accounts. Replaces having to run `tool/create_admin.js` for every new
@@ -245,7 +246,7 @@ class _AdminTeamScreenState extends State<AdminTeamScreen> {
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Symbols.arrow_back_rounded),
-          onPressed: () => context.pop(),
+          onPressed: () => context.popOrGo(RoutePaths.adminHome),
         ),
         title: const Text('Team'),
       ),

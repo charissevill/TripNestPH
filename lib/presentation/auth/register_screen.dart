@@ -4,6 +4,7 @@ import 'package:material_symbols_icons/symbols.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/providers/auth_provider.dart';
+import '../../core/routes/back_navigation.dart';
 import '../../core/routes/route_paths.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
@@ -103,7 +104,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 alignment: Alignment.centerLeft,
                 child: IconButton(
                   icon: const Icon(Symbols.arrow_back_rounded),
-                  onPressed: () => context.pop(),
+                  onPressed: () => context.popOrGo(RoutePaths.login),
                 ),
               ),
               Expanded(
@@ -150,7 +151,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     alignment: Alignment.centerLeft,
                     child: IconButton(
                       icon: const Icon(Symbols.arrow_back_rounded),
-                      onPressed: () => context.pop(),
+                      onPressed: () => context.popOrGo(RoutePaths.login),
                     ),
                   ),
                   Expanded(
@@ -281,7 +282,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         strokeColor: AppColors.primaryDark,
                       ),
                       TextButton(
-                        onPressed: () => context.pop(),
+                        onPressed: () => context.popOrGo(RoutePaths.login),
                         child: StrokedText(
                           'Sign In',
                           style: theme.textTheme.labelLarge!.copyWith(color: Colors.white),
@@ -299,7 +300,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     children: [
                       Text('Already have an account?', style: theme.textTheme.bodyMedium),
                       TextButton(
-                        onPressed: () => context.pop(),
+                        onPressed: () => context.popOrGo(RoutePaths.login),
                         child: Text('Sign In', style: theme.textTheme.labelLarge),
                       ),
                     ],

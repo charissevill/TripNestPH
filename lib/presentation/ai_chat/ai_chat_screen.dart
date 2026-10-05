@@ -19,6 +19,7 @@ import '../../ai/widgets/prompt_suggestion_chips.dart';
 import '../../ai/widgets/suggestion_pill.dart';
 import '../../ai/widgets/typing_indicator.dart';
 import '../../core/providers/auth_provider.dart';
+import '../../core/routes/back_navigation.dart';
 import '../../core/routes/route_paths.dart';
 import '../../core/services/location_service.dart';
 import '../../core/services/places_service.dart';
@@ -1095,7 +1096,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Symbols.arrow_back_rounded),
-          onPressed: () => context.pop(),
+          onPressed: () => context.popOrGo(RoutePaths.home),
         ),
         title: const Text('AI Travel Assistant'),
         actions: [

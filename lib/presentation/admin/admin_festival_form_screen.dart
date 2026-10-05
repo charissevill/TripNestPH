@@ -20,6 +20,8 @@ import '../../data/repositories/province_repository.dart';
 import '../../domain/models/admin_user.dart';
 import '../../domain/models/festival.dart';
 import '../../domain/models/province.dart';
+import '../../core/routes/back_navigation.dart';
+import '../../core/routes/route_paths.dart';
 
 /// Create or edit a festival — the admin/lgu "Festivals" module's full
 /// curatorial control.
@@ -273,7 +275,7 @@ class _AdminFestivalFormScreenState extends State<AdminFestivalFormScreen> {
         appBar: AppBar(
           leading: IconButton(
             icon: const Icon(Symbols.arrow_back_rounded),
-            onPressed: () => context.pop(),
+            onPressed: () => context.popOrGo(RoutePaths.adminFestivals),
           ),
           title: Text(_isEditing ? 'Edit Festival' : 'New Festival'),
         ),

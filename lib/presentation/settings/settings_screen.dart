@@ -11,6 +11,7 @@ import '../../core/providers/accent_color_provider.dart';
 import '../../core/providers/auth_provider.dart';
 import '../../core/providers/theme_mode_provider.dart';
 import '../../core/providers/typography_provider.dart';
+import '../../core/routes/back_navigation.dart';
 import '../../core/routes/route_paths.dart';
 import '../../core/services/local_preferences_service.dart';
 import '../../core/services/location_service.dart';
@@ -405,7 +406,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(icon: const Icon(Symbols.arrow_back_rounded), onPressed: () => context.pop()),
+        leading: IconButton(icon: const Icon(Symbols.arrow_back_rounded), onPressed: () => context.popOrGo(RoutePaths.profile)),
         title: const Text('Settings'),
       ),
       body: ListView(

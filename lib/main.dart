@@ -25,6 +25,7 @@ import 'core/theme/accent_colors.dart';
 import 'core/theme/app_theme.dart';
 import 'core/utils/app_exception.dart';
 import 'core/utils/safe_launch.dart';
+import 'core/widgets/banners/connectivity_toast.dart';
 import 'firebase_options.dart';
 
 /// Must be a top-level function: the platform invokes this in a background
@@ -181,7 +182,7 @@ class _TripNestAppState extends State<TripNestApp> {
             themeMode: themeModeProvider.mode,
             builder: (context, child) => MediaQuery(
               data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(typographyProvider.fontScale)),
-              child: child!,
+              child: ConnectivityToastHost(child: child!),
             ),
             routerConfig: _router,
           );

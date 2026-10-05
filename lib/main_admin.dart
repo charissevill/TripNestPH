@@ -23,6 +23,7 @@ import 'core/theme/accent_colors.dart';
 import 'core/theme/app_theme.dart';
 import 'core/utils/app_exception.dart';
 import 'core/utils/safe_launch.dart';
+import 'core/widgets/banners/connectivity_toast.dart';
 import 'firebase_options.dart';
 
 /// Dedicated entrypoint for the Admin Portal's own deployed site — same
@@ -169,7 +170,7 @@ class _TripNestAdminAppState extends State<TripNestAdminApp> {
             themeMode: themeModeProvider.mode,
             builder: (context, child) => MediaQuery(
               data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(typographyProvider.fontScale)),
-              child: child!,
+              child: ConnectivityToastHost(child: child!),
             ),
             routerConfig: _router,
           );

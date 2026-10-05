@@ -25,6 +25,7 @@ import '../../core/widgets/dialogs/active_filter_chips.dart';
 import '../../core/widgets/dialogs/search_filter_sheet.dart';
 import '../../core/widgets/inputs/search_bar_widget.dart';
 import '../../core/widgets/layout/max_width_container.dart';
+import '../../core/widgets/navigation/swipe_tab_switcher.dart';
 import '../../core/widgets/states/empty_state_widget.dart';
 import '../../core/widgets/states/loading_widget.dart';
 import '../../core/widgets/cards/business_card.dart';
@@ -117,6 +118,12 @@ class _ExploreScreenState extends State<ExploreScreen> {
   late final PlacesService _places = widget.placesService ?? PlacesService();
 
   _ExploreTab _tab = _ExploreTab.destinations;
+  // Lets a swipe scroll the newly selected tab into view on a narrow phone,
+  // where the four tabs don't all fit across the row at once.
+  final ScrollController _tabRowController = ScrollController();
+  final Map<_ExploreTab, GlobalKey> _tabKeys = {
+    for (final tab in _ExploreTab.values) tab: GlobalKey(),
+  };
   String? _selectedCategory;
   Timer? _categoryDebounce;
 
@@ -281,7 +288,32 @@ class _ExploreScreenState extends State<ExploreScreen> {
   @override
   void dispose() {
     _categoryDebounce?.cancel();
+    _tabRowController.dispose();
     super.dispose();
+  }
+
+  void _selectTab(_ExploreTab tab) {
+    setState(() => _tab = tab);
+    _ensureLoaded(tab);
+  }
+
+  /// Same as tapping [tab], plus scrolling the tab row so its indicator
+  /// stays on screen — a tap can only hit an already-visible tab, a swipe
+  /// can land on one that's scrolled off the edge. Scrolls only the tab row's
+  /// own position (not `Scrollable.ensureVisible`, which would also yank the
+  /// whole page back up to the tab row mid-browse).
+  void _swipeToTab(_ExploreTab tab) {
+    _selectTab(tab);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final tabBox = _tabKeys[tab]!.currentContext?.findRenderObject();
+      if (!mounted || tabBox == null || !_tabRowController.hasClients) return;
+      _tabRowController.position.ensureVisible(
+        tabBox,
+        alignment: 0.5,
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOutCubic,
+      );
+    });
   }
 
   /// One bounded read each against the small, fixed `regions`/`provinces`
@@ -756,6 +788,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                 SizedBox(
                   height: context.textScaledHeight(56, textLine: 20),
                   child: ListView.separated(
+                    controller: _tabRowController,
                     scrollDirection: Axis.horizontal,
                     padding: EdgeInsets.symmetric(horizontal: sidePadding),
                     itemCount: _ExploreTab.values.length,
@@ -764,6 +797,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                     itemBuilder: (context, i) {
                       final tab = _ExploreTab.values[i];
                       return _MainTabButton(
+                        key: _tabKeys[tab],
                         icon: switch (tab) {
                           _ExploreTab.destinations => Symbols.landscape_rounded,
                           _ExploreTab.restaurants => Symbols.restaurant_rounded,
@@ -777,10 +811,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                           _ExploreTab.businesses => 'Local Finds',
                         },
                         selected: _tab == tab,
-                        onTap: () {
-                          setState(() => _tab = tab);
-                          _ensureLoaded(tab);
-                        },
+                        onTap: () => _selectTab(tab),
                       );
                     },
                   ),
@@ -870,54 +901,28 @@ class _ExploreScreenState extends State<ExploreScreen> {
                   ),
                 ],
                 const SizedBox(height: AppSpacing.md),
-                switch (_tab) {
-                  _ExploreTab.destinations => _buildGrid(
-                    items: _filteredDestinationPlaces,
-                    isLoading: _loadingDestinations,
-                    error: _destinationsError,
-                    // Google's 20-result cap is the whole result set —
-                    // there's no further page to load, unlike the
-                    // curated-catalog "Load More" the Restaurants tab
-                    // still has.
-                    hasMore: false,
-                    onLoadMore: _loadDestinations,
-                    onRetry: () => _loadDestinations(reset: true),
-                    emptyMessage: _hasFilters
-                        ? 'No destinations match your filters — try widening them.'
-                        : 'No destinations in this category yet — try another one.',
-                    itemBuilder: (context, width, p) => PlaceCard(
-                      place: p,
-                      width: width,
-                      imageHeight: _gridImageHeight,
-                      imageUrl: p.photoNames.isNotEmpty
-                          ? _places.photoUrl(p.photoNames.first)
-                          : '',
-                      onTap: () => showPlaceDetailsSheet(
-                        context,
-                        place: p,
-                        placesService: _places,
-                      ),
-                    ),
-                  ),
-                  _ExploreTab.restaurants => _buildGrid(
-                    items: _filteredRestaurantItems,
-                    isLoading: _loadingRestaurants,
-                    error: _restaurantsError,
-                    hasMore: _restaurantsHasMore,
-                    onLoadMore: _loadRestaurants,
-                    onRetry: () => _loadRestaurants(reset: true),
-                    emptyMessage: _hasFilters
-                        ? 'No restaurants match your filters — try widening them.'
-                        : 'No restaurants found.',
-                    itemBuilder: (context, width, item) => switch (item) {
-                      Restaurant r => RestaurantCard(
-                        restaurant: r,
-                        width: width,
-                        imageHeight: _gridImageHeight,
-                        onTap: () =>
-                            context.push(RoutePaths.restaurantDetails(r.id)),
-                      ),
-                      Place p => PlaceCard(
+                // Swipe left/right on the content to move between the
+                // four tabs, same as tapping them in the row above.
+                SwipeTabSwitcher(
+                  index: _tab.index,
+                  length: _ExploreTab.values.length,
+                  onIndexChanged: (i) => _swipeToTab(_ExploreTab.values[i]),
+                  child: switch (_tab) {
+                    _ExploreTab.destinations => _buildGrid(
+                      items: _filteredDestinationPlaces,
+                      isLoading: _loadingDestinations,
+                      error: _destinationsError,
+                      // Google's 20-result cap is the whole result set —
+                      // there's no further page to load, unlike the
+                      // curated-catalog "Load More" the Restaurants tab
+                      // still has.
+                      hasMore: false,
+                      onLoadMore: _loadDestinations,
+                      onRetry: () => _loadDestinations(reset: true),
+                      emptyMessage: _hasFilters
+                          ? 'No destinations match your filters — try widening them.'
+                          : 'No destinations in this category yet — try another one.',
+                      itemBuilder: (context, width, p) => PlaceCard(
                         place: p,
                         width: width,
                         imageHeight: _gridImageHeight,
@@ -930,47 +935,80 @@ class _ExploreScreenState extends State<ExploreScreen> {
                           placesService: _places,
                         ),
                       ),
-                      Object() => const SizedBox.shrink(),
-                    },
-                  ),
-                  _ExploreTab.festivals => _buildGrid(
-                    items: _filteredFestivals,
-                    isLoading: _loadingFestivals,
-                    error: _festivalsError,
-                    hasMore: _festivalsHasMore,
-                    onLoadMore: _loadFestivals,
-                    onRetry: () => _loadFestivals(reset: true),
-                    emptyMessage: _hasFilters
-                        ? 'No festivals match your filters — try widening them.'
-                        : 'No festivals found.',
-                    itemBuilder: (context, width, item) => FestivalCard(
-                      festival: item,
-                      width: width,
-                      imageHeight: _gridImageHeight,
-                      onTap: () =>
-                          context.push(RoutePaths.festivalDetails(item.id)),
                     ),
-                  ),
-                  _ExploreTab.businesses => _buildGrid(
-                    items: _filteredBusinesses,
-                    isLoading: _loadingBusinesses,
-                    error: _businessesError,
-                    // One-shot fetch (see _loadBusinesses) — there's no
-                    // further page to load.
-                    hasMore: false,
-                    onLoadMore: _loadBusinesses,
-                    onRetry: () => _loadBusinesses(reset: true),
-                    emptyMessage: (_hasFilters || _businessCategory != null)
-                        ? 'No local finds match your filters — try widening them.'
-                        : 'No local finds yet.',
-                    itemBuilder: (context, width, b) => BusinessCard(
-                      business: b,
-                      width: width,
-                      imageHeight: _gridImageHeight,
-                      onTap: () => showBusinessInfoSheet(context, b),
+                    _ExploreTab.restaurants => _buildGrid(
+                      items: _filteredRestaurantItems,
+                      isLoading: _loadingRestaurants,
+                      error: _restaurantsError,
+                      hasMore: _restaurantsHasMore,
+                      onLoadMore: _loadRestaurants,
+                      onRetry: () => _loadRestaurants(reset: true),
+                      emptyMessage: _hasFilters
+                          ? 'No restaurants match your filters — try widening them.'
+                          : 'No restaurants found.',
+                      itemBuilder: (context, width, item) => switch (item) {
+                        Restaurant r => RestaurantCard(
+                          restaurant: r,
+                          width: width,
+                          imageHeight: _gridImageHeight,
+                          onTap: () =>
+                              context.push(RoutePaths.restaurantDetails(r.id)),
+                        ),
+                        Place p => PlaceCard(
+                          place: p,
+                          width: width,
+                          imageHeight: _gridImageHeight,
+                          imageUrl: p.photoNames.isNotEmpty
+                              ? _places.photoUrl(p.photoNames.first)
+                              : '',
+                          onTap: () => showPlaceDetailsSheet(
+                            context,
+                            place: p,
+                            placesService: _places,
+                          ),
+                        ),
+                        Object() => const SizedBox.shrink(),
+                      },
                     ),
-                  ),
-                },
+                    _ExploreTab.festivals => _buildGrid(
+                      items: _filteredFestivals,
+                      isLoading: _loadingFestivals,
+                      error: _festivalsError,
+                      hasMore: _festivalsHasMore,
+                      onLoadMore: _loadFestivals,
+                      onRetry: () => _loadFestivals(reset: true),
+                      emptyMessage: _hasFilters
+                          ? 'No festivals match your filters — try widening them.'
+                          : 'No festivals found.',
+                      itemBuilder: (context, width, item) => FestivalCard(
+                        festival: item,
+                        width: width,
+                        imageHeight: _gridImageHeight,
+                        onTap: () =>
+                            context.push(RoutePaths.festivalDetails(item.id)),
+                      ),
+                    ),
+                    _ExploreTab.businesses => _buildGrid(
+                      items: _filteredBusinesses,
+                      isLoading: _loadingBusinesses,
+                      error: _businessesError,
+                      // One-shot fetch (see _loadBusinesses) — there's no
+                      // further page to load.
+                      hasMore: false,
+                      onLoadMore: _loadBusinesses,
+                      onRetry: () => _loadBusinesses(reset: true),
+                      emptyMessage: (_hasFilters || _businessCategory != null)
+                          ? 'No local finds match your filters — try widening them.'
+                          : 'No local finds yet.',
+                      itemBuilder: (context, width, b) => BusinessCard(
+                        business: b,
+                        width: width,
+                        imageHeight: _gridImageHeight,
+                        onTap: () => showBusinessInfoSheet(context, b),
+                      ),
+                    ),
+                  },
+                ),
               ],
             ),
           ),
@@ -1070,6 +1108,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
 /// what's shown within a tab.
 class _MainTabButton extends StatelessWidget {
   const _MainTabButton({
+    super.key,
     required this.icon,
     required this.label,
     required this.selected,

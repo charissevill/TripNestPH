@@ -586,4 +586,58 @@ void main() {
     expect(find.text('Abaca Baking Company'), findsOneWidget);
     expect(find.text('Lantaw Native Restaurant'), findsOneWidget);
   });
+
+  testWidgets(
+    'swiping the content moves between tabs and stops at the first one',
+    (tester) async {
+      final firestore = FakeFirebaseFirestore();
+      await seedGeography(firestore);
+      // Any query beyond these two fails the test — so swiping right past
+      // Destinations must not trigger a load of anything at all.
+      final placesService = PlacesService(
+        caller: _fakePlacesSearchText({
+          'top tourist attractions in the Philippines': [
+            {
+              'id': 'places/banaue',
+              'displayName': {'text': 'Banaue Rice Terraces'},
+              'formattedAddress': 'Banaue, Ifugao',
+              'location': {'latitude': 16.9, 'longitude': 121.05},
+            },
+          ],
+          'best restaurants in the Philippines': [
+            {
+              'id': 'places/abaca',
+              'displayName': {'text': 'Abaca Baking Company'},
+              'formattedAddress': 'Boracay, Aklan',
+              'location': {'latitude': 11.96, 'longitude': 121.92},
+            },
+          ],
+        }),
+      );
+
+      await buildScreen(
+        tester: tester,
+        firestore: firestore,
+        placesService: placesService,
+      );
+      expect(find.text('Banaue Rice Terraces'), findsOneWidget);
+
+      // Right on the first tab — nothing before Destinations.
+      await tester.drag(find.text('Banaue Rice Terraces'), const Offset(250, 0));
+      await _settle(tester);
+      expect(find.text('Banaue Rice Terraces'), findsOneWidget);
+
+      // Left → Restaurants, same as tapping its tab.
+      await tester.drag(find.text('Banaue Rice Terraces'), const Offset(-250, 0));
+      await _settle(tester);
+      expect(find.text('Abaca Baking Company'), findsOneWidget);
+      expect(find.text('Banaue Rice Terraces'), findsNothing);
+
+      // Right → back to Destinations (already loaded, so no re-query).
+      await tester.drag(find.text('Abaca Baking Company'), const Offset(250, 0));
+      await _settle(tester);
+      expect(find.text('Banaue Rice Terraces'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
 }

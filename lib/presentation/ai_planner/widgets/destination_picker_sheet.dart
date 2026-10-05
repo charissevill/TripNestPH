@@ -8,6 +8,7 @@ import '../../../core/utils/app_exception.dart';
 import '../../../core/widgets/buttons/selectable_chip.dart';
 import '../../../core/widgets/inputs/search_bar_widget.dart';
 import '../../../core/widgets/states/loading_widget.dart';
+import '../../../core/widgets/navigation/swipe_tab_switcher.dart';
 import '../../../data/repositories/destination_repository.dart';
 import '../../../data/repositories/province_repository.dart';
 import '../../../domain/models/destination.dart';
@@ -191,112 +192,119 @@ class _DestinationPickerSheetState extends State<DestinationPickerSheet> {
                 ),
               ),
               Expanded(
-                child: _mode == PickerMode.destination
-                    ? _destinationsError != null
-                          ? Center(
-                              child: Padding(
-                                padding: const EdgeInsets.all(AppSpacing.lg),
-                                child: Text(
-                                  AppException.from(
-                                    _destinationsError!,
-                                  ).message,
-                                  textAlign: TextAlign.center,
+                // Swipe left/right on the list to flip between the two
+                // modes, same as tapping their chips above.
+                child: SwipeTabSwitcher(
+                  index: _mode.index,
+                  length: PickerMode.values.length,
+                  onIndexChanged: (i) => _switchMode(PickerMode.values[i]),
+                  child: _mode == PickerMode.destination
+                      ? _destinationsError != null
+                            ? Center(
+                                child: Padding(
+                                  padding: const EdgeInsets.all(AppSpacing.lg),
+                                  child: Text(
+                                    AppException.from(
+                                      _destinationsError!,
+                                    ).message,
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ),
+                              )
+                            : _destinations == null
+                            ? ListView(
+                                children: List.generate(
+                                  6,
+                                  (_) =>
+                                      LoadingWidget.textTile(leadingCircle: true),
+                                ),
+                              )
+                            : _destinations!.isEmpty
+                            ? const Center(child: Text('No destinations found'))
+                            : ListView.builder(
+                                controller: scrollController,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: AppSpacing.lg,
+                                ),
+                                itemCount: _destinations!.length,
+                                itemBuilder: (context, i) {
+                                  final destination = _destinations![i];
+                                  final selected =
+                                      widget.currentDestination?.id ==
+                                      destination.id;
+                                  return ListTile(
+                                    onTap: () =>
+                                        Navigator.of(context).pop(destination),
+                                    contentPadding: EdgeInsets.zero,
+                                    leading: CircleAvatar(
+                                      backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.12),
+                                      child: Icon(
+                                        Symbols.place_rounded,
+                                        color: theme.colorScheme.primary,
+                                      ),
+                                    ),
+                                    title: Text(destination.name),
+                                    subtitle: Text(destination.provinceName),
+                                    trailing: selected
+                                        ? Icon(
+                                            Symbols.check_circle_rounded,
+                                            color: theme.colorScheme.primary,
+                                          )
+                                        : null,
+                                  );
+                                },
+                              )
+                      : _provincesError != null
+                      ? Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(AppSpacing.lg),
+                            child: Text(
+                              AppException.from(_provincesError!).message,
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                        )
+                      : provinces == null
+                      ? ListView(
+                          children: List.generate(
+                            6,
+                            (_) => LoadingWidget.textTile(leadingCircle: true),
+                          ),
+                        )
+                      : provinces.isEmpty
+                      ? const Center(child: Text('No provinces found'))
+                      : ListView.builder(
+                          controller: scrollController,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.lg,
+                          ),
+                          itemCount: provinces.length,
+                          itemBuilder: (context, i) {
+                            final province = provinces[i];
+                            final selected =
+                                widget.currentProvince?.id == province.id;
+                            return ListTile(
+                              onTap: () => Navigator.of(context).pop(province),
+                              contentPadding: EdgeInsets.zero,
+                              leading: CircleAvatar(
+                                backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.12),
+                                child: Icon(
+                                  Symbols.public_rounded,
+                                  color: theme.colorScheme.primary,
                                 ),
                               ),
-                            )
-                          : _destinations == null
-                          ? ListView(
-                              children: List.generate(
-                                6,
-                                (_) =>
-                                    LoadingWidget.textTile(leadingCircle: true),
-                              ),
-                            )
-                          : _destinations!.isEmpty
-                          ? const Center(child: Text('No destinations found'))
-                          : ListView.builder(
-                              controller: scrollController,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: AppSpacing.lg,
-                              ),
-                              itemCount: _destinations!.length,
-                              itemBuilder: (context, i) {
-                                final destination = _destinations![i];
-                                final selected =
-                                    widget.currentDestination?.id ==
-                                    destination.id;
-                                return ListTile(
-                                  onTap: () =>
-                                      Navigator.of(context).pop(destination),
-                                  contentPadding: EdgeInsets.zero,
-                                  leading: CircleAvatar(
-                                    backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.12),
-                                    child: Icon(
-                                      Symbols.place_rounded,
+                              title: Text(province.name),
+                              subtitle: Text(province.regionName),
+                              trailing: selected
+                                  ? Icon(
+                                      Symbols.check_circle_rounded,
                                       color: theme.colorScheme.primary,
-                                    ),
-                                  ),
-                                  title: Text(destination.name),
-                                  subtitle: Text(destination.provinceName),
-                                  trailing: selected
-                                      ? Icon(
-                                          Symbols.check_circle_rounded,
-                                          color: theme.colorScheme.primary,
-                                        )
-                                      : null,
-                                );
-                              },
-                            )
-                    : _provincesError != null
-                    ? Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(AppSpacing.lg),
-                          child: Text(
-                            AppException.from(_provincesError!).message,
-                            textAlign: TextAlign.center,
-                          ),
+                                    )
+                                  : null,
+                            );
+                          },
                         ),
-                      )
-                    : provinces == null
-                    ? ListView(
-                        children: List.generate(
-                          6,
-                          (_) => LoadingWidget.textTile(leadingCircle: true),
-                        ),
-                      )
-                    : provinces.isEmpty
-                    ? const Center(child: Text('No provinces found'))
-                    : ListView.builder(
-                        controller: scrollController,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: AppSpacing.lg,
-                        ),
-                        itemCount: provinces.length,
-                        itemBuilder: (context, i) {
-                          final province = provinces[i];
-                          final selected =
-                              widget.currentProvince?.id == province.id;
-                          return ListTile(
-                            onTap: () => Navigator.of(context).pop(province),
-                            contentPadding: EdgeInsets.zero,
-                            leading: CircleAvatar(
-                              backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.12),
-                              child: Icon(
-                                Symbols.public_rounded,
-                                color: theme.colorScheme.primary,
-                              ),
-                            ),
-                            title: Text(province.name),
-                            subtitle: Text(province.regionName),
-                            trailing: selected
-                                ? Icon(
-                                    Symbols.check_circle_rounded,
-                                    color: theme.colorScheme.primary,
-                                  )
-                                : null,
-                          );
-                        },
-                      ),
+                ),
               ),
             ],
           ),

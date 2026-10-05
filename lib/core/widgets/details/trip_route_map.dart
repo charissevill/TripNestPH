@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -14,10 +16,12 @@ import '../../utils/maps_launcher.dart';
 /// the same route for real turn-by-turn directions. A single-stop day (see
 /// `matchDayToRoute`'s destination-anchor fallback) just shows one centered
 /// pin with no line/"Open Route" link, since there's nothing to route
-/// between. Pan and zoom (pinch and the on-screen buttons) all stay enabled
-/// — Google Maps handles gesture priority within its own bounds on its own,
-/// so dragging on the map pans it rather than fighting the itinerary page's
-/// outer scroll.
+/// between. Pan and zoom (pinch and the on-screen buttons) all stay enabled,
+/// and the map eagerly claims every gesture that starts within its bounds
+/// (see `gestureRecognizers` below), so dragging on the map pans it rather
+/// than scrolling the itinerary page or swiping its tabs away — without
+/// that, a platform view only gets the gestures no Flutter recognizer
+/// above it wanted.
 ///
 /// Draws a straight line between stops immediately (so the map is never
 /// blank), then swaps to a real, road-following route with per-leg travel
@@ -133,6 +137,11 @@ class _TripRouteMapState extends State<TripRouteMap> {
                         width: 4,
                       ),
                     },
+              gestureRecognizers: {
+                Factory<OneSequenceGestureRecognizer>(
+                  () => EagerGestureRecognizer(),
+                ),
+              },
               scrollGesturesEnabled: true,
               zoomControlsEnabled: true,
               zoomGesturesEnabled: true,

@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
@@ -6,6 +8,7 @@ import '../../services/storage_service.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_spacing.dart';
 import '../../utils/app_exception.dart';
+import '../../utils/document_scan_helper.dart';
 import '../../utils/image_crop_helper.dart';
 import '../media/image_error_placeholder.dart';
 
@@ -24,6 +27,7 @@ class HeroImagePicker extends StatefulWidget {
     required this.onChanged,
     this.label = 'Photo',
     this.height = 160,
+    this.scanDocument = false,
   });
 
   final String imageUrl;
@@ -32,6 +36,10 @@ class HeroImagePicker extends StatefulWidget {
   final ValueChanged<String> onChanged;
   final String label;
   final double height;
+
+  /// Opens the document scanner (auto edge detection + crop) instead of the
+  /// gallery picker — for paperwork like a business permit, not photos.
+  final bool scanDocument;
 
   @override
   State<HeroImagePicker> createState() => _HeroImagePickerState();
@@ -43,7 +51,13 @@ class _HeroImagePickerState extends State<HeroImagePicker> {
   String? _error;
 
   Future<void> _pick() async {
-    final file = await pickAndCropImage();
+    final File? file;
+    try {
+      file = widget.scanDocument ? await scanDocument() : await pickAndCropImage();
+    } catch (e) {
+      if (mounted) setState(() => _error = AppException.from(e).message);
+      return;
+    }
     if (file == null || !mounted) return;
 
     setState(() {
@@ -90,13 +104,20 @@ class _HeroImagePickerState extends State<HeroImagePicker> {
                     errorWidget: (context, url, error) => const ImageErrorPlaceholder(),
                   ),
                 if (widget.imageUrl.isEmpty && !_uploading)
-                  const Center(
+                  Center(
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Symbols.add_photo_alternate_rounded, color: AppColors.textTertiary, size: 32),
-                        SizedBox(height: AppSpacing.xs),
-                        Text('Tap to upload a photo', style: TextStyle(color: AppColors.textTertiary, fontSize: 12)),
+                        Icon(
+                          widget.scanDocument ? Symbols.document_scanner_rounded : Symbols.add_photo_alternate_rounded,
+                          color: AppColors.textTertiary,
+                          size: 32,
+                        ),
+                        const SizedBox(height: AppSpacing.xs),
+                        Text(
+                          widget.scanDocument ? 'Tap to scan or upload' : 'Tap to upload a photo',
+                          style: const TextStyle(color: AppColors.textTertiary, fontSize: 12),
+                        ),
                       ],
                     ),
                   ),

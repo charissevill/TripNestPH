@@ -29,7 +29,7 @@
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>TripNest PH uses your location to show nearby destinations, restaurants and directions.</string>
 	<key>NSCameraUsageDescription</key>
-	<string>TripNest PH needs camera access so you can attach photos to your reviews and profile.</string>
+	<string>TripNest PH needs camera access so you can attach photos to your reviews and profile, and scan your business permit.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>TripNest PH needs photo library access so you can attach photos to your reviews and profile.</string>
 	<key>UIApplicationSceneManifest</key>

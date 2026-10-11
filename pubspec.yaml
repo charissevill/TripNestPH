@@ -1,5 +1,5 @@
 name: tripnest_ph
-description: "A new Flutter project."
+description: "TripNest PH: AI-powered local tourism discovery and trip-planning app for the Philippines."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
@@ -75,6 +75,7 @@ dependencies:
   # Media & device
   image_picker: ^1.1.2
   image_cropper: ^8.0.2
+  cunning_document_scanner: ^3.0.3
   exif: ^3.3.0
   flutter_local_notifications: ^18.0.1
   timezone: ^0.9.4

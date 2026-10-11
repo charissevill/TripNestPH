@@ -1125,7 +1125,10 @@ class AiRepository {
           {'role': 'user', 'content': message},
         ],
         temperature: 0,
-        maxTokens: 20,
+        // Well above the few tokens the answer itself needs: the model
+        // spends part of this budget on hidden reasoning first, and a
+        // budget that only fits the answer comes back empty every time.
+        maxTokens: 200,
       );
       final trimmed = reply.trim();
       if (trimmed.isEmpty || trimmed.toUpperCase() == 'NONE') return null;

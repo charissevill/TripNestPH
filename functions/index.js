@@ -659,43 +659,82 @@ exports.extractPermitText = onCall({ region: 'asia-southeast1', secrets: [google
     return { text: '' };
   }
 
-  const apiKey = googlePlacesApiKey.value();
-  let text = '';
-  if (apiKey) {
-    try {
-      const response = await fetch(`https://vision.googleapis.com/v1/images:annotate?key=${apiKey}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          requests: [
-            {
-              image: { source: { imageUri: imageUrl } },
-              features: [{ type: 'TEXT_DETECTION' }],
-            },
-          ],
-        }),
-      });
-      if (response.status === 200) {
-        const json = await response.json().catch(() => null);
-        const result = json?.responses?.[0];
-        // A per-image error (e.g. Vision couldn't fetch imageUrl) lands
-        // inside a 200 response, not as an HTTP error status.
-        if (result?.error) {
-          console.error('extractPermitText: Vision per-image error', result.error);
-        } else {
-          text = result?.fullTextAnnotation?.text ?? '';
-        }
-      } else {
-        console.error('extractPermitText: Vision API returned', response.status, await response.text().catch(() => ''));
-      }
-    } catch (e) {
-      console.error('extractPermitText: request failed', e);
-    }
-  }
-
+  const text = await detectTextInImage(imageUrl, 'extractPermitText');
   await permitRef.set({ permitOcrText: text }, { merge: true });
   return { text };
 });
+
+/**
+ * Same Vision reading aid as `extractPermitText`, for the permit photo on a
+ * Business Owner *application* (`business_owner_applications/{id}`) — an
+ * applicant has no `businesses` doc yet, so that function's ownership check
+ * can't apply to them. Same shape and guarantees otherwise: takes only
+ * `applicationId` (never an image URL), reads `permitUrl` off the caller's
+ * own application, and is the only writer of that doc's `permitOcrText`.
+ */
+exports.extractApplicationPermitText = onCall({ region: 'asia-southeast1', secrets: [googlePlacesApiKey] }, async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.');
+  await enforceRateLimit(request.auth.uid, 'extractApplicationPermitText', 20);
+
+  const { applicationId } = request.data ?? {};
+  if (typeof applicationId !== 'string' || !applicationId.trim()) {
+    throw new HttpsError('invalid-argument', 'applicationId is required.');
+  }
+
+  const applicationRef = db.collection('business_owner_applications').doc(applicationId);
+  const applicationSnap = await applicationRef.get();
+  if (!applicationSnap.exists || applicationSnap.data()?.userId !== request.auth.uid) {
+    throw new HttpsError('permission-denied', 'This is not your application.');
+  }
+
+  const imageUrl = applicationSnap.data()?.permitUrl;
+  if (typeof imageUrl !== 'string' || !imageUrl) {
+    return { text: '' };
+  }
+
+  const text = await detectTextInImage(imageUrl, 'extractApplicationPermitText');
+  await applicationRef.set({ permitOcrText: text }, { merge: true });
+  return { text };
+});
+
+/**
+ * Shared Vision TEXT_DETECTION call behind both permit-OCR functions above.
+ * Never throws — every failure mode logs under [logTag] and returns ''.
+ */
+async function detectTextInImage(imageUrl, logTag) {
+  const apiKey = googlePlacesApiKey.value();
+  if (!apiKey) return '';
+  try {
+    const response = await fetch(`https://vision.googleapis.com/v1/images:annotate?key=${apiKey}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        requests: [
+          {
+            image: { source: { imageUri: imageUrl } },
+            features: [{ type: 'TEXT_DETECTION' }],
+          },
+        ],
+      }),
+    });
+    if (response.status !== 200) {
+      console.error(`${logTag}: Vision API returned`, response.status, await response.text().catch(() => ''));
+      return '';
+    }
+    const json = await response.json().catch(() => null);
+    const result = json?.responses?.[0];
+    // A per-image error (e.g. Vision couldn't fetch imageUrl) lands
+    // inside a 200 response, not as an HTTP error status.
+    if (result?.error) {
+      console.error(`${logTag}: Vision per-image error`, result.error);
+      return '';
+    }
+    return result?.fullTextAnnotation?.text ?? '';
+  } catch (e) {
+    console.error(`${logTag}: request failed`, e);
+    return '';
+  }
+}
 
 /**
  * Turns a dropped map pin's coordinates into a readable place name (plus

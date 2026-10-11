@@ -27,7 +27,9 @@ class BusinessOwnerApplicationRepository {
   CollectionReference<Map<String, dynamic>> get _collection =>
       _db.collection(FirestorePaths.businessOwnerApplications);
 
-  Future<void> submit({
+  /// Returns the new application's id — the caller needs it to kick off
+  /// the permit OCR (`OcrService.extractApplicationText`).
+  Future<String> submit({
     required String userId,
     required String applicantName,
     required String applicantEmail,
@@ -35,9 +37,14 @@ class BusinessOwnerApplicationRepository {
     required String category,
     required String phone,
     required String description,
+    required String address,
+    required double latitude,
+    required double longitude,
+    required String permitUrl,
+    required String idUrl,
   }) async {
     try {
-      await _collection.add(
+      final doc = await _collection.add(
         BusinessOwnerApplication(
           id: '',
           userId: userId,
@@ -47,10 +54,16 @@ class BusinessOwnerApplicationRepository {
           category: category,
           phone: phone,
           description: description,
+          address: address,
+          latitude: latitude,
+          longitude: longitude,
+          permitUrl: permitUrl,
+          idUrl: idUrl,
           status: BusinessOwnerApplicationStatus.pending,
           createdAt: DateTime.now(),
         ).toMap(),
       );
+      return doc.id;
     } catch (e) {
       throw AppException.from(e);
     }

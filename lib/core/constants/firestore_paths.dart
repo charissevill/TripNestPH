@@ -39,4 +39,5 @@ class FirestorePaths {
   static const String storageDestinationPhotos = 'destination_photos';
   static const String storageBusinessGallery = 'business_gallery';
   static const String storageBusinessPermits = 'business_permits';
+  static const String storageBusinessApplicationDocs = 'business_application_docs';
 }

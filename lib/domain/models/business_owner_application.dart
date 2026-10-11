@@ -29,6 +29,12 @@ class BusinessOwnerApplication {
     required this.category,
     required this.phone,
     required this.description,
+    this.address = '',
+    this.latitude,
+    this.longitude,
+    this.permitUrl = '',
+    this.permitOcrText = '',
+    this.idUrl = '',
     required this.status,
     this.rejectionReason,
     required this.createdAt,
@@ -44,6 +50,24 @@ class BusinessOwnerApplication {
   final String category;
   final String phone;
   final String description;
+
+  /// Where the business is — the readable address of a pin the applicant
+  /// dropped on a map (`MapDestinationPicker`), with its coordinates.
+  /// Empty/null only on applications submitted before these were asked for.
+  final String address;
+  final double? latitude;
+  final double? longitude;
+
+  /// Applicant-uploaded Business Permit / DTI Registration photo.
+  final String permitUrl;
+
+  /// Best-effort OCR of [permitUrl] — a reading aid for the reviewing admin.
+  /// Only ever set by the `extractApplicationPermitText` Cloud Function,
+  /// never by the client (see firestore.rules), so it's left out of [toMap].
+  final String permitOcrText;
+
+  /// Applicant-uploaded photo of a valid government ID.
+  final String idUrl;
 
   /// One of [BusinessOwnerApplicationStatus]'s values.
   final String status;
@@ -61,6 +85,12 @@ class BusinessOwnerApplication {
       category: map['category'] as String? ?? '',
       phone: map['phone'] as String? ?? '',
       description: map['description'] as String? ?? '',
+      address: map['address'] as String? ?? '',
+      latitude: (map['latitude'] as num?)?.toDouble(),
+      longitude: (map['longitude'] as num?)?.toDouble(),
+      permitUrl: map['permitUrl'] as String? ?? '',
+      permitOcrText: map['permitOcrText'] as String? ?? '',
+      idUrl: map['idUrl'] as String? ?? '',
       status: map['status'] as String? ?? BusinessOwnerApplicationStatus.pending,
       rejectionReason: map['rejectionReason'] as String?,
       createdAt: timestamp is Timestamp ? timestamp.toDate() : DateTime.now(),
@@ -76,6 +106,11 @@ class BusinessOwnerApplication {
       'category': category,
       'phone': phone,
       'description': description,
+      'address': address,
+      'latitude': latitude,
+      'longitude': longitude,
+      'permitUrl': permitUrl,
+      'idUrl': idUrl,
       'status': status,
       'rejectionReason': rejectionReason,
       'createdAt': FieldValue.serverTimestamp(),

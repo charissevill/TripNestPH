@@ -739,7 +739,19 @@ service cloud.firestore {
       return request.resource.data.businessName is string && request.resource.data.businessName.size() > 0 && request.resource.data.businessName.size() <= 100
         && request.resource.data.category in ['accommodation', 'foodAndDining', 'tourOperator', 'shop', 'transport', 'other']
         && request.resource.data.description is string && request.resource.data.description.size() <= 1000
-        && request.resource.data.applicantEmail is string && request.resource.data.applicantEmail.size() > 0;
+        && request.resource.data.applicantEmail is string && request.resource.data.applicantEmail.size() > 0
+        // Proof the admin reviews before approving: where the business
+        // actually is (a map pin, not just typed text) plus a permit photo
+        // and a valid ID photo.
+        && request.resource.data.address is string && request.resource.data.address.size() > 0 && request.resource.data.address.size() <= 300
+        && request.resource.data.latitude is number && request.resource.data.latitude >= -90 && request.resource.data.latitude <= 90
+        && request.resource.data.longitude is number && request.resource.data.longitude >= -180 && request.resource.data.longitude <= 180
+        && request.resource.data.permitUrl is string && request.resource.data.permitUrl.size() > 0
+        && request.resource.data.idUrl is string && request.resource.data.idUrl.size() > 0
+        // Only the extractApplicationPermitText Cloud Function (Admin SDK)
+        // ever sets this — same "a client can never fabricate OCR output"
+        // reasoning as businesses/{id}/private/permit above.
+        && !('permitOcrText' in request.resource.data);
     }
 
     match /business_owner_applications/{id} {

@@ -8,6 +8,7 @@ import '../../core/routes/route_paths.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/utils/app_exception.dart';
+import '../../core/utils/maps_launcher.dart';
 import '../../core/widgets/dialogs/confirmation_dialog.dart';
 import '../../core/widgets/states/empty_state_widget.dart';
 import '../../core/widgets/states/loading_widget.dart';
@@ -168,6 +169,51 @@ class _ApplicationCard extends StatelessWidget {
             const SizedBox(height: AppSpacing.sm),
             Text(application.description, style: theme.textTheme.bodyMedium),
           ],
+          // Absent only on applications submitted before the form asked for
+          // them — each link just doesn't render rather than showing a dead one.
+          if (application.latitude != null && application.longitude != null)
+            _ProofLink(
+              icon: Symbols.location_on_rounded,
+              label: application.address.isEmpty ? 'View pinned location' : application.address,
+              onTap: () => MapsLauncher.openDirections(
+                latitude: application.latitude!,
+                longitude: application.longitude!,
+                label: application.businessName,
+              ),
+            ),
+          if (application.permitUrl.isNotEmpty)
+            _ProofLink(
+              icon: Symbols.description_rounded,
+              label: 'View submitted permit',
+              onTap: () => MapsLauncher.openUrl(application.permitUrl),
+            ),
+          if (application.idUrl.isNotEmpty)
+            _ProofLink(
+              icon: Symbols.badge_rounded,
+              label: 'View submitted ID',
+              onTap: () => MapsLauncher.openUrl(application.idUrl),
+            ),
+          if (application.permitOcrText.isNotEmpty) ...[
+            const SizedBox(height: AppSpacing.sm),
+            Text(
+              'Extracted permit text (OCR) — verify against the actual photo',
+              style: theme.textTheme.labelSmall?.copyWith(color: AppColors.textTertiary),
+            ),
+            const SizedBox(height: 4),
+            Container(
+              width: double.infinity,
+              constraints: const BoxConstraints(maxHeight: 120),
+              padding: const EdgeInsets.all(AppSpacing.sm),
+              decoration: BoxDecoration(
+                color: AppColors.background,
+                borderRadius: BorderRadius.circular(AppRadius.sm),
+                border: Border.all(color: AppColors.border),
+              ),
+              child: SingleChildScrollView(
+                child: Text(application.permitOcrText, style: theme.textTheme.bodySmall),
+              ),
+            ),
+          ],
           const SizedBox(height: AppSpacing.md),
           Row(
             children: [
@@ -185,6 +231,42 @@ class _ApplicationCard extends StatelessWidget {
             ],
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// One tappable piece of submitted proof (pinned location, permit, ID) —
+/// same underlined-link treatment as `AdminBusinessListScreen`'s permit link.
+class _ProofLink extends StatelessWidget {
+  const _ProofLink({required this.icon, required this.label, required this.onTap});
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: AppSpacing.sm),
+      child: InkWell(
+        onTap: onTap,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 16, color: AppColors.primary),
+            const SizedBox(width: 4),
+            Flexible(
+              child: Text(
+                label,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: AppColors.primary,
+                  decoration: TextDecoration.underline,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -27,4 +27,16 @@ class OcrService {
       throw AppException.from(e);
     }
   }
+
+  /// Same thing for the permit on a Business Owner application
+  /// (`extractApplicationPermitText`) — an applicant has no business doc
+  /// yet, so this keys off their own [applicationId] instead.
+  Future<String> extractApplicationText(String applicationId) async {
+    try {
+      final result = await _call('extractApplicationPermitText', {'applicationId': applicationId});
+      return result['text'] as String? ?? '';
+    } on FirebaseFunctionsException catch (e) {
+      throw AppException.from(e);
+    }
+  }
 }

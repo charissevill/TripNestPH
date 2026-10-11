@@ -66,6 +66,16 @@ service firebase.storage {
       allow write: if isOwner(userId) && hasAdminRole(['businessOwner']) && isImage() && request.resource.size < 10 * 1024 * 1024;
     }
 
+    // Business Owner application paperwork (permit + valid ID photos):
+    // uploaded *before* the applicant holds any admin role — that's the
+    // whole point of applying — so unlike business_permits above this can't
+    // require `businessOwner`. Same privacy otherwise: only the applicant
+    // and the reviewing admin can read it.
+    match /business_application_docs/{userId}/{fileName} {
+      allow read: if isOwner(userId) || hasAdminRole(['admin']);
+      allow write: if isOwner(userId) && isImage() && request.resource.size < 10 * 1024 * 1024;
+    }
+
     // Business gallery photos: public once approved, writable only by the
     // owning Business Owner.
     match /business_gallery/{userId}/{fileName} {

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:provider/provider.dart';
@@ -78,6 +79,22 @@ class _RegisterScreenState extends State<RegisterScreen> {
     } else {
       context.go(RoutePaths.verifyEmail);
     }
+  }
+
+  /// Same Google shortcut Login offers, but carrying the role choice through:
+  /// a Google account's email is already verified, so there's no Verify
+  /// Email step to land on — a traveler goes straight home, a business owner
+  /// to their application first.
+  Future<void> _signUpWithGoogle() async {
+    final auth = context.read<AuthProvider>();
+    // Captured before the await: the moment sign-in succeeds the router's
+    // own redirect bounces this (auth-only) route to Home, which can unmount
+    // this screen before the line below runs — and a `mounted` check there
+    // would then silently drop the business owner's application step.
+    final router = GoRouter.of(context);
+    final ok = await auth.signInWithGoogle();
+    if (!ok) return;
+    router.go(widget.wantsBusinessOwner ? RoutePaths.businessOwnerApplication : RoutePaths.home);
   }
 
   @override
@@ -264,6 +281,28 @@ class _RegisterScreenState extends State<RegisterScreen> {
             label: 'Create Account',
             isLoading: auth.isBusy,
             onPressed: auth.isBusy ? null : _submit,
+          ),
+          const SizedBox(height: AppSpacing.xl),
+          Row(
+            children: [
+              const Expanded(child: Divider(color: AppColors.border)),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+                child: Text('or continue with', style: theme.textTheme.bodySmall),
+              ),
+              const Expanded(child: Divider(color: AppColors.border)),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.xl),
+          AnimatedButton(
+            label: 'Continue with Google',
+            leading: SvgPicture.asset('assets/images/google_logo.svg', width: 20, height: 20),
+            filled: false,
+            isLoading: auth.isBusy,
+            onPressed: auth.isBusy ? null : _signUpWithGoogle,
+            labelColor: Colors.white,
+            strokeLabel: true,
+            strokeColor: AppColors.primaryDark,
           ),
           const SizedBox(height: AppSpacing.xxl),
           Center(

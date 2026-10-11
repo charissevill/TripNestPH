@@ -749,9 +749,28 @@ service cloud.firestore {
         && request.resource.data.permitUrl is string && request.resource.data.permitUrl.size() > 0
         && request.resource.data.idUrl is string && request.resource.data.idUrl.size() > 0
         // Only the extractApplicationPermitText Cloud Function (Admin SDK)
-        // ever sets this — same "a client can never fabricate OCR output"
+        // ever sets these — same "a client can never fabricate OCR output"
         // reasoning as businesses/{id}/private/permit above.
-        && !('permitOcrText' in request.resource.data);
+        && !('permitOcrText' in request.resource.data)
+        && !('permitFields' in request.resource.data)
+        && !('idName' in request.resource.data)
+        // What the applicant confirmed (and possibly corrected) after seeing
+        // the OCR reading on the form — theirs to write, kept apart from the
+        // function-only fields above so the admin can tell the two apart.
+        && (!('confirmedPermitFields' in request.resource.data) || isValidConfirmedPermitFields(request.resource.data.confirmedPermitFields))
+        && (!('confirmedIdName' in request.resource.data)
+            || (request.resource.data.confirmedIdName is string && request.resource.data.confirmedIdName.size() <= 120));
+    }
+
+    function isValidConfirmedPermitFields(fields) {
+      return fields is map
+        && fields.keys().hasOnly(['businessName', 'ownerName', 'address', 'permitNo', 'validUntil', 'issuingLgu'])
+        && fields.get('businessName', '') is string && fields.get('businessName', '').size() <= 150
+        && fields.get('ownerName', '') is string && fields.get('ownerName', '').size() <= 120
+        && fields.get('address', '') is string && fields.get('address', '').size() <= 300
+        && fields.get('permitNo', '') is string && fields.get('permitNo', '').size() <= 40
+        && fields.get('validUntil', '') is string && fields.get('validUntil', '').size() <= 10
+        && fields.get('issuingLgu', '') is string && fields.get('issuingLgu', '').size() <= 120;
     }
 
     match /business_owner_applications/{id} {

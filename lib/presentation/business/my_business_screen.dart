@@ -370,7 +370,7 @@ class _BusinessFormState extends State<_BusinessForm> {
         context,
         title: 'Submit without a permit photo?',
         message:
-            'A Business Permit or DTI Registration photo speeds up approval '
+            'A Business Permit photo speeds up approval '
             'since the admin has less to manually verify. You can still '
             'submit without one — an admin may ask for it later.',
         confirmLabel: 'Submit Anyway',
@@ -817,8 +817,9 @@ class _BusinessFormState extends State<_BusinessForm> {
                       imageUrl: _permitUrl,
                       folder: FirestorePaths.storageBusinessPermits,
                       ownerId: widget.uid,
-                      label: 'Business Permit / DTI Registration',
+                      label: 'Business Permit',
                       height: 140,
+                      scanDocument: true,
                       onChanged: (url) => setState(() {
                         _permitUrl = url;
                         _dirty = true;

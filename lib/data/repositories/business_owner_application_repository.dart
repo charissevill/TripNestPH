@@ -35,13 +35,13 @@ class BusinessOwnerApplicationRepository {
     required String applicantEmail,
     required String businessName,
     required String category,
-    required String phone,
-    required String description,
     required String address,
     required double latitude,
     required double longitude,
     required String permitUrl,
     required String idUrl,
+    PermitFields confirmedPermitFields = const PermitFields(),
+    String confirmedIdName = '',
   }) async {
     try {
       final doc = await _collection.add(
@@ -52,13 +52,15 @@ class BusinessOwnerApplicationRepository {
           applicantEmail: applicantEmail,
           businessName: businessName,
           category: category,
-          phone: phone,
-          description: description,
+          // No longer asked for on the form.
+          description: '',
           address: address,
           latitude: latitude,
           longitude: longitude,
           permitUrl: permitUrl,
           idUrl: idUrl,
+          confirmedPermitFields: confirmedPermitFields,
+          confirmedIdName: confirmedIdName,
           status: BusinessOwnerApplicationStatus.pending,
           createdAt: DateTime.now(),
         ).toMap(),

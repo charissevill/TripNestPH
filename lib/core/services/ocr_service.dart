@@ -1,5 +1,6 @@
 import 'package:cloud_functions/cloud_functions.dart';
 
+import '../../domain/models/business_owner_application.dart';
 import '../utils/app_exception.dart';
 import '../utils/function_caller.dart';
 
@@ -35,6 +36,25 @@ class OcrService {
     try {
       final result = await _call('extractApplicationPermitText', {'applicationId': applicationId});
       return result['text'] as String? ?? '';
+    } on FirebaseFunctionsException catch (e) {
+      throw AppException.from(e);
+    }
+  }
+
+  /// Reads a just-uploaded permit and/or valid ID photo *before* the
+  /// application is submitted (`readApplicationDocs`), so the form can show
+  /// the applicant what was read and let them correct it. Nothing is stored
+  /// by this call. Pass only the photo that changed — an empty URL is skipped.
+  Future<({PermitFields permitFields, String idName})> readApplicationDocs({
+    String permitUrl = '',
+    String idUrl = '',
+  }) async {
+    try {
+      final result = await _call('readApplicationDocs', {'permitUrl': permitUrl, 'idUrl': idUrl});
+      return (
+        permitFields: PermitFields.fromMap(result['permitFields']),
+        idName: result['idName'] as String? ?? '',
+      );
     } on FirebaseFunctionsException catch (e) {
       throw AppException.from(e);
     }

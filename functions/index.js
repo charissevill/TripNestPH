@@ -7,6 +7,8 @@ const { initializeApp } = require('firebase-admin/app');
 const { getFirestore, FieldValue } = require('firebase-admin/firestore');
 const { getMessaging } = require('firebase-admin/messaging');
 const { getAuth } = require('firebase-admin/auth');
+const { parsePermitFields } = require('./permit_parser');
+const { parseIdName } = require('./id_parser');
 
 initializeApp();
 
@@ -671,6 +673,17 @@ exports.extractPermitText = onCall({ region: 'asia-southeast1', secrets: [google
  * can't apply to them. Same shape and guarantees otherwise: takes only
  * `applicationId` (never an image URL), reads `permitUrl` off the caller's
  * own application, and is the only writer of that doc's `permitOcrText`.
+ *
+ * Also stores `permitFields` — the labelled fields `parsePermitFields`
+ * could pick out of that text (business name, owner, address, permit no.,
+ * validity, issuing LGU) — so the admin can check them against what the
+ * applicant typed. Parsed here rather than on the client for the same
+ * reason as the raw text: it must only ever reflect real Vision output.
+ *
+ * The valid ID photo (`idUrl`) is read in the same call, but only the
+ * holder's name is kept, as `idName` — the ID's raw text carries its
+ * number, birth date and more, none of which the review needs, so that
+ * text is never stored or returned.
  */
 exports.extractApplicationPermitText = onCall({ region: 'asia-southeast1', secrets: [googlePlacesApiKey] }, async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.');
@@ -687,18 +700,76 @@ exports.extractApplicationPermitText = onCall({ region: 'asia-southeast1', secre
     throw new HttpsError('permission-denied', 'This is not your application.');
   }
 
-  const imageUrl = applicationSnap.data()?.permitUrl;
-  if (typeof imageUrl !== 'string' || !imageUrl) {
-    return { text: '' };
-  }
+  const { permitUrl, idUrl } = applicationSnap.data() ?? {};
+  const read = (url) =>
+    typeof url === 'string' && url ? detectTextInImage(url, 'extractApplicationPermitText') : Promise.resolve('');
+  const [text, idText] = await Promise.all([read(permitUrl), read(idUrl)]);
 
-  const text = await detectTextInImage(imageUrl, 'extractApplicationPermitText');
-  await applicationRef.set({ permitOcrText: text }, { merge: true });
+  await applicationRef.set(
+    { permitOcrText: text, permitFields: parsePermitFields(text), idName: parseIdName(idText) },
+    { merge: true },
+  );
   return { text };
 });
 
 /**
- * Shared Vision TEXT_DETECTION call behind both permit-OCR functions above.
+ * Reads the same fields as `extractApplicationPermitText`, but *before* the
+ * application exists — so the form can show the applicant what was read off
+ * their permit and ID and let them correct it before submitting. Returns
+ * `{ permitFields, idName }` and stores nothing: whatever the applicant ends
+ * up submitting goes into the application's own `confirmedPermitFields` /
+ * `confirmedIdName`, while `extractApplicationPermitText` still writes the
+ * untouched Vision reading next to it for the admin to compare against.
+ *
+ * There's no application doc to read the URLs from yet, so unlike the two
+ * functions above this one does take them from the client — but only ever
+ * reads a file in the caller's own `business_application_docs/{uid}/`
+ * Storage folder (see `isOwnApplicationDocUrl`), which keeps it from being
+ * a free OCR proxy against arbitrary images. Either URL may be omitted, so
+ * the form can read each photo as it's uploaded.
+ */
+exports.readApplicationDocs = onCall({ region: 'asia-southeast1', secrets: [googlePlacesApiKey] }, async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.');
+  await enforceRateLimit(request.auth.uid, 'readApplicationDocs', 20);
+
+  const { permitUrl, idUrl } = request.data ?? {};
+  const read = (url) =>
+    isOwnApplicationDocUrl(url, request.auth.uid) ? detectTextInImage(url, 'readApplicationDocs') : Promise.resolve('');
+  const [text, idText] = await Promise.all([read(permitUrl), read(idUrl)]);
+
+  // Same as extractApplicationPermitText: only the name leaves the ID's text.
+  return { permitFields: parsePermitFields(text), idName: parseIdName(idText) };
+});
+
+/**
+ * True only for a Firebase Storage download URL of a file under
+ * `business_application_docs/{uid}/` in this project's own bucket — the one
+ * place `storage.rules` lets that user (and nobody else) upload to.
+ */
+function isOwnApplicationDocUrl(url, uid) {
+  if (typeof url !== 'string' || !url) return false;
+  let parsed;
+  try {
+    parsed = new URL(url);
+  } catch (_) {
+    return false;
+  }
+  if (parsed.protocol !== 'https:' || parsed.hostname !== 'firebasestorage.googleapis.com') return false;
+  const match = parsed.pathname.match(/^\/v0\/b\/([^/]+)\/o\/([^/]+)$/);
+  if (!match) return false;
+  const project = process.env.GCLOUD_PROJECT;
+  if (match[1] !== `${project}.firebasestorage.app` && match[1] !== `${project}.appspot.com`) return false;
+  let objectPath;
+  try {
+    objectPath = decodeURIComponent(match[2]);
+  } catch (_) {
+    return false;
+  }
+  return objectPath.startsWith(`business_application_docs/${uid}/`);
+}
+
+/**
+ * Shared Vision TEXT_DETECTION call behind the permit-OCR functions above.
  * Never throws — every failure mode logs under [logTag] and returns ''.
  */
 async function detectTextInImage(imageUrl, logTag) {

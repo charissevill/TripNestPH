@@ -42,8 +42,28 @@ class RatingWidget extends StatelessWidget {
   }
 }
 
+/// A "4.0+" minimum-rating label followed by a star icon, used for the
+/// rating filter chips in the search filter sheet and active-filter row.
+class MinRatingLabel extends StatelessWidget {
+  const MinRatingLabel({super.key, required this.rating});
+
+  final double rating;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text('${rating.toStringAsFixed(1)}+'),
+        const SizedBox(width: AppSpacing.xxs),
+        Icon(Symbols.star_rounded, size: 16, color: Theme.of(context).colorScheme.tertiary, fill: 1),
+      ],
+    );
+  }
+}
+
 /// The small floating pill that overlays a card image to show a rating,
-/// e.g. "★ 4.8". Distinct from [RatingWidget], which is used inline in text.
+/// e.g. a star icon followed by "4.8". Distinct from [RatingWidget], which is used inline in text.
 class RatingBadge extends StatelessWidget {
   const RatingBadge({super.key, required this.rating});
 

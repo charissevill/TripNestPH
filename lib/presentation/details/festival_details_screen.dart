@@ -372,21 +372,18 @@ class _FestivalDetailsBody extends StatelessWidget {
                   onPressed: () => _setFestivalReminder(context, festival),
                 ),
               ),
-              const SizedBox(width: AppSpacing.sm),
-              Expanded(
-                flex: 2,
-                child: AnimatedButton(
-                  label: festival.registrationLink.isNotEmpty
-                      ? 'Register Now'
-                      : 'Plan a Trip Nearby',
-                  icon: festival.registrationLink.isNotEmpty
-                      ? Symbols.how_to_reg_rounded
-                      : Symbols.auto_awesome_rounded,
-                  onPressed: festival.registrationLink.isNotEmpty
-                      ? () => MapsLauncher.openUrl(festival.registrationLink)
-                      : () => context.go(RoutePaths.planner),
+              if (festival.registrationLink.isNotEmpty) ...[
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  flex: 2,
+                  child: AnimatedButton(
+                    label: 'Register Now',
+                    icon: Symbols.how_to_reg_rounded,
+                    onPressed: () =>
+                        MapsLauncher.openUrl(festival.registrationLink),
+                  ),
                 ),
-              ),
+              ],
             ],
           ),
         ),

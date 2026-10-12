@@ -16,11 +16,14 @@ import '../../core/widgets/buttons/animated_button.dart';
 import '../../core/widgets/dialogs/confirmation_dialog.dart';
 import '../../core/widgets/dialogs/discard_changes_scope.dart';
 import '../../core/widgets/inputs/hero_image_picker.dart';
+import '../../core/widgets/inputs/ph_phone_field.dart';
 import '../../core/widgets/states/loading_widget.dart';
+import '../../data/repositories/business_owner_application_repository.dart';
 import '../../data/repositories/business_repository.dart';
 import '../../data/repositories/province_repository.dart';
 import '../../data/repositories/restaurant_repository.dart';
 import '../../domain/models/business.dart';
+import '../../domain/models/business_owner_application.dart';
 import '../../domain/models/province.dart';
 import '../../domain/models/restaurant.dart' show MenuItem;
 import '../ai_planner/widgets/map_destination_picker.dart';
@@ -40,6 +43,43 @@ const Map<String, String> _priceRangeLabels = {
   '₱₱₱': '₱₱₱ · Pricey',
   '₱₱₱₱': '₱₱₱₱ · Fine Dining',
 };
+
+// Ids for the form's collapsible sections — see _BusinessFormState._expanded.
+const String _sectionBasic = 'basic';
+const String _sectionCatalog = 'catalog';
+const String _sectionLocation = 'location';
+const String _sectionAccessibility = 'accessibility';
+const String _sectionVerification = 'verification';
+
+final RegExp _clockTimePattern = RegExp(
+  r'(\d{1,2}):(\d{2})\s*([AP]M)',
+  caseSensitive: false,
+);
+
+/// Always "9:00 PM", whatever the device's 12/24-hour setting — this is
+/// what gets stored and shown to travelers, and what [_parseOpeningHours]
+/// reads back.
+String _formatClockTime(TimeOfDay time) {
+  final hour = time.hourOfPeriod == 0 ? 12 : time.hourOfPeriod;
+  final minute = time.minute.toString().padLeft(2, '0');
+  return '$hour:$minute ${time.period == DayPeriod.am ? 'AM' : 'PM'}';
+}
+
+/// The opening and closing times in a stored "10:00 AM – 9:00 PM daily",
+/// or null when [text] doesn't hold exactly two clock times.
+(TimeOfDay, TimeOfDay)? _parseOpeningHours(String text) {
+  final matches = _clockTimePattern.allMatches(text).toList();
+  if (matches.length != 2) return null;
+  TimeOfDay toTime(RegExpMatch m) {
+    final isPm = m.group(3)!.toUpperCase() == 'PM';
+    return TimeOfDay(
+      hour: int.parse(m.group(1)!) % 12 + (isPm ? 12 : 0),
+      minute: int.parse(m.group(2)!),
+    );
+  }
+
+  return (toTime(matches[0]), toTime(matches[1]));
+}
 
 /// The [MenuItem]-backed catalog section (name/price/photo per entry)
 /// isn't food-specific at all — every category has some equivalent list a
@@ -129,6 +169,21 @@ class MyBusinessScreen extends StatefulWidget {
 class _MyBusinessScreenState extends State<MyBusinessScreen> {
   final BusinessRepository _repository = BusinessRepository();
 
+  /// Started at most once, and only once the owner turns out to have no
+  /// listing yet — see [_BusinessForm.prefill].
+  Future<BusinessOwnerApplication?>? _applicationFuture;
+
+  /// Best-effort: a failed lookup just means an empty form, same as an
+  /// owner who was invited directly and never filed an application.
+  Future<BusinessOwnerApplication?> _loadApplication() async {
+    try {
+      return await BusinessOwnerApplicationRepository()
+          .getLatestApprovedForUser(widget.uid);
+    } catch (_) {
+      return null;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -141,6 +196,25 @@ class _MyBusinessScreenState extends State<MyBusinessScreen> {
             }
             final businesses = snapshot.data ?? const [];
             final existing = businesses.isEmpty ? null : businesses.first;
+            if (existing == null) {
+              // Waits for the lookup before mounting the form at all: its
+              // fields are seeded once at first build (see below), so a
+              // prefill arriving any later would never reach them.
+              return FutureBuilder<BusinessOwnerApplication?>(
+                future: _applicationFuture ??= _loadApplication(),
+                builder: (context, application) {
+                  if (application.connectionState != ConnectionState.done) {
+                    return LoadingWidget.block(height: 300);
+                  }
+                  return _BusinessForm(
+                    key: const ValueKey('new'),
+                    uid: widget.uid,
+                    prefill: application.data,
+                    showBackButton: widget.showBackButton,
+                  );
+                },
+              );
+            }
             // Keyed by the listing's own id (or a fixed sentinel when
             // there isn't one yet): _BusinessFormState's text controllers
             // are `late final`, seeded once from `widget.existing` at
@@ -153,7 +227,7 @@ class _MyBusinessScreenState extends State<MyBusinessScreen> {
             // re-seed every field — whenever the underlying listing
             // identity actually changes.
             return _BusinessForm(
-              key: ValueKey(existing?.id ?? 'new'),
+              key: ValueKey(existing.id),
               uid: widget.uid,
               existing: existing,
               showBackButton: widget.showBackButton,
@@ -170,11 +244,17 @@ class _BusinessForm extends StatefulWidget {
     super.key,
     required this.uid,
     this.existing,
+    this.prefill,
     this.showBackButton = true,
   });
 
   final String uid;
   final Business? existing;
+
+  /// The owner's approved application, passed only when there's no
+  /// [existing] listing yet — seeds the name, category, address, map pin
+  /// and permit photo they already gave on it. Everything stays editable.
+  final BusinessOwnerApplication? prefill;
 
   /// See [MyBusinessScreen.showBackButton]'s doc comment.
   final bool showBackButton;
@@ -189,16 +269,17 @@ class _BusinessFormState extends State<_BusinessForm> {
   final _formKey = GlobalKey<FormState>();
 
   late final _nameController = TextEditingController(
-    text: widget.existing?.name ?? '',
+    text: widget.existing?.name ?? widget.prefill?.businessName ?? '',
   );
   late final _descController = TextEditingController(
     text: widget.existing?.description ?? '',
   );
   late final _addressController = TextEditingController(
-    text: widget.existing?.address ?? '',
+    text: widget.existing?.address ?? widget.prefill?.address ?? '',
   );
+  // Just the digits after +63 — see PhPhoneField.
   late final _contactController = TextEditingController(
-    text: widget.existing?.contactNumber ?? '',
+    text: PhPhoneField.nationalDigits(widget.existing?.contactNumber ?? ''),
   );
   late final _websiteController = TextEditingController(
     text: widget.existing?.websiteUrl ?? '',
@@ -206,31 +287,64 @@ class _BusinessFormState extends State<_BusinessForm> {
   late final _cuisineController = TextEditingController(
     text: widget.existing?.cuisine ?? '',
   );
-  late final _openingHoursController = TextEditingController(
-    text: widget.existing?.openingHours ?? '',
-  );
+  /// Opening/closing time pickers, read back out of the stored string when
+  /// it's one this form wrote. Older free text ("Open 24 hours") leaves
+  /// both null, and an untouched pair keeps that original string on save.
+  late TimeOfDay? _openingTime = _parseOpeningHours(
+    widget.existing?.openingHours ?? '',
+  )?.$1;
+  late TimeOfDay? _closingTime = _parseOpeningHours(
+    widget.existing?.openingHours ?? '',
+  )?.$2;
   late String _heroImageUrl = widget.existing?.heroImageUrl ?? '';
   // Lives outside Business (see BusinessPermit's doc comment) — fetched
   // separately in initState below since it's not part of widget.existing.
-  String _permitUrl = '';
+  // A first listing starts from the permit photo already on the owner's
+  // approved application instead.
+  late String _permitUrl = widget.prefill?.permitUrl ?? '';
+  // True while [_permitUrl] is still the photo an admin already checked on
+  // that application — the Verification section then says so instead of
+  // asking for it again. Cleared once the owner picks a different photo.
+  late bool _permitFromApplication = _permitUrl.isNotEmpty;
   late String _priceRange = _priceRanges.contains(widget.existing?.priceRange)
       ? widget.existing!.priceRange
       : _priceRanges.first;
 
   late String _category =
-      widget.existing?.category ?? BusinessCategory.accommodation;
+      widget.existing?.category ??
+      (BusinessCategory.all.contains(widget.prefill?.category)
+          ? widget.prefill!.category
+          : BusinessCategory.accommodation);
   late final Set<String> _accessibilityTags = {
     ...(widget.existing?.accessibilityTags ?? const []),
   };
   late final List<MenuItem> _menuItems = [
     ...(widget.existing?.menuItems ?? const []),
   ];
-  late double? _latitude = widget.existing?.latitude;
-  late double? _longitude = widget.existing?.longitude;
+  late double? _latitude =
+      widget.existing?.latitude ?? widget.prefill?.latitude;
+  late double? _longitude =
+      widget.existing?.longitude ?? widget.prefill?.longitude;
   Province? _selectedProvince;
   late Future<List<Province>> _provincesFuture;
   bool _saving = false;
   bool _dirty = false;
+
+  /// Which [_SectionCard]s are open — the rest show just their header and
+  /// a one-line summary, so the form isn't one long scroll.
+  final Set<String> _expanded = {_sectionBasic};
+
+  void _toggleSection(String id) {
+    setState(() {
+      if (!_expanded.remove(id)) _expanded.add(id);
+    });
+  }
+
+  /// Opens the sections that hold required fields, so whatever a failed
+  /// save is complaining about is actually on screen.
+  void _revealRequiredFields() {
+    setState(() => _expanded.addAll({_sectionBasic, _sectionLocation}));
+  }
 
   @override
   void initState() {
@@ -242,7 +356,6 @@ class _BusinessFormState extends State<_BusinessForm> {
       _contactController,
       _websiteController,
       _cuisineController,
-      _openingHoursController,
     ]) {
       c.addListener(() => setState(() => _dirty = true));
     }
@@ -256,12 +369,35 @@ class _BusinessFormState extends State<_BusinessForm> {
           }
         }
       }
+      // Same best-effort match the map-pin shortcut does below — the
+      // application's address is itself a map pin's resolved address.
+      final prefillAddress = widget.prefill?.address ?? '';
+      if (_selectedProvince == null && prefillAddress.isNotEmpty) {
+        _selectedProvince = matchProvinceByAddress(prefillAddress, provinces);
+      }
       return provinces..sort((a, b) => a.name.compareTo(b.name));
     });
     final existingId = widget.existing?.id;
     if (existingId != null && existingId.isNotEmpty) {
-      _repository.getPermit(existingId).then((permit) {
-        if (mounted) setState(() => _permitUrl = permit?.permitUrl ?? '');
+      _repository.getPermit(existingId).then((permit) async {
+        var url = permit?.permitUrl ?? '';
+        var fromApplication = false;
+        // A listing saved without one falls back to the permit photo on
+        // the owner's approved application — stored here on the next save.
+        if (url.isEmpty) {
+          try {
+            final application = await BusinessOwnerApplicationRepository()
+                .getLatestApprovedForUser(widget.uid);
+            url = application?.permitUrl ?? '';
+            fromApplication = url.isNotEmpty;
+          } catch (_) {}
+        }
+        if (mounted) {
+          setState(() {
+            _permitUrl = url;
+            _permitFromApplication = fromApplication;
+          });
+        }
       });
     }
   }
@@ -335,17 +471,35 @@ class _BusinessFormState extends State<_BusinessForm> {
       _contactController,
       _websiteController,
       _cuisineController,
-      _openingHoursController,
     ]) {
       c.dispose();
     }
     super.dispose();
   }
 
+  Future<void> _pickTime({required bool isOpening}) async {
+    final initial =
+        (isOpening ? _openingTime : _closingTime) ?? TimeOfDay.now();
+    final picked = await showTimePicker(context: context, initialTime: initial);
+    if (picked == null) return;
+    setState(() {
+      if (isOpening) {
+        _openingTime = picked;
+      } else {
+        _closingTime = picked;
+      }
+      _dirty = true;
+    });
+  }
+
   Future<void> _save({bool resubmit = false}) async {
-    if (!_formKey.currentState!.validate()) return;
+    if (!_formKey.currentState!.validate()) {
+      _revealRequiredFields();
+      return;
+    }
     final province = _selectedProvince;
     if (province == null) {
+      _revealRequiredFields();
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('Province is required.')));
@@ -359,13 +513,28 @@ class _BusinessFormState extends State<_BusinessForm> {
       );
       return;
     }
+    final opening = _openingTime;
+    final closing = _closingTime;
+    final openingHours = opening != null && closing != null
+        ? '${_formatClockTime(opening)} – ${_formatClockTime(closing)} daily'
+        : (widget.existing?.openingHours ?? '');
+    if (_category == BusinessCategory.foodAndDining &&
+        (openingHours.isEmpty || (opening == null) != (closing == null))) {
+      _revealRequiredFields();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Select both an opening and a closing time.'),
+        ),
+      );
+      return;
+    }
 
-    // Only nudge on an actual submission (first-time or resubmit-after-
-    // rejection) — an already-approved owner just saving an unrelated edit
-    // shouldn't be re-asked about a permit they've already deliberately
-    // left out.
-    final isSubmission = widget.existing == null || resubmit;
-    if (isSubmission && _permitUrl.isEmpty && mounted) {
+    // Only nudge on a resubmit-after-rejection — the one save that still
+    // goes back through an admin's review. A first listing goes live on its
+    // own (see BusinessRepository.create), and an already-approved owner
+    // just saving an unrelated edit shouldn't be re-asked about a permit
+    // they've already deliberately left out.
+    if (resubmit && _permitUrl.isEmpty && mounted) {
       final proceed = await showConfirmationDialog(
         context,
         title: 'Submit without a permit photo?',
@@ -389,7 +558,7 @@ class _BusinessFormState extends State<_BusinessForm> {
       provinceName: province.name,
       regionId: province.regionId,
       address: _addressController.text.trim(),
-      contactNumber: _contactController.text.trim(),
+      contactNumber: PhPhoneField.toStored(_contactController.text),
       websiteUrl: _websiteController.text.trim(),
       heroImageUrl: _heroImageUrl,
       cuisine: _category == BusinessCategory.foodAndDining
@@ -397,7 +566,7 @@ class _BusinessFormState extends State<_BusinessForm> {
           : '',
       priceRange: _priceRange,
       openingHours: _category == BusinessCategory.foodAndDining
-          ? _openingHoursController.text.trim()
+          ? openingHours
           : '',
       accessibilityTags: _accessibilityTags.toList(),
       menuItems: _menuItems,
@@ -409,6 +578,7 @@ class _BusinessFormState extends State<_BusinessForm> {
       final String id;
       if (widget.existing == null) {
         id = await _repository.create(business);
+        await _mirrorToRestaurant(id, business);
       } else if (resubmit) {
         id = widget.existing!.id;
         await _repository.resubmit(id, business);
@@ -423,6 +593,10 @@ class _BusinessFormState extends State<_BusinessForm> {
             restaurantId,
             business,
           );
+        } else if (widget.existing!.isApproved) {
+          // Live but never mirrored — its category just became Food &
+          // Dining, or the mirror failed right after it was created.
+          await _mirrorToRestaurant(id, business);
         }
       }
       // Separate write — see BusinessPermit's doc comment for why permit
@@ -440,7 +614,7 @@ class _BusinessFormState extends State<_BusinessForm> {
           SnackBar(
             content: Text(
               widget.existing == null
-                  ? 'Listing submitted for review.'
+                  ? 'Listing published — travelers can see it now.'
                   : 'Listing updated.',
             ),
           ),
@@ -454,6 +628,18 @@ class _BusinessFormState extends State<_BusinessForm> {
     } finally {
       if (mounted) setState(() => _saving = false);
     }
+  }
+
+  /// Gives a live Food & Dining listing its `restaurants` doc (what puts it
+  /// in Explore/Search — see the class doc on Business) and links the two.
+  /// No-op for every other category.
+  Future<void> _mirrorToRestaurant(String id, Business business) async {
+    if (!business.isFoodAndDining) return;
+    final restaurantId = await _restaurantRepository.createFromBusiness(
+      business,
+      businessId: id,
+    );
+    await _repository.setRestaurantId(id, restaurantId);
   }
 
   Future<void> _contactSupport(Business business) async {
@@ -506,7 +692,9 @@ class _BusinessFormState extends State<_BusinessForm> {
         return _Banner(
           color: AppColors.warning,
           icon: Symbols.hourglass_top_rounded,
-          text: 'Pending review.',
+          text:
+              'Pending review — your listing\'s details and photos are being '
+              'checked before travelers can see it.',
           textStyle: theme.textTheme.bodyMedium,
         );
     }
@@ -571,6 +759,17 @@ class _BusinessFormState extends State<_BusinessForm> {
                   ],
                   const SizedBox(height: AppSpacing.xl),
                 ],
+                if (existing == null && widget.prefill != null) ...[
+                  const _Banner(
+                    color: AppColors.primary,
+                    icon: Symbols.auto_awesome_rounded,
+                    text:
+                        'We filled in the details from your approved application. '
+                        'Check them, add the rest, then publish — your business '
+                        'is already verified, so it goes live right away.',
+                  ),
+                  const SizedBox(height: AppSpacing.xl),
+                ],
                 Stack(
                   children: [
                     HeroImagePicker(
@@ -614,6 +813,11 @@ class _BusinessFormState extends State<_BusinessForm> {
                 _SectionCard(
                   icon: Symbols.storefront_rounded,
                   label: 'Basic Information',
+                  summary: _nameController.text.trim().isEmpty
+                      ? 'Name, category and description'
+                      : '${_nameController.text.trim()} · ${BusinessCategory.label(_category)}',
+                  expanded: _expanded.contains(_sectionBasic),
+                  onToggle: () => _toggleSection(_sectionBasic),
                   children: [
                     TextFormField(
                       controller: _nameController,
@@ -671,15 +875,59 @@ class _BusinessFormState extends State<_BusinessForm> {
                           _dirty = true;
                         }),
                       ),
-                      TextFormField(
-                        controller: _openingHoursController,
-                        decoration: const InputDecoration(
-                          labelText: 'Opening Hours',
-                          hintText: 'e.g. 10:00 AM – 9:00 PM daily',
-                          prefixIcon: Icon(Symbols.schedule_rounded, size: 20),
+                      if (_openingTime == null &&
+                          _closingTime == null &&
+                          (existing?.openingHours.isNotEmpty ?? false))
+                        Text(
+                          'Current hours: ${existing!.openingHours}',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
                         ),
-                        validator: (v) =>
-                            Validators.required(v, label: 'Opening hours'),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(12),
+                              onTap: () => _pickTime(isOpening: true),
+                              child: InputDecorator(
+                                decoration: const InputDecoration(
+                                  labelText: 'Opens',
+                                  prefixIcon: Icon(
+                                    Symbols.schedule_rounded,
+                                    size: 20,
+                                  ),
+                                ),
+                                child: Text(
+                                  _openingTime == null
+                                      ? 'Select time'
+                                      : _formatClockTime(_openingTime!),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: AppSpacing.md),
+                          Expanded(
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(12),
+                              onTap: () => _pickTime(isOpening: false),
+                              child: InputDecorator(
+                                decoration: const InputDecoration(
+                                  labelText: 'Closes',
+                                  prefixIcon: Icon(
+                                    Symbols.schedule_rounded,
+                                    size: 20,
+                                  ),
+                                ),
+                                child: Text(
+                                  _closingTime == null
+                                      ? 'Select time'
+                                      : _formatClockTime(_closingTime!),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                     TextFormField(
@@ -700,6 +948,11 @@ class _BusinessFormState extends State<_BusinessForm> {
                 _SectionCard(
                   icon: catalog.icon,
                   label: catalog.sectionLabel,
+                  summary: _menuItems.isEmpty
+                      ? 'None added yet'
+                      : '${_menuItems.length} added',
+                  expanded: _expanded.contains(_sectionCatalog),
+                  onToggle: () => _toggleSection(_sectionCatalog),
                   children: [
                     if (_menuItems.isEmpty)
                       Text(
@@ -727,6 +980,11 @@ class _BusinessFormState extends State<_BusinessForm> {
                 _SectionCard(
                   icon: Symbols.location_on_rounded,
                   label: 'Location & Contact',
+                  summary: _addressController.text.trim().isEmpty
+                      ? 'Province, address and contact number'
+                      : _addressController.text.trim(),
+                  expanded: _expanded.contains(_sectionLocation),
+                  onToggle: () => _toggleSection(_sectionLocation),
                   children: [
                     DropdownButtonFormField<Province>(
                       initialValue: _selectedProvince,
@@ -760,14 +1018,7 @@ class _BusinessFormState extends State<_BusinessForm> {
                       validator: (v) =>
                           Validators.required(v, label: 'Address'),
                     ),
-                    TextFormField(
-                      controller: _contactController,
-                      decoration: const InputDecoration(
-                        labelText: 'Contact Number',
-                        prefixIcon: Icon(Symbols.call_rounded, size: 20),
-                      ),
-                      validator: (v) => Validators.phone(v, required: true),
-                    ),
+                    PhPhoneField(controller: _contactController, required: true),
                     TextFormField(
                       controller: _websiteController,
                       decoration: const InputDecoration(
@@ -782,6 +1033,11 @@ class _BusinessFormState extends State<_BusinessForm> {
                 _SectionCard(
                   icon: Symbols.accessible_forward_rounded,
                   label: 'Accessibility',
+                  summary: _accessibilityTags.isEmpty
+                      ? 'None selected'
+                      : '${_accessibilityTags.length} selected',
+                  expanded: _expanded.contains(_sectionAccessibility),
+                  onToggle: () => _toggleSection(_sectionAccessibility),
                   children: [
                     Wrap(
                       spacing: AppSpacing.sm,
@@ -806,9 +1062,20 @@ class _BusinessFormState extends State<_BusinessForm> {
                 _SectionCard(
                   icon: Symbols.verified_rounded,
                   label: 'Verification',
+                  summary: _permitUrl.isEmpty
+                      ? 'No permit photo yet'
+                      : (_permitFromApplication
+                            ? 'Permit on file from your application'
+                            : 'Permit photo added'),
+                  expanded: _expanded.contains(_sectionVerification),
+                  onToggle: () => _toggleSection(_sectionVerification),
                   children: [
                     Text(
-                      'Optional, but speeds up admin approval.',
+                      _permitFromApplication
+                          ? 'Already verified with your application — replace '
+                                'it only if your permit has changed.'
+                          : 'Optional — kept on file in case an admin needs to '
+                                'verify this listing.',
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
@@ -822,6 +1089,7 @@ class _BusinessFormState extends State<_BusinessForm> {
                       scanDocument: true,
                       onChanged: (url) => setState(() {
                         _permitUrl = url;
+                        _permitFromApplication = false;
                         _dirty = true;
                       }),
                     ),
@@ -830,7 +1098,7 @@ class _BusinessFormState extends State<_BusinessForm> {
                 const SizedBox(height: AppSpacing.xxl),
                 AnimatedButton(
                   label: existing == null
-                      ? 'Submit for Review'
+                      ? 'Publish Listing'
                       : (existing.isRejected
                             ? 'Edit & Resubmit'
                             : 'Save Changes'),
@@ -1053,15 +1321,26 @@ class _SectionHeader extends StatelessWidget {
 /// elevated card with its own [_SectionHeader] — replaces what used to be
 /// one long undifferentiated list of fields, where nothing signaled where
 /// one logical group ended and the next began.
+///
+/// Collapsible: tapping the header toggles [expanded], and a collapsed
+/// card shows [summary] in place of its fields. Those fields stay mounted
+/// (just offstage) either way, so the surrounding `Form` still validates
+/// and keeps the state of a section the owner has closed.
 class _SectionCard extends StatelessWidget {
   const _SectionCard({
     required this.icon,
     required this.label,
+    required this.summary,
+    required this.expanded,
+    required this.onToggle,
     required this.children,
   });
 
   final IconData icon;
   final String label;
+  final String summary;
+  final bool expanded;
+  final VoidCallback onToggle;
   final List<Widget> children;
 
   @override
@@ -1086,12 +1365,56 @@ class _SectionCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _SectionHeader(icon: icon, label: label),
-          const SizedBox(height: AppSpacing.md),
-          for (var i = 0; i < children.length; i++) ...[
-            if (i > 0) const SizedBox(height: AppSpacing.md),
-            children[i],
-          ],
+          InkWell(
+            onTap: onToggle,
+            borderRadius: BorderRadius.circular(AppRadius.sm),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _SectionHeader(icon: icon, label: label),
+                      if (!expanded) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          summary,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                Icon(
+                  expanded
+                      ? Symbols.expand_less_rounded
+                      : Symbols.expand_more_rounded,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ],
+            ),
+          ),
+          AnimatedSize(
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeOut,
+            alignment: Alignment.topCenter,
+            child: Offstage(
+              offstage: !expanded,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  for (final child in children) ...[
+                    const SizedBox(height: AppSpacing.md),
+                    child,
+                  ],
+                ],
+              ),
+            ),
+          ),
         ],
       ),
     );

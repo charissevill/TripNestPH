@@ -47,6 +47,11 @@ class AdminUser {
 
   bool get isActive => status == 'active';
 
+  /// An 'lgu' account nobody staged a province for — `firestore.rules`'
+  /// `canManageProvince` rejects every content write it attempts, so the
+  /// portal shows it nothing to manage rather than every province.
+  bool get isLguWithoutProvince => role == AdminRole.lgu && provinceId == null;
+
   factory AdminUser.fromMap(String uid, Map<String, dynamic> map) {
     return AdminUser(
       uid: uid,

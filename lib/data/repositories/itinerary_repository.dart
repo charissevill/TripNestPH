@@ -132,10 +132,14 @@ class ItineraryRepository {
   /// content) and, if saved again, created a duplicate with none of the
   /// original's collaborators/expenses/packing list. Owner-only, enforced
   /// by rules the same as every other field on this doc.
-  Future<void> updateItinerary(String itineraryId, {required String title, required Itinerary itinerary}) async {
+  ///
+  /// [title] is only written when given — every in-place edit (activities,
+  /// budget, regenerate) leaves it out, so a trip the traveler named
+  /// themselves keeps that name instead of being reset to its destination.
+  Future<void> updateItinerary(String itineraryId, {String? title, required Itinerary itinerary}) async {
     try {
       await _collection.doc(itineraryId).update({
-        'title': title,
+        'title': ?title,
         'itinerary': itinerary.toMap(),
       });
     } catch (e) {

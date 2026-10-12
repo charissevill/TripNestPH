@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
@@ -94,7 +96,30 @@ class _RegisterScreenState extends State<RegisterScreen> {
     final router = GoRouter.of(context);
     final ok = await auth.signInWithGoogle();
     if (!ok) return;
+    // signInWithGoogle() returning doesn't mean AuthProvider has heard about
+    // it yet — its auth-state listener fires on its own schedule. Navigating
+    // in that gap makes the router see "nobody signed in", bounce the
+    // application route to Login, and then (once the sign-in does land) on to
+    // Home — the business owner ends up a plain traveler with no application.
+    await _untilSignedIn(auth);
     router.go(widget.wantsBusinessOwner ? RoutePaths.businessOwnerApplication : RoutePaths.home);
+  }
+
+  /// Completes once [auth] reports a signed-in user, or after a few seconds
+  /// regardless — never worth hanging the sign-up on.
+  Future<void> _untilSignedIn(AuthProvider auth) async {
+    if (auth.isSignedIn) return;
+    final signedIn = Completer<void>();
+    void listener() {
+      if (auth.isSignedIn && !signedIn.isCompleted) signedIn.complete();
+    }
+
+    auth.addListener(listener);
+    try {
+      await signedIn.future.timeout(const Duration(seconds: 5), onTimeout: () {});
+    } finally {
+      auth.removeListener(listener);
+    }
   }
 
   @override

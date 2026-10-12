@@ -13,6 +13,7 @@ import '../../core/widgets/buttons/animated_button.dart';
 import '../../core/widgets/dialogs/discard_changes_scope.dart';
 import '../../core/widgets/inputs/gallery_image_picker.dart';
 import '../../core/widgets/inputs/hero_image_picker.dart';
+import '../../core/widgets/states/empty_state_widget.dart';
 import '../../core/widgets/states/loading_widget.dart';
 import '../../data/repositories/admin_repository.dart';
 import '../../data/repositories/festival_repository.dart';
@@ -20,8 +21,8 @@ import '../../data/repositories/province_repository.dart';
 import '../../domain/models/admin_user.dart';
 import '../../domain/models/festival.dart';
 import '../../domain/models/province.dart';
-import '../../core/routes/back_navigation.dart';
 import '../../core/routes/route_paths.dart';
+import 'widgets/admin_page_header.dart';
 
 /// Create or edit a festival — the admin/lgu "Festivals" module's full
 /// curatorial control.
@@ -272,12 +273,10 @@ class _AdminFestivalFormScreenState extends State<AdminFestivalFormScreen> {
     return DiscardChangesScope(
       isDirty: _dirty,
       child: Scaffold(
-        appBar: AppBar(
-          leading: IconButton(
-            icon: const Icon(Symbols.arrow_back_rounded),
-            onPressed: () => context.popOrGo(RoutePaths.adminFestivals),
-          ),
-          title: Text(_isEditing ? 'Edit Festival' : 'New Festival'),
+        appBar: adminPageHeader(
+          context,
+          title: _isEditing ? 'Edit Festival' : 'New Festival',
+          backTo: RoutePaths.adminFestivals,
         ),
         body: SafeArea(
           child: FutureBuilder<List<Province>>(
@@ -285,6 +284,15 @@ class _AdminFestivalFormScreenState extends State<AdminFestivalFormScreen> {
             builder: (context, snapshot) {
               if (snapshot.connectionState != ConnectionState.done) {
                 return LoadingWidget.block(height: 400);
+              }
+              // Without the provinces the form can't be filled in — say so
+              // rather than showing it with an empty province list.
+              if (snapshot.hasError) {
+                return EmptyStateWidget(
+                  icon: Symbols.error_outline_rounded,
+                  title: 'Couldn\'t load provinces',
+                  message: AppException.from(snapshot.error!).message,
+                );
               }
               final provinces = snapshot.data ?? const [];
               return Form(

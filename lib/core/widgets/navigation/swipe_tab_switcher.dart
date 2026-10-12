@@ -18,8 +18,10 @@ import 'package:flutter/material.dart';
 ///   once it moves past the touch slop.
 /// - Drag devices follow the ambient [ScrollConfiguration], so a mouse
 ///   click-drag on web/desktop doesn't flip tabs (same as scrollables).
-/// - Swiping past the first/last tab does nothing: the content doesn't move
-///   and no callback fires.
+/// - Swiping past the first/last tab does nothing here: the content doesn't
+///   move and no callback fires. If another [SwipeTabSwitcher] encloses this
+///   one (the bottom-nav one around Explore's own tabs), that swipe is
+///   handed up to it instead, so the outer tabs take over at either end.
 class SwipeTabSwitcher extends StatefulWidget {
   const SwipeTabSwitcher({
     super.key,
@@ -106,15 +108,29 @@ class _SwipeTabSwitcherState extends State<SwipeTabSwitcher>
         // way is the user changing their mind.
         !(velocity.abs() >= _velocityThreshold &&
             velocity.sign != _dragDx.sign);
-    final target = (flung || farEnough) ? _targetFor(_dragDx) : null;
-
-    if (target == null) {
+    if (!flung && !farEnough) {
       _settle();
       return;
     }
+    final dx = _dragDx;
+    if (_targetFor(dx) == null) {
+      // Nothing further this way in our own tabs — see the class doc.
+      context.findAncestorStateOfType<_SwipeTabSwitcherState>()?._commit(dx);
+      _settle();
+      return;
+    }
+    _commit(dx);
+  }
+
+  /// Switches to the tab a committed swipe of sign [dx] leads to (a no-op
+  /// past either end) and slides its content in.
+  void _commit(double dx) {
+    final target = _targetFor(dx);
+    if (target == null) return;
+    final width = context.size?.width ?? 0;
     widget.onIndexChanged(target);
     // Slide the new tab's content in from the side the swipe came from.
-    _offset.value = -_dragDx.sign * width * _followFactor * 0.5;
+    _offset.value = -dx.sign * width * _followFactor * 0.5;
     _settle();
   }
 

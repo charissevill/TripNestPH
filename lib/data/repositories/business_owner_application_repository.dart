@@ -8,9 +8,8 @@ import 'admin_repository.dart';
 import 'notification_repository.dart';
 
 /// Firestore access for the `business_owner_applications` collection — see
-/// [BusinessOwnerApplication]'s doc comment for why approving one stages an
-/// `admin_invites` entry (via the existing [AdminRepository.createInvite])
-/// rather than writing `admin_users` directly.
+/// [BusinessOwnerApplication]'s doc comment for how approving one grants
+/// the role (via [AdminRepository.grantRole]).
 class BusinessOwnerApplicationRepository {
   BusinessOwnerApplicationRepository({
     FirebaseFirestore? firestore,
@@ -80,19 +79,36 @@ class BusinessOwnerApplicationRepository {
         .map((s) => s.docs.map((d) => BusinessOwnerApplication.fromMap(d.id, d.data())).toList());
   }
 
-  /// Stages the `businessOwner` role for the applicant (same
-  /// `admin_invites` handoff any manually-invited admin already goes
-  /// through — the applicant still explicitly accepts it via Profile's
-  /// pending-invite banner, this doesn't grant anything by itself), marks
-  /// the application approved, then best-effort notifies the applicant so
-  /// they know to go accept it rather than relying on them noticing the
-  /// banner on their own.
-  Future<void> approve(BusinessOwnerApplication application, {required String adminName}) async {
+  /// [userId]'s own most recent approved application, or null — what
+  /// `MyBusinessScreen` seeds a first listing's form from, so the owner
+  /// doesn't retype what an admin already reviewed. Filters on `userId`
+  /// alone (the one query shape firestore.rules allows a non-admin) and
+  /// narrows to approved here, so it needs no composite index.
+  Future<BusinessOwnerApplication?> getLatestApprovedForUser(String userId) async {
     try {
-      await _adminRepository.createInvite(
+      final snapshot = await _collection.where('userId', isEqualTo: userId).get();
+      final approved = snapshot.docs
+          .map((d) => BusinessOwnerApplication.fromMap(d.id, d.data()))
+          .where((a) => a.status == BusinessOwnerApplicationStatus.approved)
+          .toList()
+        ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return approved.isEmpty ? null : approved.first;
+    } catch (e) {
+      throw AppException.from(e);
+    }
+  }
+
+  /// Grants the applicant the `businessOwner` role outright (no invite to
+  /// accept — applying was already them asking for it), marks the
+  /// application approved, then best-effort notifies the applicant that
+  /// their account switched over.
+  Future<void> approve(BusinessOwnerApplication application) async {
+    try {
+      await _adminRepository.grantRole(
+        uid: application.userId,
         email: application.applicantEmail,
+        name: application.applicantName,
         role: 'businessOwner',
-        invitedByName: adminName,
       );
       await _collection.doc(application.id).update({'status': BusinessOwnerApplicationStatus.approved});
     } catch (e) {
@@ -102,7 +118,7 @@ class BusinessOwnerApplicationRepository {
       await _notificationRepository.createForUser(
         userId: application.userId,
         title: 'Your business owner application was approved',
-        body: 'Open Profile and accept your new role to access the Admin Portal.',
+        body: 'Your account is now a Business Owner account — open My Business to set up your listing.',
         category: NotificationCategory.general,
       );
     } catch (_) {

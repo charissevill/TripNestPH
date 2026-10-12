@@ -24,6 +24,20 @@ void main() {
       expect(restaurant.reviewDigest, isNull);
     });
 
+    test('tolerates numbers saved in text fields', () {
+      final restaurant = Restaurant.fromMap('r1', const {
+        'name': 'Test',
+        'phoneNumber': 9171234567,
+        'menuHighlights': [
+          {'name': 'Adobo', 'price': 150},
+        ],
+      });
+
+      expect(restaurant.phoneNumber, '9171234567');
+      expect(restaurant.menuHighlights.single.price, '150');
+      expect(restaurant.priceRange, '₱');
+    });
+
     test('parses accessibilityTags and reviewDigest when present', () {
       final restaurant = Restaurant.fromMap('r1', {
         'name': 'Test',

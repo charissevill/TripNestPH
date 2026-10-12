@@ -171,14 +171,18 @@ class RestaurantRepository {
     }
   }
 
-  /// Mirrors a just-approved [BusinessCategory.foodAndDining] business into
-  /// a brand-new `restaurants` doc — the *only* way a restaurant gets
-  /// created (see the class doc on [Business]). Called once, from
-  /// `AdminBusinessListScreen._approve`, the first time that business is
-  /// approved; the returned id is saved back onto the business as
-  /// `restaurantId` via `BusinessRepository.setRestaurantId`. Published
-  /// immediately since the business was just approved.
-  Future<String> createFromBusiness(Business business) async {
+  /// Mirrors a live [BusinessCategory.foodAndDining] business into a
+  /// brand-new `restaurants` doc — the *only* way a restaurant gets
+  /// created (see the class doc on [Business]). Called once per business:
+  /// by its owner right after publishing it (`MyBusinessScreen`), or from
+  /// `AdminBusinessListScreen._approve` for a listing that was still
+  /// waiting on review. The returned id is saved back onto the business as
+  /// `restaurantId` via `BusinessRepository.setRestaurantId`. [businessId]
+  /// is for a [business] built before its doc had an id.
+  Future<String> createFromBusiness(
+    Business business, {
+    String? businessId,
+  }) async {
     try {
       final doc = await _collection.add({
         'name': business.name,
@@ -202,7 +206,7 @@ class RestaurantRepository {
         'websiteUrl': business.websiteUrl,
         'facebookUrl': '',
         'ownerId': business.ownerId,
-        'businessId': business.id,
+        'businessId': businessId ?? business.id,
         'nameLower': business.name.toLowerCase(),
         'status': 'published',
         'accessibilityTags': business.accessibilityTags,

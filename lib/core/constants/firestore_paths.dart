@@ -13,6 +13,7 @@ class FirestorePaths {
   static const String savedItineraries = 'saved_itineraries';
   static const String reviews = 'reviews';
   static const String notifications = 'notifications';
+  static const String provinceAnnouncements = 'province_announcements';
   static const String travelTips = 'travel_tips';
   static const String regions = 'regions';
   static const String provinces = 'provinces';

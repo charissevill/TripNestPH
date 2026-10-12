@@ -81,4 +81,18 @@ void main() {
     expect(place.photoNames, isEmpty);
     expect(place.isOpenNow, isNull);
   });
+
+  test('isDining files a place by what its category badge says', () {
+    Place withTypes(List<String> types) =>
+        Place.fromJson({'id': 'p', 'types': types});
+
+    expect(withTypes(['restaurant', 'food']).isDining, isTrue);
+    expect(withTypes(['cafe']).isDining, isTrue);
+    expect(withTypes(['filipino_restaurant']).isDining, isTrue);
+    expect(withTypes(['bakery', 'store']).isDining, isTrue);
+    // A hotel with its own restaurant is still a hotel.
+    expect(withTypes(['restaurant', 'lodging']).isDining, isFalse);
+    expect(withTypes(['tourist_attraction', 'park']).isDining, isFalse);
+    expect(withTypes([]).isDining, isFalse);
+  });
 }

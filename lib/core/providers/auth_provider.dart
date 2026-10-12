@@ -177,11 +177,26 @@ class AuthProvider extends ChangeNotifier {
     // keep using their still-open session (e.g. uploading gallery photos)
     // for the rest of that token's life. Forcing a sign-out here means
     // their next sign-in mints a fresh token with correctly-revoked claims.
+    //
+    // The other direction needs a nudge too: a role granted mid-session (an
+    // admin approving this user's business owner application creates their
+    // admin_users doc with no step on this device) isn't in the cached
+    // token's claims either, so any role/status change after the first
+    // snapshot re-syncs them here — the first snapshot is already covered
+    // by the sign-in sync above.
     try {
+      String? lastClaimKey;
+      var isFirstSnapshot = true;
       _adminStatusSubscription = _adminRepository.streamSelf(user.uid).listen((admin) async {
         if (admin != null && !admin.isActive) {
           await _authService.signOut();
+          return;
         }
+        final claimKey = admin == null ? null : '${admin.role}|${admin.status}';
+        final changed = !isFirstSnapshot && claimKey != lastClaimKey;
+        isFirstSnapshot = false;
+        lastClaimKey = claimKey;
+        if (changed) await _syncAdminClaimsBestEffort();
       });
     } catch (_) {
       // Must never break sign-in itself — same reasoning as

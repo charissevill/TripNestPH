@@ -7,7 +7,7 @@ const { initializeApp } = require('firebase-admin/app');
 const { getFirestore, FieldValue } = require('firebase-admin/firestore');
 const { getMessaging } = require('firebase-admin/messaging');
 const { getAuth } = require('firebase-admin/auth');
-const { parsePermitFields } = require('./permit_parser');
+const { parsePermitFields, linesFromVision } = require('./permit_parser');
 const { parseIdName } = require('./id_parser');
 
 initializeApp();
@@ -702,11 +702,14 @@ exports.extractApplicationPermitText = onCall({ region: 'asia-southeast1', secre
 
   const { permitUrl, idUrl } = applicationSnap.data() ?? {};
   const read = (url) =>
-    typeof url === 'string' && url ? detectTextInImage(url, 'extractApplicationPermitText') : Promise.resolve('');
-  const [text, idText] = await Promise.all([read(permitUrl), read(idUrl)]);
+    typeof url === 'string' && url
+      ? detectDocument(url, 'extractApplicationPermitText')
+      : Promise.resolve({ text: '', boxes: [] });
+  const [permit, id] = await Promise.all([read(permitUrl), read(idUrl)]);
+  const text = permit.text;
 
   await applicationRef.set(
-    { permitOcrText: text, permitFields: parsePermitFields(text), idName: parseIdName(idText) },
+    { permitOcrText: text, permitFields: parsePermitFields(text, permit.boxes), idName: parseIdName(id.text) },
     { merge: true },
   );
   return { text };
@@ -734,11 +737,13 @@ exports.readApplicationDocs = onCall({ region: 'asia-southeast1', secrets: [goog
 
   const { permitUrl, idUrl } = request.data ?? {};
   const read = (url) =>
-    isOwnApplicationDocUrl(url, request.auth.uid) ? detectTextInImage(url, 'readApplicationDocs') : Promise.resolve('');
-  const [text, idText] = await Promise.all([read(permitUrl), read(idUrl)]);
+    isOwnApplicationDocUrl(url, request.auth.uid)
+      ? detectDocument(url, 'readApplicationDocs')
+      : Promise.resolve({ text: '', boxes: [] });
+  const [permit, id] = await Promise.all([read(permitUrl), read(idUrl)]);
 
   // Same as extractApplicationPermitText: only the name leaves the ID's text.
-  return { permitFields: parsePermitFields(text), idName: parseIdName(idText) };
+  return { permitFields: parsePermitFields(permit.text, permit.boxes), idName: parseIdName(id.text) };
 });
 
 /**
@@ -773,8 +778,19 @@ function isOwnApplicationDocUrl(url, uid) {
  * Never throws — every failure mode logs under [logTag] and returns ''.
  */
 async function detectTextInImage(imageUrl, logTag) {
+  return (await detectDocument(imageUrl, logTag)).text;
+}
+
+/**
+ * [detectTextInImage] plus where each line of that text sits on the photo
+ * (`boxes`, see `linesFromVision`) — what `parsePermitFields` needs to tell
+ * which value belongs to which label on a multi-column permit. Never
+ * throws; a failure is `{ text: '', boxes: [] }`.
+ */
+async function detectDocument(imageUrl, logTag) {
+  const nothing = { text: '', boxes: [] };
   const apiKey = googlePlacesApiKey.value();
-  if (!apiKey) return '';
+  if (!apiKey) return nothing;
   try {
     const response = await fetch(`https://vision.googleapis.com/v1/images:annotate?key=${apiKey}`, {
       method: 'POST',
@@ -790,7 +806,7 @@ async function detectTextInImage(imageUrl, logTag) {
     });
     if (response.status !== 200) {
       console.error(`${logTag}: Vision API returned`, response.status, await response.text().catch(() => ''));
-      return '';
+      return nothing;
     }
     const json = await response.json().catch(() => null);
     const result = json?.responses?.[0];
@@ -798,12 +814,13 @@ async function detectTextInImage(imageUrl, logTag) {
     // inside a 200 response, not as an HTTP error status.
     if (result?.error) {
       console.error(`${logTag}: Vision per-image error`, result.error);
-      return '';
+      return nothing;
     }
-    return result?.fullTextAnnotation?.text ?? '';
+    const annotation = result?.fullTextAnnotation;
+    return { text: annotation?.text ?? '', boxes: linesFromVision(annotation) };
   } catch (e) {
     console.error(`${logTag}: request failed`, e);
-    return '';
+    return nothing;
   }
 }
 
@@ -946,7 +963,8 @@ function chunk(array, size) {
 /**
  * Every `notifications` doc NotificationRepository writes (a traveler
  * review reply is the only other writer, but that path doesn't exist yet)
- * — personal (`userId` set) or broadcast (`userId` == '', see
+ * — personal (`userId` set, including the ones `deliverProvinceAnnouncement`
+ * below writes) or broadcast (`userId` == '', see
  * `NotificationRepository.createBroadcast`) — triggers this and gets
  * delivered as a real OS-level push via FCM, on top of the in-app
  * notification bell the mobile app already reads directly from Firestore.
@@ -1012,6 +1030,117 @@ async function pruneInvalidTokens(tokens, response) {
   const snapshot = await db.collection('users').where('fcmTokens', 'array-contains-any', invalid.slice(0, 30)).get();
   await Promise.all(snapshot.docs.map((doc) => doc.ref.update({ fcmTokens: FieldValue.arrayRemove(...invalid) })));
 }
+
+// Firestore's `in` filter takes at most 30 values.
+const IN_QUERY_SIZE = 30;
+// A write batch takes at most 500 operations.
+const WRITE_BATCH_SIZE = 500;
+
+/**
+ * The travelers an LGU's announcement about [provinceId] is for: anyone
+ * with a favorite on one of that province's listings, or a saved trip
+ * (their own, or one they joined) headed to the province or one of its
+ * tourist spots. Worked out here at send time from what travelers already
+ * have saved, so there's no per-traveler "home province" to keep in sync.
+ */
+async function travelersInterestedInProvince(provinceId, provinceName) {
+  // Which favorite `itemType` points at which collection.
+  const collections = {
+    destination: 'tourist_spots',
+    restaurant: 'restaurants',
+    festival: 'festivals',
+    business: 'businesses',
+  };
+  const idsByType = {};
+  const spotNames = [];
+  await Promise.all(
+    Object.entries(collections).map(async ([type, collection]) => {
+      const snapshot = await db.collection(collection).where('provinceId', '==', provinceId).select('name').get();
+      idsByType[type] = new Set(snapshot.docs.map((doc) => doc.id));
+      if (type === 'destination') {
+        for (const doc of snapshot.docs) {
+          if (doc.data().name) spotNames.push(doc.data().name);
+        }
+      }
+    }),
+  );
+
+  const uids = new Set();
+
+  const itemIds = [...new Set(Object.values(idsByType).flatMap((ids) => [...ids]))];
+  await Promise.all(
+    chunk(itemIds, IN_QUERY_SIZE).map(async (ids) => {
+      const snapshot = await db.collection('favorites').where('itemId', 'in', ids).select('userId', 'itemType', 'itemId').get();
+      for (const doc of snapshot.docs) {
+        const { userId, itemType, itemId } = doc.data();
+        // The same id under another type is some other listing entirely.
+        if (userId && idsByType[itemType]?.has(itemId)) uids.add(userId);
+      }
+    }),
+  );
+
+  const addTripMembers = (snapshot) => {
+    for (const doc of snapshot.docs) {
+      const { userId, collaboratorIds } = doc.data();
+      if (userId) uids.add(userId);
+      if (Array.isArray(collaboratorIds)) collaboratorIds.forEach((uid) => uids.add(uid));
+    }
+  };
+  const trips = db.collection('saved_itineraries');
+  // A trip names its destination by tourist-spot id when it has one, and
+  // always by name — the province's own name for a whole-province trip.
+  const destinationNames = [...new Set([provinceName, ...spotNames].filter(Boolean))];
+  await Promise.all([
+    ...chunk([...idsByType.destination], IN_QUERY_SIZE).map(async (ids) =>
+      addTripMembers(await trips.where('itinerary.destinationId', 'in', ids).select('userId', 'collaboratorIds').get()),
+    ),
+    ...chunk(destinationNames, IN_QUERY_SIZE).map(async (names) =>
+      addTripMembers(await trips.where('itinerary.destinationName', 'in', names).select('userId', 'collaboratorIds').get()),
+    ),
+  ]);
+
+  return [...uids];
+}
+
+/**
+ * An LGU account's "Send Announcement" (see
+ * `NotificationRepository.createProvinceAnnouncement`) — delivered as one
+ * personal `notifications` doc per interested traveler rather than a
+ * nationwide broadcast, so it shows up in only their bell. Each of those
+ * docs then goes out as a push through `sendPushOnNotificationCreated`
+ * above, exactly like any other personal notification.
+ */
+exports.deliverProvinceAnnouncement = onDocumentCreated('province_announcements/{announcementId}', async (event) => {
+  const announcement = event.data?.data();
+  if (!announcement) return;
+
+  const { provinceId, provinceName, title, body, category } = announcement;
+  if (!provinceId || !title || !body) return;
+
+  const uids = await travelersInterestedInProvince(provinceId, provinceName ?? '');
+
+  for (const batchUids of chunk(uids, WRITE_BATCH_SIZE)) {
+    const batch = db.batch();
+    for (const uid of batchUids) {
+      // Keyed by announcement + traveler, so a retried delivery overwrites
+      // its own notification instead of sending the traveler a second one.
+      batch.set(db.collection('notifications').doc(`${event.params.announcementId}_${uid}`), {
+        userId: uid,
+        title,
+        body,
+        category: category ?? 'general',
+        createdAt: FieldValue.serverTimestamp(),
+        isRead: false,
+        relatedId: null,
+        imageUrl: '',
+        provinceId,
+      });
+    }
+    await batch.commit();
+  }
+
+  await event.data.ref.update({ recipientCount: uids.length, deliveredAt: FieldValue.serverTimestamp() });
+});
 
 /**
  * A "Travelers say..." summary generated from a listing's own review text —

@@ -50,16 +50,47 @@ class _TripRouteMapState extends State<TripRouteMap> {
     _loadRealRoute();
   }
 
+  /// The itinerary screen shows one day at a time and swaps [stops] in
+  /// place when the traveler pages to another day, reusing this same State
+  /// — so without this, the road route, travel times and camera all stayed
+  /// on whichever day was opened first, and every day looked identical.
+  @override
+  void didUpdateWidget(TripRouteMap oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (_sameStops(oldWidget.stops, widget.stops)) return;
+    _realRoute = null;
+    _fitCamera(widget.stops.map((s) => LatLng(s.latitude, s.longitude)).toList());
+    _loadRealRoute();
+  }
+
+  /// Compared by value — the parent rebuilds its stop list on every build,
+  /// so identity alone would refetch the route on each unrelated rebuild.
+  static bool _sameStops(List<RouteStop> a, List<RouteStop> b) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i].name != b[i].name ||
+          a[i].time != b[i].time ||
+          a[i].latitude != b[i].latitude ||
+          a[i].longitude != b[i].longitude) {
+        return false;
+      }
+    }
+    return true;
+  }
+
   Future<void> _loadRealRoute() async {
-    final route = await _routesService.computeRoute(widget.stops);
-    if (!mounted || !route.hasRoute) return;
+    final stops = widget.stops;
+    final route = await _routesService.computeRoute(stops);
+    // A slow response for a day the traveler has already paged away from
+    // must not overwrite the route of the day now showing.
+    if (!mounted || !_sameStops(stops, widget.stops) || !route.hasRoute) return;
     setState(() => _realRoute = route);
     await _fitCamera(route.polylinePoints);
   }
 
   Future<void> _fitCamera(List<LatLng> points) async {
     final controller = _controller;
-    if (controller == null) return;
+    if (controller == null || points.isEmpty) return;
     if (points.length < 2) {
       await controller.animateCamera(CameraUpdate.newLatLngZoom(points.first, 14));
     } else {
@@ -172,6 +203,7 @@ class _TripRouteMapState extends State<TripRouteMap> {
           Text('Travel Times', style: theme.textTheme.titleSmall),
           const SizedBox(height: AppSpacing.xs),
           ...List.generate(realRoute.legs.length, (i) {
+            if (i + 1 >= stops.length) return const SizedBox.shrink();
             final leg = realRoute.legs[i];
             return Padding(
               padding: const EdgeInsets.only(bottom: 2),

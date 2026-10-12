@@ -73,6 +73,16 @@ class Validators {
     return null;
   }
 
+  /// The digits after +63, as `PhPhoneField` collects them: a 10-digit
+  /// mobile number (9XX XXX XXXX) or a 9-digit landline (area code + number).
+  static String? phPhone(String? value, {bool required = false}) {
+    final v = value?.trim() ?? '';
+    if (v.isEmpty) return required ? 'Contact number is required' : null;
+    if (v.startsWith('9') && v.length != 10) return 'Mobile numbers have 10 digits after +63';
+    if (!RegExp(r'^[1-9]\d{8,9}$').hasMatch(v)) return 'Enter a valid Philippine phone number';
+    return null;
+  }
+
   /// Optional (an admin listing can be saved without coordinates and still
   /// work — it just loses the weather card/map/directions on the details
   /// screen), but if something was typed, it must be a real latitude.

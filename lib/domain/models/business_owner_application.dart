@@ -74,11 +74,11 @@ class PermitFields {
 /// the sign-up form itself (`RegisterScreen`'s role toggle), to be granted
 /// the `businessOwner` Admin Portal role. Backed by the
 /// `business_owner_applications` Firestore collection.
-/// Deliberately just a request — approving one doesn't touch `admin_users`
-/// directly, it stages an `admin_invites` entry via the existing
-/// `AdminRepository.createInvite`, so the applicant still explicitly
-/// accepts it (via Profile's `_PendingInviteBanner`) the same way any
-/// admin-invited role already works.
+/// Deliberately just a request — only an admin approving it grants the
+/// role, by creating the applicant's `admin_users` doc directly
+/// (`AdminRepository.grantRole`). There's no invite for the applicant to
+/// accept afterwards, unlike a manually-invited admin/LGU account: they
+/// already asked for the role by applying.
 class BusinessOwnerApplication {
   const BusinessOwnerApplication({
     required this.id,

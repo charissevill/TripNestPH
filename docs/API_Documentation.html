@@ -376,6 +376,24 @@ app would install at all. Overall, the integration was straightforward once thos
 resolved, since Open-Meteo requires no API key and needed no extra credential-management work.
 </p>
 
+<h2>14. Request Methods Across the App</h2>
+<p>TripNest PH sends requests to its backend in three ways. The table shows which request method each one uses.</p>
+<table>
+  <tr><th>Operation</th><th>How it is sent</th><th>Request method</th><th>Example in the code</th></tr>
+  <tr><td>Read weather</td><td>Direct REST call (<code>http</code> package)</td><td>GET</td><td><span class="file-ref">lib/core/services/weather_service.dart</span></td></tr>
+  <tr><td>Load a place photo</td><td>Direct call to the <code>placesPhoto</code> Cloud Function</td><td>GET</td><td><span class="file-ref">functions/index.js</span></td></tr>
+  <tr><td>Place search, nearby places, routes, AI chat and itinerary, permit OCR, OTP codes</td><td>Callable Cloud Functions (sent over HTTPS)</td><td>POST</td><td><span class="file-ref">lib/core/utils/function_caller.dart</span></td></tr>
+  <tr><td>Create a record (save a trip, add an expense, write a review)</td><td>Firestore SDK <code>add()</code> / <code>set()</code></td><td>POST equivalent</td><td><code>ItineraryRepository.save()</code></td></tr>
+  <tr><td>Read records (lists, details, search)</td><td>Firestore SDK <code>get()</code> / <code>snapshots()</code></td><td>GET equivalent</td><td><code>ItineraryRepository.streamForUser()</code></td></tr>
+  <tr><td>Update a record (edit a trip date, an expense, a review, a profile)</td><td>Firestore SDK <code>update()</code></td><td>PATCH equivalent</td><td><code>ItineraryRepository.updateStartDate()</code></td></tr>
+  <tr><td>Delete a record (remove a trip, an expense, a review)</td><td>Firestore SDK <code>delete()</code></td><td>DELETE equivalent</td><td><code>ItineraryRepository.delete()</code></td></tr>
+</table>
+<p>The database operations go through the Cloud Firestore SDK instead of hand-written REST calls. The SDK
+performs the same create, read, update and delete actions that POST, GET, PATCH and DELETE perform in a REST API,
+and it also keeps the screen synchronized with the database in real time. Every request is checked by Firestore
+Security Rules on the server, and failures are shown to the user as a clear message instead of a crash. The full
+list of create, read, update and delete operations is in <span class="file-ref">docs/CRUD_Documentation.md</span>.</p>
+
 <div class="footer-note">TripNest PH — Week 5 API Integration Submission</div>
 
 </body>

@@ -12,7 +12,11 @@ import '../../core/widgets/branding/app_logo.dart';
 /// The first screen shown on launch: the TripNest PH logo scales and fades
 /// in on a white background, then hands off to onboarding after a short beat.
 class SplashScreen extends StatefulWidget {
-  const SplashScreen({super.key});
+  const SplashScreen({super.key, this.showOnboarding = true});
+
+  /// The Admin Portal site has no onboarding route at all (see
+  /// `buildAdminRouter`), so its splash always hands off to Login instead.
+  final bool showOnboarding;
 
   @override
   State<SplashScreen> createState() => _SplashScreenState();
@@ -33,6 +37,10 @@ class _SplashScreenState extends State<SplashScreen> {
   /// logic takes it from there (straight through to Home if already signed
   /// in and verified).
   Future<void> _navigateNext() async {
+    if (!widget.showOnboarding) {
+      context.go(RoutePaths.login);
+      return;
+    }
     final hasSeenOnboarding = await _preferences.getHasSeenOnboarding();
     if (!mounted) return;
     if (hasSeenOnboarding) {

@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:provider/provider.dart';
@@ -11,11 +10,11 @@ import '../../ai/planner_options.dart';
 import '../../ai/providers/ai_planner_provider.dart';
 import '../../core/routes/route_paths.dart';
 import '../../core/services/places_service.dart';
-import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/utils/app_exception.dart';
 import '../../core/widgets/buttons/animated_button.dart';
 import '../../core/widgets/buttons/selectable_chip.dart';
+import '../../core/widgets/dialogs/number_prompt_dialog.dart';
 import '../../core/widgets/inputs/search_bar_widget.dart';
 import '../../core/widgets/layout/max_width_container.dart';
 import '../../core/widgets/states/loading_widget.dart';
@@ -23,6 +22,7 @@ import '../../domain/models/destination.dart';
 import '../../domain/models/place.dart';
 import '../../domain/models/province.dart';
 import 'widgets/destination_picker_sheet.dart';
+import 'widgets/planner_hero.dart';
 
 /// The AI itinerary request form: destination, budget tier, trip length,
 /// traveler count/type, transportation and interests, ending in a large
@@ -74,6 +74,9 @@ class _AiPlannerScreenState extends State<AiPlannerScreen> {
   final Set<String> _interests = {...defaultInterests};
   String _tripPace = 'Balanced';
 
+  /// Whether the transportation/interests/pace section is unfolded.
+  bool _showMorePreferences = false;
+
   /// Solo/Couple are exactly what they say; Family/Friends are open-ended
   /// group sizes. Keeps "How many travelers?" and "Who's traveling?" from
   /// ever contradicting each other instead of validating after the fact.
@@ -100,7 +103,7 @@ class _AiPlannerScreenState extends State<AiPlannerScreen> {
   }
 
   Future<void> _editDays() async {
-    final value = await _promptForNumber(
+    final value = await promptForNumber(
       context,
       title: 'How many days?',
       initial: _days,
@@ -112,7 +115,7 @@ class _AiPlannerScreenState extends State<AiPlannerScreen> {
 
   Future<void> _editTravelers() async {
     final (min, max) = _travelerRangeFor(_travelerType);
-    final value = await _promptForNumber(
+    final value = await promptForNumber(
       context,
       title: 'How many travelers?',
       initial: _travelers,
@@ -227,80 +230,27 @@ class _AiPlannerScreenState extends State<AiPlannerScreen> {
     final planner = context.watch<AiPlannerProvider>();
     final sidePadding = MaxWidthContainer.sidePadding(context, maxWidth: 800);
     return Scaffold(
+      // The hero header paints its artwork up behind the status bar, so the
+      // top inset is handled inside [PlannerHero] instead of by SafeArea.
       body: SafeArea(
+        top: false,
         child: ListView(
           padding: EdgeInsets.fromLTRB(
             sidePadding,
-            AppSpacing.sm,
+            0,
             sidePadding,
             AppSpacing.huge,
           ),
           children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text('Planner', style: theme.textTheme.displayMedium),
-                ),
-                InkWell(
-                  onTap: () => context.push(RoutePaths.aiChat),
-                  borderRadius: BorderRadius.circular(AppRadius.pill),
-                  child: Container(
-                    padding: const EdgeInsets.all(AppSpacing.xs),
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.surface,
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.06),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: Icon(Symbols.chat_rounded, color: theme.colorScheme.primary),
-                  ),
-                ),
-              ],
+            PlannerHero(
+              bleed: sidePadding,
+              badgeIcon: Symbols.auto_awesome_rounded,
+              badgeLabel: 'AI Trip Planner',
+              headline: 'Plan your next\nadventure',
+              subtitle: 'Answer a few questions and get a personalized day-by-day itinerary.',
+              actionIcon: Symbols.chat_rounded,
+              onAction: () => context.push(RoutePaths.aiChat),
             ),
-            const SizedBox(height: AppSpacing.lg),
-            Container(
-              padding: const EdgeInsets.all(AppSpacing.lg),
-              decoration: BoxDecoration(
-                gradient: AppColors.gradient([theme.colorScheme.primary, theme.colorScheme.primaryFixedDim]),
-                borderRadius: BorderRadius.circular(AppRadius.xl),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'AI Trip Planner',
-                          style: theme.textTheme.headlineMedium?.copyWith(
-                            color: Colors.white,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Answer a few questions and get a personalized day-by-day itinerary.',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: Colors.white.withValues(alpha: 0.9),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: AppSpacing.sm),
-                  const Icon(
-                    Symbols.auto_awesome_rounded,
-                    color: Colors.white,
-                    size: 40,
-                  ),
-                ],
-              ),
-            ).animate().fadeIn(duration: 380.ms).moveY(begin: 12, end: 0),
-            const SizedBox(height: AppSpacing.xxl),
             const _FieldLabel(
               icon: Symbols.location_on_rounded,
               label: 'Where do you want to go?',
@@ -422,134 +372,43 @@ class _AiPlannerScreenState extends State<AiPlannerScreen> {
               }),
             ),
             const SizedBox(height: AppSpacing.xxl),
-            const _FieldLabel(
-              icon: Symbols.date_range_rounded,
-              label: 'How many days?',
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.lg,
-                vertical: AppSpacing.sm,
-              ),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surface,
-                borderRadius: BorderRadius.circular(AppRadius.lg),
-                border: Border.all(color: theme.colorScheme.outline),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  InkWell(
-                    onTap: _editDays,
-                    borderRadius: BorderRadius.circular(AppRadius.sm),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        vertical: AppSpacing.xs,
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            '$_days ${_days == 1 ? 'day' : 'days'}',
-                            style: theme.textTheme.titleLarge,
-                          ),
-                          const SizedBox(width: 4),
-                          Icon(
-                            Symbols.edit_rounded,
-                            size: 15,
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  Row(
-                    children: [
-                      _StepperButton(
-                        icon: Symbols.remove_rounded,
-                        onTap: _days > 1 ? () => setState(() => _days--) : null,
-                      ),
-                      const SizedBox(width: AppSpacing.sm),
-                      _StepperButton(
-                        icon: Symbols.add_rounded,
-                        onTap: _days < 14
-                            ? () => setState(() => _days++)
-                            : null,
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: AppSpacing.xxl),
-            const _FieldLabel(
-              icon: Symbols.groups_2_rounded,
-              label: 'How many travelers?',
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            Builder(
-              builder: (context) {
+            // Days and travelers share one row to keep the form short; they
+            // stack again when the screen is too narrow for two counters.
+            LayoutBuilder(
+              builder: (context, constraints) {
                 final (min, max) = _travelerRangeFor(_travelerType);
-                final locked = min == max;
-                return Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.lg,
-                    vertical: AppSpacing.sm,
-                  ),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.surface,
-                    borderRadius: BorderRadius.circular(AppRadius.lg),
-                    border: Border.all(color: theme.colorScheme.outline),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                final days = _CounterCard(
+                  icon: Symbols.date_range_rounded,
+                  label: _days == 1 ? 'Day' : 'Days',
+                  value: _days,
+                  onEdit: _editDays,
+                  onDecrement: _days > minTripDays ? () => setState(() => _days--) : null,
+                  onIncrement: _days < maxTripDays ? () => setState(() => _days++) : null,
+                );
+                final travelers = _CounterCard(
+                  icon: Symbols.groups_2_rounded,
+                  label: _travelers == 1 ? 'Traveler' : 'Travelers',
+                  value: _travelers,
+                  onEdit: min == max ? null : _editTravelers,
+                  onDecrement: _travelers > min ? () => setState(() => _travelers--) : null,
+                  onIncrement: _travelers < max ? () => setState(() => _travelers++) : null,
+                );
+                if (constraints.maxWidth < 300) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      InkWell(
-                        onTap: locked ? null : _editTravelers,
-                        borderRadius: BorderRadius.circular(AppRadius.sm),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                            vertical: AppSpacing.xs,
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                '$_travelers ${_travelers == 1 ? 'traveler' : 'travelers'}',
-                                style: theme.textTheme.titleLarge,
-                              ),
-                              if (!locked) ...[
-                                const SizedBox(width: 4),
-                                Icon(
-                                  Symbols.edit_rounded,
-                                  size: 15,
-                                  color: theme.colorScheme.onSurfaceVariant,
-                                ),
-                              ],
-                            ],
-                          ),
-                        ),
-                      ),
-                      Row(
-                        children: [
-                          _StepperButton(
-                            icon: Symbols.remove_rounded,
-                            onTap: _travelers > min
-                                ? () => setState(() => _travelers--)
-                                : null,
-                          ),
-                          const SizedBox(width: AppSpacing.sm),
-                          _StepperButton(
-                            icon: Symbols.add_rounded,
-                            onTap: _travelers < max
-                                ? () => setState(() => _travelers++)
-                                : null,
-                          ),
-                        ],
-                      ),
+                      days,
+                      const SizedBox(height: AppSpacing.sm),
+                      travelers,
                     ],
-                  ),
+                  );
+                }
+                return Row(
+                  children: [
+                    Expanded(child: days),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(child: travelers),
+                  ],
                 );
               },
             ),
@@ -585,69 +444,133 @@ class _AiPlannerScreenState extends State<AiPlannerScreen> {
               }).toList(),
             ),
             const SizedBox(height: AppSpacing.xxl),
-            const _FieldLabel(
-              icon: Symbols.commute_rounded,
-              label: 'Preferred transportation',
+            // Transportation, interests and pace all have sensible defaults,
+            // so they stay folded behind one row (summarizing the current
+            // picks) until the traveler wants to fine-tune them.
+            InkWell(
+              onTap: () => setState(() => _showMorePreferences = !_showMorePreferences),
+              borderRadius: BorderRadius.circular(AppRadius.lg),
+              child: Container(
+                padding: const EdgeInsets.all(AppSpacing.md),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surface,
+                  borderRadius: BorderRadius.circular(AppRadius.lg),
+                  border: Border.all(color: theme.colorScheme.outline),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Symbols.tune_rounded, size: 24, color: theme.colorScheme.primary),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('More preferences', style: theme.textTheme.titleMedium),
+                          const SizedBox(height: 2),
+                          Text(
+                            [
+                              _transportation.isEmpty ? 'Any transport' : _transportation.join(', '),
+                              '${_interests.length} ${_interests.length == 1 ? 'interest' : 'interests'}',
+                              '$_tripPace pace',
+                            ].join(' · '),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.xs),
+                    AnimatedRotation(
+                      turns: _showMorePreferences ? 0.5 : 0,
+                      duration: const Duration(milliseconds: 200),
+                      child: Icon(
+                        Symbols.expand_more_rounded,
+                        color: theme.textTheme.bodyMedium?.color,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
-            const SizedBox(height: AppSpacing.sm),
-            Wrap(
-              spacing: AppSpacing.sm,
-              runSpacing: AppSpacing.sm,
-              children: transportOptions.map((option) {
-                final (label, icon) = option;
-                final selected = _transportation.contains(label);
-                return SelectableChip(
-                  label: label,
-                  icon: icon,
-                  selected: selected,
-                  onTap: () => setState(() {
-                    if (!_transportation.remove(label))
-                      _transportation.add(label);
-                  }),
-                );
-              }).toList(),
-            ),
-            const SizedBox(height: AppSpacing.xxl),
-            const _FieldLabel(
-              icon: Symbols.interests_rounded,
-              label: 'What are you interested in?',
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            Wrap(
-              spacing: AppSpacing.sm,
-              runSpacing: AppSpacing.sm,
-              children: interestOptions.map((option) {
-                final (label, icon) = option;
-                final selected = _interests.contains(label);
-                return SelectableChip(
-                  label: label,
-                  icon: icon,
-                  selected: selected,
-                  onTap: () => setState(() {
-                    if (!_interests.remove(label)) _interests.add(label);
-                  }),
-                );
-              }).toList(),
-            ),
-            const SizedBox(height: AppSpacing.xxl),
-            const _FieldLabel(
-              icon: Symbols.tune_rounded,
-              label: 'Trip pace',
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            Wrap(
-              spacing: AppSpacing.sm,
-              runSpacing: AppSpacing.sm,
-              children: tripPaceOptions.map((option) {
-                final (label, icon) = option;
-                final selected = _tripPace == label;
-                return SelectableChip(
-                  label: label,
-                  icon: icon,
-                  selected: selected,
-                  onTap: () => setState(() => _tripPace = label),
-                );
-              }).toList(),
+            AnimatedSize(
+              duration: const Duration(milliseconds: 220),
+              curve: Curves.easeOut,
+              alignment: Alignment.topCenter,
+              child: !_showMorePreferences
+                  ? const SizedBox(width: double.infinity)
+                  : Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        const SizedBox(height: AppSpacing.xl),
+                        const _FieldLabel(
+                          icon: Symbols.commute_rounded,
+                          label: 'Preferred transportation',
+                        ),
+                        const SizedBox(height: AppSpacing.sm),
+                        Wrap(
+                          spacing: AppSpacing.sm,
+                          runSpacing: AppSpacing.sm,
+                          children: transportOptions.map((option) {
+                            final (label, icon) = option;
+                            final selected = _transportation.contains(label);
+                            return SelectableChip(
+                              label: label,
+                              icon: icon,
+                              selected: selected,
+                              onTap: () => setState(() {
+                                if (!_transportation.remove(label))
+                                  _transportation.add(label);
+                              }),
+                            );
+                          }).toList(),
+                        ),
+                        const SizedBox(height: AppSpacing.xl),
+                        const _FieldLabel(
+                          icon: Symbols.interests_rounded,
+                          label: 'What are you interested in?',
+                        ),
+                        const SizedBox(height: AppSpacing.sm),
+                        Wrap(
+                          spacing: AppSpacing.sm,
+                          runSpacing: AppSpacing.sm,
+                          children: interestOptions.map((option) {
+                            final (label, icon) = option;
+                            final selected = _interests.contains(label);
+                            return SelectableChip(
+                              label: label,
+                              icon: icon,
+                              selected: selected,
+                              onTap: () => setState(() {
+                                if (!_interests.remove(label)) _interests.add(label);
+                              }),
+                            );
+                          }).toList(),
+                        ),
+                        const SizedBox(height: AppSpacing.xl),
+                        const _FieldLabel(
+                          icon: Symbols.speed_rounded,
+                          label: 'Trip pace',
+                        ),
+                        const SizedBox(height: AppSpacing.sm),
+                        Wrap(
+                          spacing: AppSpacing.sm,
+                          runSpacing: AppSpacing.sm,
+                          children: tripPaceOptions.map((option) {
+                            final (label, icon) = option;
+                            final selected = _tripPace == label;
+                            return SelectableChip(
+                              label: label,
+                              icon: icon,
+                              selected: selected,
+                              onTap: () => setState(() => _tripPace = label),
+                            );
+                          }).toList(),
+                        ),
+                      ],
+                    ),
             ),
           ],
         ),
@@ -688,12 +611,41 @@ class _AiPlannerScreenState extends State<AiPlannerScreen> {
                         planner.isGenerating
                     ? null
                     : _generate,
+                trailingIcon: planner.isGenerating
+                    ? null
+                    : Symbols.arrow_forward_rounded,
+                borderRadius: AppRadius.pill,
                 height: 60,
               ),
               if (!planner.isGenerating)
-                TextButton(
-                  onPressed: () => context.push(RoutePaths.manualItinerary),
-                  child: const Text('Prefer to build it yourself? Create manually'),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Expanded(
+                      child: Divider(
+                        endIndent: AppSpacing.xs,
+                        color: theme.colorScheme.outline,
+                      ),
+                    ),
+                    // Flexible so the label wraps instead of overflowing on
+                    // very narrow screens or at large text scales.
+                    Flexible(
+                      flex: 8,
+                      child: TextButton(
+                        onPressed: () => context.push(RoutePaths.manualItinerary),
+                        child: const Text(
+                          'Or create your own itinerary',
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: Divider(
+                        indent: AppSpacing.xs,
+                        color: theme.colorScheme.outline,
+                      ),
+                    ),
+                  ],
                 ),
             ],
           ),
@@ -701,65 +653,6 @@ class _AiPlannerScreenState extends State<AiPlannerScreen> {
       ),
     );
   }
-}
-
-/// A small "type the exact number" dialog for the days/travelers counters —
-/// the +/- steppers are fine for nudging by one, but slow for jumping from
-/// 1 to 12. Validates against [min]/[max] the same way every other form in
-/// the app validates input, rather than silently clamping a bad value.
-Future<int?> _promptForNumber(
-  BuildContext context, {
-  required String title,
-  required int initial,
-  required int min,
-  required int max,
-}) {
-  final controller = TextEditingController(text: '$initial');
-  final formKey = GlobalKey<FormState>();
-  return showDialog<int>(
-    context: context,
-    builder: (context) => AlertDialog(
-      // Scrolls on a short viewport (landscape, keyboard open) instead of overflowing.
-      scrollable: true,
-      title: Text(title),
-      content: Form(
-        key: formKey,
-        child: TextFormField(
-          controller: controller,
-          autofocus: true,
-          keyboardType: TextInputType.number,
-          decoration: InputDecoration(
-            labelText: 'Between $min and $max',
-            prefixIcon: const Icon(Symbols.numbers_rounded, size: 20),
-          ),
-          validator: (v) {
-            final n = int.tryParse((v ?? '').trim());
-            if (n == null) return 'Enter a whole number';
-            if (n < min || n > max)
-              return 'Enter a number between $min and $max';
-            return null;
-          },
-          onFieldSubmitted: (_) {
-            if (formKey.currentState!.validate())
-              Navigator.of(context).pop(int.parse(controller.text.trim()));
-          },
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(
-          onPressed: () {
-            if (formKey.currentState!.validate())
-              Navigator.of(context).pop(int.parse(controller.text.trim()));
-          },
-          child: const Text('Save'),
-        ),
-      ],
-    ),
-  );
 }
 
 class _FieldLabel extends StatelessWidget {
@@ -773,8 +666,8 @@ class _FieldLabel extends StatelessWidget {
     final theme = Theme.of(context);
     return Row(
       children: [
-        Icon(icon, size: 18, color: theme.colorScheme.primary),
-        const SizedBox(width: AppSpacing.xs),
+        Icon(icon, size: 24, color: theme.colorScheme.primary),
+        const SizedBox(width: AppSpacing.sm),
         Flexible(
           child: Text(
             label,
@@ -823,28 +716,127 @@ class _SelectableCard extends StatelessWidget {
             width: selected ? 1.6 : 1,
           ),
         ),
-        child: Column(
+        child: Stack(
+          alignment: Alignment.topCenter,
+          clipBehavior: Clip.none,
           children: [
-            Icon(
-              icon,
-              color: selected ? theme.colorScheme.primary : theme.textTheme.bodyMedium?.color,
-              size: 26,
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primary.withValues(alpha: selected ? 0.18 : 0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(icon, color: theme.colorScheme.primary, size: 24),
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                Text(
+                  title,
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    color: selected ? theme.colorScheme.primary : theme.colorScheme.onSurface,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  style: theme.textTheme.bodySmall,
+                  textAlign: TextAlign.center,
+                ),
+              ],
             ),
-            const SizedBox(height: 6),
-            Text(
-              title,
-              style: theme.textTheme.titleSmall?.copyWith(
-                color: selected ? theme.colorScheme.primary : theme.colorScheme.onSurface,
+            if (selected)
+              Positioned(
+                top: -AppSpacing.xs,
+                right: 0,
+                child: Container(
+                  width: 20,
+                  height: 20,
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primary,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Symbols.check_rounded, color: Colors.white, size: 14, weight: 700),
+                ),
               ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              subtitle,
-              style: theme.textTheme.bodySmall,
-              textAlign: TextAlign.center,
-            ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// A compact labelled counter (days, travelers): −/+ steppers around the
+/// number, which opens the "type the exact number" dialog when tapped —
+/// [onEdit] is null while the value is locked (e.g. Solo/Couple travelers).
+class _CounterCard extends StatelessWidget {
+  const _CounterCard({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.onEdit,
+    required this.onDecrement,
+    required this.onIncrement,
+  });
+
+  final IconData icon;
+  final String label;
+  final int value;
+  final VoidCallback? onEdit;
+  final VoidCallback? onDecrement;
+  final VoidCallback? onIncrement;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.sm),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: Border.all(color: theme.colorScheme.outline),
+      ),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 18, color: theme.colorScheme.primary),
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.titleSmall,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Row(
+            children: [
+              _StepperButton(icon: Symbols.remove_rounded, onTap: onDecrement),
+              Expanded(
+                child: InkWell(
+                  onTap: onEdit,
+                  borderRadius: BorderRadius.circular(AppRadius.sm),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text('$value', style: theme.textTheme.headlineSmall),
+                    ),
+                  ),
+                ),
+              ),
+              _StepperButton(icon: Symbols.add_rounded, onTap: onIncrement),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -864,15 +856,15 @@ class _StepperButton extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(AppRadius.pill),
       child: Container(
-        width: 34,
-        height: 34,
+        width: 40,
+        height: 40,
         decoration: BoxDecoration(
           color: enabled ? theme.colorScheme.primary.withValues(alpha: 0.1) : theme.colorScheme.outline,
           shape: BoxShape.circle,
         ),
         child: Icon(
           icon,
-          size: 18,
+          size: 20,
           color: enabled ? theme.colorScheme.primary : theme.colorScheme.onSurfaceVariant,
         ),
       ),

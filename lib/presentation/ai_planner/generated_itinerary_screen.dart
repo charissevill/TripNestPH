@@ -108,6 +108,7 @@ class GeneratedItineraryScreen extends StatefulWidget {
     super.key,
     required this.itinerary,
     this.savedItineraryId,
+    this.promptIfLeftEmpty = false,
   });
 
   final Itinerary itinerary;
@@ -115,6 +116,12 @@ class GeneratedItineraryScreen extends StatefulWidget {
   /// Non-null when opened from the Saved Trips list — swaps the "Save"
   /// action for "Remove from Saved".
   final String? savedItineraryId;
+
+  /// True only right after `ManualItineraryScreen` creates a trip — that
+  /// flow has to save before a single activity exists (see its
+  /// `_startPlanning`), so leaving again without adding any asks whether to
+  /// keep the empty trip instead of silently littering Saved Trips with it.
+  final bool promptIfLeftEmpty;
 
   @override
   State<GeneratedItineraryScreen> createState() =>
@@ -180,6 +187,14 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen>
   List<WeatherForecast> get _weather =>
       _weatherOverride ?? widget.itinerary.weather;
 
+  /// Which trip day (0-based) [_weatherOverride]'s first entry belongs to —
+  /// 0 unless the trip has already started, in which case the days that
+  /// have passed have no forecast and the list picks up from today's.
+  int _weatherFirstDayIndex = 0;
+
+  /// How far ahead of today Open-Meteo's free forecast reaches.
+  static const int _forecastHorizonDays = 16;
+
   /// Set right before a deliberate pop (after the traveler chooses Save or
   /// Discard in [_handleUnsavedPopAttempt]) so that second, self-triggered
   /// pop attempt isn't intercepted all over again.
@@ -223,9 +238,18 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen>
   /// "is this person even allowed to edit" — this answers "are they
   /// actively editing right now"; the actual per-icon gates below always
   /// check both together.
-  bool _editMode = false;
+  ///
+  /// The one exception is a just-created manual trip: every day is empty
+  /// and "Add Activity" is the only thing there is to do, so it opens with
+  /// editing already on instead of hiding that button behind the toggle.
+  late bool _editMode = widget.promptIfLeftEmpty;
 
   bool get _showActivityEditControls => _canEditActivities && _editMode;
+
+  /// Whether the Travel Tips list is unfolded — folded by default so the
+  /// half-dozen AI-written tips don't add most of a screen of scrolling
+  /// for a traveler who's only here for the day plan.
+  bool _showTravelTips = false;
   bool get _showBudgetEditControls => _canEditBudget && _editMode;
 
   /// The Edit/Done toggle itself — one per tab's own section header (Day-
@@ -455,6 +479,53 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen>
   /// (never saved) is only ever held in this route's memory, so leaving
   /// without a choice here would silently discard it, which is exactly the
   /// "I can't find my itinerary again" complaint this guards against.
+  bool get _isEmptyNewTrip =>
+      widget.promptIfLeftEmpty &&
+      widget.savedItineraryId != null &&
+      _days.every((day) => day.activities.isEmpty);
+
+  /// Backs the [PopScope] guard for a just-created manual trip that still
+  /// has no activities (see [GeneratedItineraryScreen.promptIfLeftEmpty]).
+  Future<void> _handleEmptyTripPopAttempt() async {
+    final keep = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        // Scrolls on a short viewport (landscape, keyboard open) instead of overflowing.
+        scrollable: true,
+        title: const Text('Keep this empty trip?'),
+        content: const Text(
+          'You haven\'t added any activities yet. Keep it in Saved Trips to finish later, or discard it?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Discard'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Keep Trip'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || keep == null)
+      return; // dismissed (tapped outside/back) — stay put
+    if (!keep) {
+      try {
+        await _repository.delete(widget.savedItineraryId!);
+      } catch (e) {
+        if (mounted)
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(AppException.from(e).message)));
+        return;
+      }
+      if (!mounted) return;
+    }
+    setState(() => _readyToPop = true);
+    Navigator.of(context).pop();
+  }
+
   Future<void> _handleUnsavedPopAttempt() async {
     final shouldSave = await showDialog<bool>(
       context: context,
@@ -671,15 +742,26 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen>
     final today = DateTime.now();
     final todayDate = DateTime(today.year, today.month, today.day);
     final tripDate = DateTime(startDate.year, startDate.month, startDate.day);
-    final daysUntilTrip = tripDate.isBefore(todayDate)
-        ? 0
-        : tripDate.difference(todayDate).inDays;
-    final forecastWindow = daysUntilTrip + widget.itinerary.totalDays;
+    final offset = tripDate.difference(todayDate).inDays;
+    final daysUntilTrip = offset < 0 ? 0 : offset;
+    // Already under way: today is trip day `-offset + 1`, and the days
+    // before it are simply gone — never relabelled as if today were Day 1.
+    final firstTripDay = offset < 0 ? -offset : 0;
+    final remainingDays = widget.itinerary.totalDays - firstTripDay;
 
-    if (forecastWindow > 16) {
-      if (mounted) setState(() => _weatherOverride = const []);
+    if (remainingDays <= 0 || daysUntilTrip >= _forecastHorizonDays) {
+      if (mounted) {
+        setState(() {
+          _weatherOverride = const [];
+          _weatherFirstDayIndex = 0;
+        });
+      }
       return;
     }
+    // Only as many trip days as the forecast actually reaches — a long or
+    // far-off trip still gets its first covered days instead of nothing.
+    final coveredDays = remainingDays.clamp(0, _forecastHorizonDays - daysUntilTrip);
+    final forecastWindow = daysUntilTrip + coveredDays;
 
     // A fresh client per request, never a field held for the widget's whole
     // lifetime — the same fix CurrentWeatherCard already needed: reusing
@@ -703,9 +785,182 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen>
     if (mounted) {
       setState(() {
         _weatherOverride = forTrip;
+        _weatherFirstDayIndex = firstTripDay;
         _weatherFetchedAt = DateTime.now();
       });
     }
+  }
+
+  /// The Weather Outlook's body: the forecast tiles, each labelled with the
+  /// trip day and date it's for, plus a plain statement of which days have
+  /// a forecast and why the rest don't — a forecast only ever covers the
+  /// next [_forecastHorizonDays] days, so a trip is routinely only partly
+  /// covered (or not at all yet).
+  List<Widget> _buildWeatherOutlook(ThemeData theme) {
+    final totalDays = widget.itinerary.totalDays;
+    final startDate = _savedItinerary?.startDate;
+    final dateFormat = DateFormat('MMM d');
+    // Spelled out as an actual date everywhere below — "16 days ahead"
+    // leaves the traveler to do the calendar math themselves.
+    final forecastUntil = dateFormat.format(DateTime.now().add(const Duration(days: _forecastHorizonDays - 1)));
+    DateTime dateOf(int dayIndex) => startDate!.add(Duration(days: dayIndex));
+    String dayRange(int from, int to) => from == to ? 'Day ${from + 1}' : 'Days ${from + 1}–${to + 1}';
+
+    // Always shown, and as a tinted box rather than fine print — which days
+    // have a forecast (and that it only ever reaches so far ahead) is the
+    // first thing a traveler should see here, not something to discover
+    // from a row of tiles that's shorter than their trip.
+    Widget note(String text) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(AppSpacing.sm),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.primary.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          border: Border.all(color: theme.colorScheme.primary.withValues(alpha: 0.3)),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(Symbols.partly_cloudy_day_rounded, size: 20, color: theme.colorScheme.primary),
+            const SizedBox(width: AppSpacing.xs),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // The one line that's always here, whatever the trip's
+                  // dates — the standing rule, with its actual end date —
+                  // followed by what that means for this particular trip.
+                  Text(
+                    'Weather forecasts are available only for the next $_forecastHorizonDays days (until $forecastUntil).',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurface,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(text, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurface)),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (_weather.isEmpty) {
+      String message =
+          'No forecast available for these dates yet — check back closer to your trip.';
+      if (startDate != null) {
+        final now = DateTime.now();
+        final today = DateTime(now.year, now.month, now.day);
+        final tripStart = DateTime(startDate.year, startDate.month, startDate.day);
+        final tripEnd = tripStart.add(Duration(days: totalDays - 1));
+        if (tripEnd.isBefore(today)) {
+          message = 'This trip\'s dates have passed, so there\'s no forecast to show.';
+        } else if (tripStart.difference(today).inDays >= _forecastHorizonDays) {
+          final availableFrom = tripStart.subtract(const Duration(days: _forecastHorizonDays - 1));
+          message =
+              'No forecast for your trip yet. '
+              'Day 1 (${dateFormat.format(tripStart)}) will have one starting ${dateFormat.format(availableFrom)}.';
+        }
+      } else if (_isSaved) {
+        message = 'Set your travel date to see the forecast for your trip days.';
+      }
+      return [note(message)];
+    }
+
+    final first = _weatherFirstDayIndex;
+    // Never more tiles than the trip has days left to show them against.
+    final shown = _weather.take((totalDays - first).clamp(0, _weather.length)).toList();
+    final last = first + shown.length - 1;
+
+    final notes = <String>[];
+    if (startDate == null) {
+      // Still the generation-time forecast, counted from the day the trip
+      // was generated rather than from a real travel date.
+      notes.add(
+        _isSaved
+            ? 'This is the forecast from today onward — set your travel date to see it for your actual trip days.'
+            : 'This is the forecast from today onward — save the trip and set a travel date to see it for your actual trip days.',
+      );
+    } else if (first == 0 && last >= totalDays - 1) {
+      notes.add(
+        totalDays == 1
+            ? 'Forecast available for your trip day.'
+            : 'Forecast available for all $totalDays days of your trip.',
+      );
+    } else {
+      notes.add('Forecast available for ${dayRange(first, last)} only.');
+      if (first > 0) notes.add('${dayRange(0, first - 1)} ${first == 1 ? 'has' : 'have'} already passed.');
+      if (last < totalDays - 1) {
+        notes.add(
+          '${dayRange(last + 1, totalDays - 1)} ${last + 1 == totalDays - 1 ? 'is' : 'are'} still too far ahead. Check back on '
+          '${dateFormat.format(dateOf(totalDays - 1).subtract(const Duration(days: _forecastHorizonDays - 1)))} to see the whole trip.',
+        );
+      }
+    }
+
+    Widget tile(int i) {
+      final dayIndex = first + i;
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (startDate != null) ...[
+            Text(
+              'Day ${dayIndex + 1}',
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.labelMedium,
+            ),
+            Text(
+              dateFormat.format(dateOf(dayIndex)),
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+            ),
+            const SizedBox(height: 4),
+          ],
+          _WeatherTile(forecast: shown[i]),
+        ],
+      );
+    }
+
+    return [
+      note(notes.join(' ')),
+      const SizedBox(height: AppSpacing.md),
+      // Up to four tiles share the row's width; more than that would crush
+      // each one, so a longer forecast scrolls sideways at a fixed width.
+      if (shown.length <= 4)
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            for (var i = 0; i < shown.length; i++)
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.only(right: AppSpacing.sm),
+                  child: tile(i),
+                ),
+              ),
+          ],
+        )
+      else
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              for (var i = 0; i < shown.length; i++)
+                Padding(
+                  padding: const EdgeInsets.only(right: AppSpacing.sm),
+                  child: SizedBox(width: 92, child: tile(i)),
+                ),
+            ],
+          ),
+        ),
+    ];
   }
 
   /// Re-runs generation for the same destination — resolved fresh via
@@ -891,11 +1146,7 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen>
           // leaving it stale/orphaned while this pushes a second, separate
           // unsaved copy (see updateItinerary's doc comment).
           try {
-            await _repository.updateItinerary(
-              savedId,
-              title: itinerary.destinationName,
-              itinerary: itinerary,
-            );
+            await _repository.updateItinerary(savedId, itinerary: itinerary);
           } catch (e) {
             if (!mounted) return;
             _showRegenerateError(AppException.from(e).message);
@@ -1845,19 +2096,27 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen>
   Future<void> _persistDays(List<ItineraryDay> updated) async {
     final savedId = widget.savedItineraryId;
     if (savedId == null) return;
+    final previous = _days;
     setState(() => _days = updated);
     try {
+      // Written together with the *current* budget, not `widget.itinerary`'s
+      // original one — this is a whole-document overwrite, so anything left
+      // at its opening value here would silently undo every budget edit
+      // made since the screen opened.
       await _repository.updateItinerary(
         savedId,
-        title: widget.itinerary.destinationName,
-        itinerary: widget.itinerary.copyWith(days: updated),
+        itinerary: widget.itinerary.copyWith(
+          days: updated,
+          budgetBreakdown: _budgetBreakdown,
+          totalBudget: _totalBudget,
+        ),
       );
     } catch (e) {
       if (!mounted) return;
-      // The local list already moved on — revert it so the screen matches
-      // what's actually saved, rather than showing an edit that silently
-      // failed to persist.
-      setState(() => _days = widget.itinerary.days);
+      // The local list already moved on — revert it to what it was just
+      // before this edit (not all the way back to how the screen opened,
+      // which would also drop every earlier edit that did save).
+      setState(() => _days = previous);
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text(AppException.from(e).message)));
@@ -1882,8 +2141,11 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen>
     try {
       await _repository.updateItinerary(
         savedId,
-        title: widget.itinerary.destinationName,
         itinerary: widget.itinerary.copyWith(
+          // The current days, for the same reason [_persistDays] writes the
+          // current budget — otherwise a budget edit wiped every activity
+          // added or changed since the screen opened.
+          days: _days,
           budgetBreakdown: updatedBreakdown,
           totalBudget: updatedTotal,
         ),
@@ -2131,13 +2393,23 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen>
     await _persistBudget(updatedBreakdown, updatedTotal);
   }
 
+  List<ItineraryActivity> _activitiesOn(int dayNumber) =>
+      _days.where((d) => d.dayNumber == dayNumber).expand((d) => d.activities).toList();
+
   Future<void> _addActivity(int dayNumber) async {
+    if (_activitiesOn(dayNumber).length >= maxActivitiesPerDay) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('A day can hold up to $maxActivitiesPerDay activities — remove one to add another.')),
+      );
+      return;
+    }
     final result = await showDialog<ItineraryActivity>(
       context: context,
       builder: (context) => _AddActivityDialog(
         anchorLatitude: widget.itinerary.destinationLatitude,
         anchorLongitude: widget.itinerary.destinationLongitude,
         anchorLabel: widget.itinerary.destinationName,
+        dayActivities: _activitiesOn(dayNumber),
       ),
     );
     if (result == null || !mounted) return;
@@ -2168,6 +2440,7 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen>
         anchorLongitude: widget.itinerary.destinationLongitude,
         anchorLabel: widget.itinerary.destinationName,
         existing: activity,
+        dayActivities: _activitiesOn(dayNumber),
       ),
     );
     if (result == null || !mounted) return;
@@ -2339,9 +2612,13 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen>
     final restaurants = _recommendedRestaurants;
 
     return PopScope(
-      canPop: _isSaved || _readyToPop,
+      canPop: _readyToPop || (_isSaved && !_isEmptyNewTrip),
       onPopInvokedWithResult: (didPop, result) {
         if (didPop) return;
+        if (_isEmptyNewTrip) {
+          _handleEmptyTripPopAttempt();
+          return;
+        }
         _handleUnsavedPopAttempt();
       },
       child: Scaffold(
@@ -2522,7 +2799,6 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen>
                               onToggleCompleted: _isOwner
                                   ? _toggleCompleted
                                   : null,
-                              totalDays: itinerary.totalDays,
                             ),
                           ],
                         ],
@@ -2661,23 +2937,7 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen>
         ],
       ),
       const SizedBox(height: AppSpacing.md),
-      _weather.isEmpty
-          ? Text(
-              'No forecast available for these dates yet — check back closer to your trip.',
-              style: theme.textTheme.bodySmall,
-            )
-          : Row(
-              children: _weather
-                  .map(
-                    (w) => Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.only(right: AppSpacing.sm),
-                        child: _WeatherTile(forecast: w),
-                      ),
-                    ),
-                  )
-                  .toList(),
-            ),
+      ..._buildWeatherOutlook(theme),
       const SizedBox(height: AppSpacing.xxl),
       Row(
         children: [
@@ -2841,10 +3101,36 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen>
       ],
       // Never populated for a manually-built trip — no AI generation to
       // have sourced tips from.
-      if (!itinerary.isManuallyCreated) ...[
+      if (!itinerary.isManuallyCreated && itinerary.travelTips.isNotEmpty) ...[
         const SizedBox(height: AppSpacing.xl),
-        Text('Travel Tips', style: theme.textTheme.titleLarge),
-        const SizedBox(height: AppSpacing.md),
+        InkWell(
+          onTap: () => setState(() => _showTravelTips = !_showTravelTips),
+          borderRadius: BorderRadius.circular(AppRadius.sm),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Travel Tips (${itinerary.travelTips.length})',
+                    style: theme.textTheme.titleLarge,
+                  ),
+                ),
+                Text(
+                  _showTravelTips ? 'Hide' : 'Show',
+                  style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.primary),
+                ),
+                AnimatedRotation(
+                  turns: _showTravelTips ? 0.5 : 0,
+                  duration: const Duration(milliseconds: 200),
+                  child: Icon(Symbols.expand_more_rounded, color: theme.colorScheme.primary),
+                ),
+              ],
+            ),
+          ),
+        ),
+        if (_showTravelTips) const SizedBox(height: AppSpacing.md),
+        if (_showTravelTips)
         Container(
           padding: const EdgeInsets.all(AppSpacing.md),
           decoration: BoxDecoration(
@@ -3183,32 +3469,42 @@ class _ActionButtonGrid extends StatelessWidget {
 
   final List<Widget> buttons;
 
-  /// 4 or fewer fits on one row; more than that (unsaved trip: Save/Share/
-  /// Download/Regenerate, 4 total; saved trip adds Remind/Offline, 6 total)
-  /// wraps at 3 per row rather than stretching a single row to fit them all.
-  int get _perRow => buttons.length <= 4 ? buttons.length : 3;
+  /// The narrowest a button may get before its label stops being readable.
+  static const double _minButtonWidth = 46;
+  static const double _gap = AppSpacing.xs;
 
   @override
   Widget build(BuildContext context) {
-    final perRow = _perRow;
-    final rows = <Widget>[];
-    for (var i = 0; i < buttons.length; i += perRow) {
-      final rowButtons = buttons.skip(i).take(perRow).toList();
-      if (rows.isNotEmpty) rows.add(const SizedBox(height: AppSpacing.sm));
-      rows.add(
-        Row(
-          children: [
-            for (var j = 0; j < perRow; j++) ...[
-              if (j > 0) const SizedBox(width: AppSpacing.sm),
-              Expanded(
-                child: j < rowButtons.length ? rowButtons[j] : const SizedBox(),
-              ),
-            ],
-          ],
-        ),
-      );
-    }
-    return Column(children: rows);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Everything on one row whenever it fits (a saved trip's six
+        // actions included) — two rows of cards pushed the itinerary
+        // itself most of a screen further down. Only a very narrow
+        // screen or large text falls back to wrapping at 3 per row.
+        final textScale = MediaQuery.textScalerOf(context).scale(1);
+        final fitsOneRow =
+            (constraints.maxWidth - _gap * (buttons.length - 1)) / buttons.length >= _minButtonWidth * textScale;
+        final perRow = fitsOneRow ? buttons.length : (buttons.length <= 4 ? buttons.length : 3);
+        final rows = <Widget>[];
+        for (var i = 0; i < buttons.length; i += perRow) {
+          final rowButtons = buttons.skip(i).take(perRow).toList();
+          if (rows.isNotEmpty) rows.add(const SizedBox(height: _gap));
+          rows.add(
+            Row(
+              children: [
+                for (var j = 0; j < perRow; j++) ...[
+                  if (j > 0) const SizedBox(width: _gap),
+                  Expanded(
+                    child: j < rowButtons.length ? rowButtons[j] : const SizedBox(),
+                  ),
+                ],
+              ],
+            ),
+          );
+        }
+        return Column(children: rows);
+      },
+    );
   }
 }
 
@@ -3230,12 +3526,12 @@ class _ActionButton extends StatelessWidget {
     final theme = Theme.of(context);
     return InkWell(
       onTap: busy ? null : onTap,
-      borderRadius: BorderRadius.circular(AppRadius.lg),
+      borderRadius: BorderRadius.circular(AppRadius.md),
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+        padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs, horizontal: 2),
         decoration: BoxDecoration(
           color: theme.colorScheme.surface,
-          borderRadius: BorderRadius.circular(AppRadius.lg),
+          borderRadius: BorderRadius.circular(AppRadius.md),
           boxShadow: AppShadows.card,
         ),
         child: Column(
@@ -3247,11 +3543,17 @@ class _ActionButton extends StatelessWidget {
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
                 : Icon(icon, size: 20, color: theme.colorScheme.primary),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: theme.textTheme.labelSmall?.copyWith(
-                color: theme.colorScheme.onSurface,
+            const SizedBox(height: 2),
+            // Shrinks to fit rather than wrapping or clipping — six
+            // buttons share one row, so "Regenerate" has little room.
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                label,
+                maxLines: 1,
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: theme.colorScheme.onSurface,
+                ),
               ),
             ),
           ],
@@ -3278,12 +3580,18 @@ class _AddActivityDialog extends StatefulWidget {
     this.anchorLongitude,
     this.anchorLabel,
     this.existing,
+    this.dayActivities = const [],
   });
 
   final double? anchorLatitude;
   final double? anchorLongitude;
   final String? anchorLabel;
   final ItineraryActivity? existing;
+
+  /// Everything already on the day this activity is going into — used only
+  /// to reject an exact repeat (same title in the same time slot), never
+  /// modified. [existing] itself is ignored when found in here.
+  final List<ItineraryActivity> dayActivities;
 
   @override
   State<_AddActivityDialog> createState() => _AddActivityDialogState();
@@ -3318,7 +3626,29 @@ class _AddActivityDialogState extends State<_AddActivityDialog> {
         )
       : null;
 
-  bool get _isValid => _titleController.text.trim().isNotEmpty;
+  static const int _minTitleLength = 2;
+  static const int _maxTitleLength = 80;
+  static const int _maxDescriptionLength = 300;
+
+  /// Null when the title is acceptable, otherwise why it isn't — shown
+  /// under the field once the traveler has typed something (an untouched
+  /// empty field just keeps the button disabled, without scolding).
+  String? get _titleError {
+    final title = _titleController.text.trim();
+    if (title.isEmpty) return 'Enter what you\'ll be doing';
+    if (title.length < _minTitleLength) return 'Use at least $_minTitleLength characters';
+    if (!RegExp(r'[A-Za-z0-9]').hasMatch(title)) return 'Use letters or numbers';
+    final isRepeat = widget.dayActivities.any(
+      (a) =>
+          !identical(a, widget.existing) &&
+          a.time == _selectedTime &&
+          a.title.trim().toLowerCase() == title.toLowerCase(),
+    );
+    if (isRepeat) return 'Already planned for this day\'s ${_selectedTime.toLowerCase()}';
+    return null;
+  }
+
+  bool get _isValid => _titleError == null;
 
   @override
   void initState() {
@@ -3391,12 +3721,20 @@ class _AddActivityDialogState extends State<_AddActivityDialog> {
             const SizedBox(height: AppSpacing.sm),
             TextField(
               controller: _titleController,
-              decoration: const InputDecoration(labelText: 'Title'),
+              maxLength: _maxTitleLength,
+              textCapitalization: TextCapitalization.sentences,
+              decoration: InputDecoration(
+                labelText: 'Title',
+                counterText: '',
+                errorText: _titleController.text.trim().isEmpty ? null : _titleError,
+              ),
             ),
             const SizedBox(height: AppSpacing.sm),
             TextField(
               controller: _descriptionController,
               maxLines: 2,
+              maxLength: _maxDescriptionLength,
+              textCapitalization: TextCapitalization.sentences,
               decoration: const InputDecoration(
                 labelText: 'Description (optional)',
               ),
@@ -3412,15 +3750,15 @@ class _AddActivityDialogState extends State<_AddActivityDialog> {
                   vertical: AppSpacing.md,
                 ),
                 decoration: BoxDecoration(
-                  border: Border.all(color: AppColors.border),
+                  border: Border.all(color: theme.colorScheme.outline),
                   borderRadius: BorderRadius.circular(AppRadius.md),
                 ),
                 child: Row(
                   children: [
-                    const Icon(
+                    Icon(
                       Symbols.map_rounded,
                       size: 20,
-                      color: AppColors.textSecondary,
+                      color: theme.colorScheme.onSurfaceVariant,
                     ),
                     const SizedBox(width: AppSpacing.sm),
                     Expanded(
@@ -3430,15 +3768,31 @@ class _AddActivityDialogState extends State<_AddActivityDialog> {
                         overflow: TextOverflow.ellipsis,
                         style: theme.textTheme.bodyMedium?.copyWith(
                           color: location == null
-                              ? AppColors.textTertiary
-                              : AppColors.textPrimary,
+                              ? theme.colorScheme.onSurfaceVariant
+                              : theme.colorScheme.onSurface,
                         ),
                       ),
                     ),
-                    const Icon(
-                      Symbols.chevron_right_rounded,
-                      color: AppColors.textTertiary,
-                    ),
+                    // A picked pin could otherwise only ever be swapped for
+                    // another one, never taken back off.
+                    if (location != null)
+                      InkWell(
+                        onTap: () => setState(() => _location = null),
+                        borderRadius: BorderRadius.circular(AppRadius.pill),
+                        child: Padding(
+                          padding: const EdgeInsets.all(4),
+                          child: Icon(
+                            Symbols.close_rounded,
+                            size: 20,
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      )
+                    else
+                      Icon(
+                        Symbols.chevron_right_rounded,
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
                   ],
                 ),
               ),
@@ -4593,19 +4947,11 @@ class _TripDatesCard extends StatelessWidget {
     required this.isOwner,
     required this.onTap,
     required this.onToggleCompleted,
-    required this.totalDays,
   });
 
   final SavedItinerary? trip;
   final bool isOwner;
   final VoidCallback? onTap;
-
-  /// [Itinerary.totalDays] — the Weather Outlook's forecast window is the
-  /// trip's whole span, not just its start date (see
-  /// [_GeneratedItineraryScreenState._refreshWeatherForDate]), so the latest
-  /// *startable* date within Open-Meteo's 16-day forecast range is 16 minus
-  /// this, not a flat 16 days from today.
-  final int totalDays;
 
   /// Owner-only — null (from a collaborator viewing someone else's trip)
   /// hides this row entirely rather than showing it read-only, since a
@@ -4619,6 +4965,15 @@ class _TripDatesCard extends StatelessWidget {
     final startDate = trip?.startDate;
     final endDate = trip?.endDate;
     final completed = trip?.isCompleted ?? false;
+    // Offering "Mark this trip as completed" on a trip that was planned a
+    // minute ago (or is still weeks away) is just noise — it appears once
+    // the start date has arrived, and stays visible whenever the trip
+    // already is completed so that can still be seen and undone.
+    final now = DateTime.now();
+    final hasStarted =
+        startDate != null &&
+        !DateTime(startDate.year, startDate.month, startDate.day).isAfter(DateTime(now.year, now.month, now.day));
+    final showCompletedRow = completed || (onToggleCompleted != null && hasStarted);
     final label = startDate == null
         ? 'Set your travel dates'
         : (endDate != null && !_isSameDay(startDate, endDate))
@@ -4635,7 +4990,7 @@ class _TripDatesCard extends StatelessWidget {
         children: [
           InkWell(
             onTap: onTap,
-            borderRadius: onToggleCompleted != null
+            borderRadius: showCompletedRow
                 ? const BorderRadius.vertical(
                     top: Radius.circular(AppRadius.lg),
                   )
@@ -4671,44 +5026,16 @@ class _TripDatesCard extends StatelessWidget {
               ),
             ),
           ),
-          // Set here rather than only after the traveler picks an
-          // out-of-range date and sees the Weather Outlook's fallback
-          // message — telling them up front is more useful than a surprise
-          // after the fact. Only shown to the owner, who's the only one who
-          // can actually pick a date (see [onTap]). Stated as the actual
-          // cutoff date rather than a raw day count — reads as a real
-          // forecast-provider limit rather than an arbitrary app rule, and
-          // stays correct without the reader doing their own date math.
-          if (isOwner && onTap != null && totalDays <= 16)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.md,
-                0,
-                AppSpacing.md,
-                AppSpacing.sm,
-              ),
-              child: Row(
-                children: [
-                  const SizedBox(width: 24 + AppSpacing.sm),
-                  Expanded(
-                    child: Text(
-                      'Choose a date before '
-                      '${DateFormat('MMM d, y').format(DateTime.now().add(Duration(days: 16 - totalDays)))} '
-                      'to see the live weather forecast.',
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+          // The forecast-range notice that used to sit here now lives in the
+          // Weather Outlook's own always-visible box (see
+          // [_GeneratedItineraryScreenState._buildWeatherOutlook]) — two
+          // notices saying the same thing a few rows apart read as a bug.
           // Shown to a non-owner collaborator too, read-only, once the trip
           // actually is completed — the owner-only toggle affordance is
           // what's gated to [onToggleCompleted], not visibility of the
           // status itself; otherwise a collaborator had no way to tell the
           // owner had already marked the trip done.
-          if (onToggleCompleted != null || completed) ...[
+          if (showCompletedRow) ...[
             const Divider(height: 1),
             InkWell(
               onTap: onToggleCompleted,
@@ -4938,7 +5265,19 @@ class _DayCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Day\'s Route', style: theme.textTheme.titleSmall),
+                  // A day with no activity resolved to a real place only
+                  // has `matchDayToRoute`'s destination anchor to show — the
+                  // same single pin on every such day — so say so rather
+                  // than calling an identical map each day's "route".
+                  if (routeStops.every((s) => s.time == 'Overview')) ...[
+                    Text('Trip Destination', style: theme.textTheme.titleSmall),
+                    const SizedBox(height: 2),
+                    Text(
+                      'No mapped stops for this day yet — activities with a location will appear here as its route.',
+                      style: theme.textTheme.bodySmall,
+                    ),
+                  ] else
+                    Text('Day\'s Route', style: theme.textTheme.titleSmall),
                   const SizedBox(height: AppSpacing.sm),
                   TripRouteMap(stops: routeStops),
                 ],
@@ -5146,3 +5485,31 @@ class _TimelineActivity extends StatelessWidget {
     );
   }
 }
+
+/// Opens the same add/edit activity dialog this screen's "Add Activity"
+/// uses — exposed so the manual "Create your own itinerary" form can collect
+/// a day's activities before the trip itself exists. Resolves to null when
+/// dismissed.
+Future<ItineraryActivity?> showActivityDialog(
+  BuildContext context, {
+  double? anchorLatitude,
+  double? anchorLongitude,
+  String? anchorLabel,
+  ItineraryActivity? existing,
+  List<ItineraryActivity> dayActivities = const [],
+}) {
+  return showDialog<ItineraryActivity>(
+    context: context,
+    builder: (context) => _AddActivityDialog(
+      anchorLatitude: anchorLatitude,
+      anchorLongitude: anchorLongitude,
+      anchorLabel: anchorLabel,
+      existing: existing,
+      dayActivities: dayActivities,
+    ),
+  );
+}
+
+/// The most activities one day may hold — far above any real day's plan,
+/// and low enough that a runaway list can't bloat the trip document.
+const int maxActivitiesPerDay = 20;

@@ -18,14 +18,104 @@ import '../../domain/models/saved_itinerary.dart';
 /// A month-grid view of every saved trip that has a travel date set —
 /// owned trips and ones shared with the traveler — so they can see at a
 /// glance where they'll be on any given day.
-class TripCalendarScreen extends StatefulWidget {
+///
+/// Saved Trips opens this as a dialog ([showTripCalendarDialog]); the
+/// full-screen form is what the `/trip-calendar` route itself still shows.
+class TripCalendarScreen extends StatelessWidget {
   const TripCalendarScreen({super.key});
 
   @override
-  State<TripCalendarScreen> createState() => _TripCalendarScreenState();
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Symbols.arrow_back_rounded),
+          onPressed: () => context.popOrGo(RoutePaths.savedItineraries),
+        ),
+        title: const Text('Trip Calendar'),
+      ),
+      body: const TripCalendarView(),
+    );
+  }
 }
 
-class _TripCalendarScreenState extends State<TripCalendarScreen> {
+/// The trip calendar as a dialog over the current screen. Picking a trip
+/// closes it and opens that trip from [context] — the screen underneath —
+/// since the dialog's own context is gone by then.
+Future<void> showTripCalendarDialog(BuildContext context) {
+  return showDialog<void>(
+    context: context,
+    // Root navigator so it also covers the shell's floating AI Chat button.
+    useRootNavigator: true,
+    builder: (dialogContext) => Dialog(
+      clipBehavior: Clip.antiAlias,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 420),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.lg,
+                AppSpacing.sm,
+                AppSpacing.xs,
+                0,
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Trip Calendar',
+                      style: Theme.of(dialogContext).textTheme.titleLarge,
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: MaterialLocalizations.of(
+                      dialogContext,
+                    ).closeButtonTooltip,
+                    icon: const Icon(Symbols.close_rounded),
+                    onPressed: () => Navigator.of(dialogContext).pop(),
+                  ),
+                ],
+              ),
+            ),
+            Flexible(
+              child: TripCalendarView(
+                shrinkWrap: true,
+                onOpenTrip: (trip) {
+                  Navigator.of(dialogContext).pop();
+                  if (!context.mounted) return;
+                  context.push(
+                    RoutePaths.generatedItinerary,
+                    extra: {'itinerary': trip.itinerary, 'savedId': trip.id},
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+/// The calendar itself — month switcher, grid, and the "no dated trips"
+/// hint — without any page chrome around it.
+class TripCalendarView extends StatefulWidget {
+  const TripCalendarView({super.key, this.shrinkWrap = false, this.onOpenTrip});
+
+  /// True inside a dialog, so it's only as tall as the month it shows.
+  final bool shrinkWrap;
+
+  /// What picking a trip does; by default it's pushed onto this view's own
+  /// navigator.
+  final void Function(SavedItinerary trip)? onOpenTrip;
+
+  @override
+  State<TripCalendarView> createState() => _TripCalendarViewState();
+}
+
+class _TripCalendarViewState extends State<TripCalendarView> {
   late DateTime _visibleMonth = DateTime(
     DateTime.now().year,
     DateTime.now().month,
@@ -77,6 +167,8 @@ class _TripCalendarScreenState extends State<TripCalendarScreen> {
   }
 
   void _openTrip(BuildContext context, SavedItinerary trip) {
+    final onOpenTrip = widget.onOpenTrip;
+    if (onOpenTrip != null) return onOpenTrip(trip);
     context.push(
       RoutePaths.generatedItinerary,
       extra: {'itinerary': trip.itinerary, 'savedId': trip.id},
@@ -90,15 +182,9 @@ class _TripCalendarScreenState extends State<TripCalendarScreen> {
     final repository = ItineraryRepository();
     final today = CalendarGrid.dateOnly(DateTime.now());
 
-    return Scaffold(
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Symbols.arrow_back_rounded),
-          onPressed: () => context.popOrGo(RoutePaths.savedItineraries),
-        ),
-        title: const Text('Trip Calendar'),
-      ),
-      body: uid == null
+    return Material(
+      type: MaterialType.transparency,
+      child: uid == null
           ? const EmptyStateWidget(
               icon: Symbols.calendar_month_rounded,
               title: 'Sign in required',
@@ -120,6 +206,7 @@ class _TripCalendarScreenState extends State<TripCalendarScreen> {
                 final hasAnyDates = trips.any((t) => t.startDate != null);
 
                 return ListView(
+                  shrinkWrap: widget.shrinkWrap,
                   padding: const EdgeInsets.all(AppSpacing.lg),
                   children: [
                     Row(

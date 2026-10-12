@@ -471,8 +471,8 @@ class _ProvinceDetailsBody extends StatelessWidget {
 /// name overlay stays exactly as designed.
 ///
 /// When a province has no curated `heroImageUrl`/`galleryImageUrls` on file
-/// yet (most of them, until an LGU/admin fills them in — see
-/// `AdminBulkProvinceContentScreen`), this falls back to a real Google
+/// yet (most of them, until an LGU/admin fills them in), this falls back to
+/// a real Google
 /// Places photo of the province itself instead of a flat tinted rectangle —
 /// the same "never show nothing when live data can fill the gap"
 /// principle `NearbyPlacesSection` already applies to attractions/dining.

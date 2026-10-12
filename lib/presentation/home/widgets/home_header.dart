@@ -40,7 +40,23 @@ class HomeHeader extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text('$_greeting,', style: theme.textTheme.bodyMedium),
-              Text('$userName 👋', style: theme.textTheme.headlineLarge),
+              Text.rich(
+                TextSpan(
+                  text: '$userName ',
+                  children: [
+                    WidgetSpan(
+                      alignment: PlaceholderAlignment.middle,
+                      child: Icon(
+                        Symbols.waving_hand_rounded,
+                        size: theme.textTheme.headlineLarge?.fontSize,
+                        color: theme.colorScheme.tertiary,
+                        fill: 1,
+                      ),
+                    ),
+                  ],
+                ),
+                style: theme.textTheme.headlineLarge,
+              ),
             ],
           ),
         ),

@@ -63,6 +63,24 @@ class AppColors {
   static const Color categoryResort = Color(0xFF0606F9);
   static const Color categoryHostel = Color(0xFFC038FA);
 
+  // ---- Admin Portal ----
+  // The portal's identity color (sidebar, overview hero, selected nav),
+  // plus one accent per overview card so each module/queue reads as
+  // distinct at a glance. Every card also carries its own icon and label,
+  // so identity never depends on hue alone.
+  //
+  // The identity was briefly a violet and is back on the brand blue; these
+  // three keep their names because every portal screen already refers to
+  // them.
+  static const Color adminViolet = primary;
+  static const Color adminVioletLight = primaryLight;
+  static const Color adminLavender = Color(0xFFEAF5FC);
+  static const Color adminBlue = Color(0xFF2F8FEA);
+  static const Color adminPink = Color(0xFFD264C8);
+  static const Color adminGreen = Color(0xFF34B37A);
+  static const Color adminOrange = Color(0xFFF2994A);
+  static const Color adminTeal = Color(0xFF2BB8C4);
+
   static const Color border = Color(0xFFE5E9F0);
   static const Color divider = Color(0xFFEFF2F6);
   static const Color shimmerBase = Color(0xFFE9EDF3);

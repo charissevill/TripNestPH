@@ -4,18 +4,19 @@ import 'package:material_symbols_icons/symbols.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/providers/auth_provider.dart';
-import '../../core/routes/back_navigation.dart';
 import '../../core/routes/route_paths.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/utils/app_exception.dart';
 import '../../core/widgets/dialogs/confirmation_dialog.dart';
+import '../../core/widgets/layout/scroll_aware_search_header.dart';
 import '../../core/widgets/states/empty_state_widget.dart';
 import '../../core/widgets/states/loading_widget.dart';
 import '../../data/repositories/admin_repository.dart';
 import '../../data/repositories/festival_repository.dart';
 import '../../domain/models/admin_user.dart';
 import '../../domain/models/festival.dart';
+import 'widgets/admin_page_header.dart';
 
 enum _FestivalSort { name, date, province, upcoming }
 
@@ -174,20 +175,19 @@ class _AdminFestivalListScreenState extends State<AdminFestivalListScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Symbols.arrow_back_rounded),
-          onPressed: () => context.popOrGo(RoutePaths.adminHome),
-        ),
-        title: const Text('Festivals'),
+      appBar: adminPageHeader(
+        context,
+        title: 'Festivals',
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _openForm(),
         child: const Icon(Symbols.add_rounded),
       ),
       body: SafeArea(
-        child: Column(
-          children: [
+        // Search + sort slide away while scrolling and return on scroll-up.
+        child: CollapsibleSearchHeader(
+          header: Column(
+            children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(
                 AppSpacing.lg,
@@ -247,8 +247,9 @@ class _AdminFestivalListScreenState extends State<AdminFestivalListScreen> {
                 ],
               ),
             ),
-            Expanded(
-              child: RefreshIndicator(
+            ],
+          ),
+          body: RefreshIndicator(
                 onRefresh: _refresh,
                 child: FutureBuilder<List<Festival>>(
                   future: _future,
@@ -353,8 +354,6 @@ class _AdminFestivalListScreenState extends State<AdminFestivalListScreen> {
                   },
                 ),
               ),
-            ),
-          ],
         ),
       ),
     );

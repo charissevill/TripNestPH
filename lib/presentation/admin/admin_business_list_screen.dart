@@ -4,8 +4,6 @@ import 'package:provider/provider.dart';
 import '../../core/utils/maps_launcher.dart';
 
 import '../../core/providers/auth_provider.dart';
-import '../../core/routes/back_navigation.dart';
-import '../../core/routes/route_paths.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/utils/app_exception.dart';
@@ -23,6 +21,21 @@ import '../../domain/models/app_notification.dart';
 import '../../domain/models/business.dart';
 import '../../domain/models/business_permit.dart';
 import '../../domain/models/review.dart';
+import 'widgets/admin_page_header.dart';
+import 'widgets/admin_search_sort_bar.dart';
+
+enum _BusinessSort { newest, name, status, category, province }
+
+const Map<_BusinessSort, String> _businessSortLabels = {
+  _BusinessSort.newest: 'Newest first',
+  _BusinessSort.name: 'Name (A–Z)',
+  _BusinessSort.status: 'Status',
+  _BusinessSort.category: 'Category',
+  _BusinessSort.province: 'Province',
+};
+
+/// What's waiting on a decision first, when sorting by status.
+const List<String> _statusOrder = ['pending', 'approved', 'suspended', 'rejected'];
 
 /// Approval queue for `businessOwner` self-service listings — approve,
 /// reject (with a reason the owner sees), suspend an already-approved
@@ -53,17 +66,88 @@ class _AdminBusinessListScreenState extends State<AdminBusinessListScreen> {
   bool get _isLguScoped =>
       _admin?.role == AdminRole.lgu && _admin?.provinceId != null;
 
+  // Held in state so typing in the search box doesn't resubscribe (and
+  // flash the loading skeleton) on every rebuild. Null until [_loadAdmin]
+  // knows whose queue this is — an LGU account can only query its own
+  // province's listings.
+  Stream<List<Business>>? _stream;
+  final TextEditingController _search = TextEditingController();
+  _BusinessSort _sort = _BusinessSort.newest;
+
   @override
   void initState() {
     super.initState();
     _loadAdmin();
   }
 
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+
+  /// [businesses] (already newest-first from the stream) narrowed to the
+  /// search text and put in the chosen order.
+  List<Business> _visible(List<Business> businesses) {
+    final query = _search.text.trim().toLowerCase();
+    final matches = businesses
+        .where(
+          (b) =>
+              query.isEmpty ||
+              b.name.toLowerCase().contains(query) ||
+              b.provinceName.toLowerCase().contains(query) ||
+              BusinessCategory.label(b.category).toLowerCase().contains(query),
+        )
+        .toList();
+    int byName(Business a, Business b) =>
+        a.name.toLowerCase().compareTo(b.name.toLowerCase());
+    int then(int first, Business a, Business b) =>
+        first != 0 ? first : byName(a, b);
+    switch (_sort) {
+      case _BusinessSort.newest:
+        break;
+      case _BusinessSort.name:
+        matches.sort(byName);
+      case _BusinessSort.status:
+        int rank(Business b) {
+          final i = _statusOrder.indexOf(b.status);
+          return i < 0 ? _statusOrder.length : i;
+        }
+        matches.sort((a, b) => then(rank(a).compareTo(rank(b)), a, b));
+      case _BusinessSort.category:
+        matches.sort(
+          (a, b) => then(
+            BusinessCategory.label(
+              a.category,
+            ).compareTo(BusinessCategory.label(b.category)),
+            a,
+            b,
+          ),
+        );
+      case _BusinessSort.province:
+        matches.sort(
+          (a, b) => then(a.provinceName.compareTo(b.provinceName), a, b),
+        );
+    }
+    return matches;
+  }
+
   Future<void> _loadAdmin() async {
     final uid = context.read<AuthProvider>().firebaseUser?.uid;
     if (uid == null) return;
-    final admin = await AdminRepository().getById(uid);
-    if (mounted) setState(() => _admin = admin);
+    AdminUser? admin;
+    try {
+      admin = await AdminRepository().getById(uid);
+    } catch (_) {
+      // Falls through to the unscoped query, whose own error then shows.
+    }
+    if (!mounted) return;
+    setState(() {
+      _admin = admin;
+      _stream = _repository.streamAllForAdmin(
+        provinceId: admin?.role == AdminRole.lgu ? admin?.provinceId : null,
+      );
+    });
   }
 
   /// For a [Business.isFoodAndDining] listing, materializes (or
@@ -300,31 +384,34 @@ class _AdminBusinessListScreenState extends State<AdminBusinessListScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        // Explicit rather than the implied arrow, which vanished whenever
-        // the desktop sidebar opened this screen with `go` — every other
-        // admin section keeps its Back button there.
-        leading: IconButton(
-          icon: const Icon(Symbols.arrow_back_rounded),
-          onPressed: () => context.popOrGo(RoutePaths.adminHome),
-        ),
-        title: const Text('Businesses'),
+      appBar: adminPageHeader(
+        context,
+        title: 'Businesses',
       ),
       body: SafeArea(
         child: StreamBuilder<List<Business>>(
-          stream: _repository.streamAllForAdmin(),
+          stream: _stream,
           builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
+            if (_stream == null ||
+                snapshot.connectionState == ConnectionState.waiting) {
               return ListView(
                 children: List.generate(4, (_) => LoadingWidget.cardBlock()),
               );
             }
-            final businesses = (snapshot.data ?? const [])
+            // A failed load isn't "no listings" — say what went wrong.
+            if (snapshot.hasError) {
+              return EmptyStateWidget(
+                icon: Symbols.error_outline_rounded,
+                title: 'Couldn\'t load businesses',
+                message: AppException.from(snapshot.error!).message,
+              );
+            }
+            final all = (snapshot.data ?? const <Business>[])
                 .where(
                   (b) => !_isLguScoped || b.provinceId == _admin!.provinceId,
                 )
                 .toList();
-            if (businesses.isEmpty) {
+            if (all.isEmpty) {
               return const EmptyStateWidget(
                 icon: Symbols.storefront_rounded,
                 title: 'No business listings yet',
@@ -332,6 +419,8 @@ class _AdminBusinessListScreenState extends State<AdminBusinessListScreen> {
                     'Submissions from business owner accounts will show up here.',
               );
             }
+            final businesses = _visible(all);
+            // Index 0 is the search + sort bar, so it scrolls with the list.
             return ListView.builder(
               padding: const EdgeInsets.fromLTRB(
                 AppSpacing.lg,
@@ -339,9 +428,29 @@ class _AdminBusinessListScreenState extends State<AdminBusinessListScreen> {
                 AppSpacing.lg,
                 AppSpacing.huge,
               ),
-              itemCount: businesses.length,
-              itemBuilder: (context, i) {
-                final business = businesses[i];
+              itemCount: (businesses.isEmpty ? 1 : businesses.length) + 1,
+              itemBuilder: (context, index) {
+                if (index == 0) {
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: AppSpacing.md),
+                    child: AdminSearchSortBar<_BusinessSort>(
+                      controller: _search,
+                      hintText: 'Search businesses...',
+                      onQueryChanged: () => setState(() {}),
+                      sort: _sort,
+                      sortLabels: _businessSortLabels,
+                      onSortChanged: (sort) => setState(() => _sort = sort),
+                    ),
+                  );
+                }
+                if (businesses.isEmpty) {
+                  return const EmptyStateWidget(
+                    icon: Symbols.search_off_rounded,
+                    title: 'No matches',
+                    message: 'No business listings match your search.',
+                  );
+                }
+                final business = businesses[index - 1];
                 return Card(
                   margin: const EdgeInsets.only(bottom: AppSpacing.sm),
                   child: Padding(

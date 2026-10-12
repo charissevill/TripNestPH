@@ -47,9 +47,27 @@ void main() {
     await tester.scrollUntilVisible(
       find.text('Alona Beach'),
       300,
-      scrollable: find.byType(Scrollable),
+      // The dashboard's own list — the search field has a Scrollable too.
+      scrollable: find.byType(Scrollable).first,
     );
     expect(find.text('Alona Beach'), findsOneWidget);
+  });
+
+  testWidgets('searching narrows the dashboard to the matching metrics', (tester) async {
+    final firestore = FakeFirebaseFirestore();
+    await firestore.collection('users').add({'status': 'active'});
+
+    await tester.pumpWidget(_wrap(AdminAnalyticsScreen(firestore: firestore)));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(TextField), 'festival');
+    await tester.pumpAndSettle();
+    expect(find.text('Festivals'), findsOneWidget);
+    expect(find.text('Total Travelers'), findsNothing);
+
+    await tester.enterText(find.byType(TextField), 'zzz');
+    await tester.pumpAndSettle();
+    expect(find.text('No metrics match "zzz".'), findsOneWidget);
   });
 
   testWidgets('shows the traveler-growth trend chart once at least 2 daily snapshots exist', (tester) async {
@@ -63,10 +81,10 @@ void main() {
     await tester.scrollUntilVisible(
       find.text('Traveler Growth'),
       300,
-      scrollable: find.byType(Scrollable),
+      scrollable: find.byType(Scrollable).first,
     );
     expect(find.text('Traveler Growth'), findsOneWidget);
-    expect(find.text('Total signed-up travelers, last 2 days'), findsOneWidget);
+    expect(find.text('+5 new travelers, last 2 days'), findsOneWidget);
   });
 
   testWidgets('hides the trend chart when fewer than 2 daily snapshots exist', (tester) async {

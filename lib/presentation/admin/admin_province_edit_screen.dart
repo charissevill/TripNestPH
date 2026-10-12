@@ -17,8 +17,8 @@ import '../../core/widgets/states/empty_state_widget.dart';
 import '../../core/widgets/states/loading_widget.dart';
 import '../../data/repositories/province_repository.dart';
 import '../../domain/models/province.dart';
-import '../../core/routes/back_navigation.dart';
 import '../../core/routes/route_paths.dart';
+import 'widgets/admin_page_header.dart';
 
 /// LGU/admin form for a single province's page content — the in-app answer
 /// to Phase 1's "~68 provinces are still content coming soon" gap. Every
@@ -188,12 +188,10 @@ class _AdminProvinceEditScreenState extends State<AdminProvinceEditScreen> {
     return DiscardChangesScope(
       isDirty: _dirty,
       child: Scaffold(
-        appBar: AppBar(
-          leading: IconButton(
-            icon: const Icon(Symbols.arrow_back_rounded),
-            onPressed: () => context.popOrGo(RoutePaths.adminProvinces),
-          ),
-          title: const Text('Edit Province'),
+        appBar: adminPageHeader(
+          context,
+          title: 'Edit Province',
+          backTo: RoutePaths.adminProvinces,
         ),
         body: SafeArea(
           child: FutureBuilder<Province?>(
@@ -201,6 +199,14 @@ class _AdminProvinceEditScreenState extends State<AdminProvinceEditScreen> {
             builder: (context, snapshot) {
               if (snapshot.connectionState != ConnectionState.done) {
                 return LoadingWidget.block(height: 400);
+              }
+              // A failed load isn't a missing province — say what went wrong.
+              if (snapshot.hasError) {
+                return EmptyStateWidget(
+                  icon: Symbols.error_outline_rounded,
+                  title: 'Couldn\'t load this province',
+                  message: AppException.from(snapshot.error!).message,
+                );
               }
               final province = snapshot.data;
               if (province == null) {

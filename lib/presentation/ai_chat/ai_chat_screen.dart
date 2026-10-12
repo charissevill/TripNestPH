@@ -40,6 +40,7 @@ import '../../core/widgets/cards/restaurant_card.dart';
 import '../../core/widgets/details/business_info_sheet.dart';
 import '../../core/widgets/details/place_details_sheet.dart';
 import '../../core/widgets/dialogs/confirmation_dialog.dart';
+import '../../core/widgets/dialogs/number_prompt_dialog.dart';
 import '../../core/widgets/layout/max_width_container.dart';
 import '../../data/repositories/business_repository.dart';
 import '../../data/repositories/destination_repository.dart';
@@ -2027,9 +2028,30 @@ class _TravelerCountDialogState extends State<_TravelerCountDialog> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  '$_count ${_count == 1 ? 'traveler' : 'travelers'}',
-                  style: theme.textTheme.titleMedium,
+                InkWell(
+                  onTap: () async {
+                    final typed = await promptForNumber(
+                      context,
+                      title: 'How many travelers?',
+                      initial: _count,
+                      min: min,
+                      max: max,
+                    );
+                    if (typed != null && mounted) {
+                      setState(() => _count = typed);
+                    }
+                  },
+                  borderRadius: BorderRadius.circular(AppRadius.sm),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: Text(
+                      '$_count ${_count == 1 ? 'traveler' : 'travelers'}',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        decoration: TextDecoration.underline,
+                        decorationStyle: TextDecorationStyle.dotted,
+                      ),
+                    ),
+                  ),
                 ),
                 Row(
                   children: [

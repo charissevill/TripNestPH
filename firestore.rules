@@ -24,6 +24,12 @@ service cloud.firestore {
       return 'readBy' in resource.data ? resource.data.readBy : [];
     }
 
+    // Same idea for a traveler "deleting" a broadcast from their own inbox:
+    // the shared doc stays, and they add their own uid to `dismissedBy`.
+    function oldNotificationDismissedBy() {
+      return 'dismissedBy' in resource.data ? resource.data.dismissedBy : [];
+    }
+
     // ---- Data validation helpers ------------------------------------------
     // Defense-in-depth: the app's own form validation already keeps ratings
     // in range and comments a sane length, but these rules stop a malicious
@@ -304,20 +310,46 @@ service cloud.firestore {
 
     // ---- restaurants/{id} — mirrored from an approved foodAndDining ------
     // businessOwner listing (see the class doc on Business), never authored
-    // directly. `create`/`delete` happen only as a side effect of an admin
-    // approving/deleting that business (never a direct traveler or
-    // business-owner create) — LGU is deliberately excluded here, unlike
-    // tourist_spots/festivals, since restaurant sourcing is fully owner-
-    // driven now. The linked owner can keep their own listing's info in
-    // sync post-approval, but can never flip `status` themselves (that
+    // directly. `create` happens only as a side effect of that business
+    // going live: by its owner right after publishing it, or by an admin
+    // approving one that was still pending. `delete` only as a side effect
+    // of an admin deleting the business — LGU is deliberately excluded
+    // here, unlike tourist_spots/festivals, since restaurant sourcing is
+    // fully owner-driven now. The linked owner can keep their own listing's
+    // info in sync afterwards, but can never flip `status` themselves (that
     // follows their business's approval state) or touch the aggregate
     // rating/reviewCount.
     match /restaurants/{restaurantId} {
+      // The owner's own live Food & Dining listing that has no restaurant
+      // doc yet — so each listing can be mirrored exactly once, and never
+      // while it's pending/rejected/suspended.
+      function isOwnUnmirroredFoodBusiness(businessId) {
+        return get(/databases/$(database)/documents/businesses/$(businessId)).data.ownerId == request.auth.uid
+          && get(/databases/$(database)/documents/businesses/$(businessId)).data.status == 'approved'
+          && get(/databases/$(database)/documents/businesses/$(businessId)).data.category == 'foodAndDining'
+          && get(/databases/$(database)/documents/businesses/$(businessId)).data.get('restaurantId', '') == '';
+      }
       allow get: if isSignedIn();
       allow list: if isSignedIn() && (resource.data.status == 'published' || hasAdminRole(['admin']));
-      allow create, delete: if hasAdminRole(['admin']);
+      // The LGU branch (canManageProvince) is the same side effect in its
+      // own province: approving a still-pending Food & Dining listing from
+      // the Businesses queue materializes its restaurant doc.
+      allow create: if canManageProvince(request.resource.data.provinceId)
+                    || (hasAdminRole(['businessOwner'])
+                        && request.resource.data.ownerId == request.auth.uid
+                        && request.resource.data.status == 'published'
+                        && request.resource.data.rating == 0
+                        && request.resource.data.reviewCount == 0
+                        && request.resource.data.isPopular == false
+                        && isOwnUnmirroredFoodBusiness(request.resource.data.businessId));
+      allow delete: if hasAdminRole(['admin']);
       allow update: if (isSignedIn() && isValidAggregateUpdate())
                     || hasAdminRole(['admin'])
+                    // An LGU suspending or reactivating a listing in its own
+                    // province takes the mirrored restaurant down or puts it
+                    // back with it — `status` and nothing else.
+                    || (hasAdminRole(['lgu']) && adminData().provinceId == resource.data.provinceId
+                        && onlyChangedFields(['status']))
                     || (hasAdminRole(['businessOwner']) && resource.data.ownerId == request.auth.uid
                         && request.resource.data.ownerId == request.auth.uid
                         && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['status', 'rating', 'reviewCount', 'ownerId', 'businessId']));
@@ -584,9 +616,16 @@ service cloud.firestore {
         resource.data.status == 'approved' || resource.data.ownerId == request.auth.uid
         || canManageProvince(resource.data.provinceId)
       );
+      // A new listing goes live as 'approved' straight away — the
+      // businessOwner role is itself only ever granted by an admin (an
+      // approved application's permit and ID, or a direct invite), so the
+      // owner is already verified and there's no second review. Moderation
+      // happens afterwards, through the admin/LGU suspend branch below.
+      // 'pending' stays accepted for app builds from before that change.
       allow create: if hasAdminRole(['businessOwner'])
                     && request.resource.data.ownerId == request.auth.uid
-                    && request.resource.data.status == 'pending';
+                    && request.resource.data.status in ['pending', 'approved']
+                    && !('restaurantId' in request.resource.data);
       // The owner can edit their info freely, and additionally — only as
       // part of the same write — move their own listing from rejected
       // back to pending (fix-and-resubmit). They can never set 'approved'
@@ -604,6 +643,17 @@ service cloud.firestore {
                         !request.resource.data.diff(resource.data).affectedKeys().hasAny(['status', 'rejectionReason', 'ownerId', 'restaurantId'])
                         || (resource.data.status == 'rejected' && request.resource.data.status == 'pending' && request.resource.data.rejectionReason == '')
                       ))
+                    // The owner linking their own live listing to the
+                    // restaurant doc they just mirrored it into (see the
+                    // restaurants create rule) — once only, and only to a
+                    // restaurant that is theirs and points back at this
+                    // exact listing.
+                    || (hasAdminRole(['businessOwner']) && resource.data.ownerId == request.auth.uid
+                      && onlyChangedFields(['restaurantId'])
+                      && resource.data.status == 'approved'
+                      && resource.data.get('restaurantId', '') == ''
+                      && get(/databases/$(database)/documents/restaurants/$(request.resource.data.restaurantId)).data.ownerId == request.auth.uid
+                      && get(/databases/$(database)/documents/restaurants/$(request.resource.data.restaurantId)).data.businessId == businessId)
                     // Admin (any province) or the LGU whose province this
                     // listing belongs to: status/rejectionReason for
                     // approve/reject/suspend, and restaurantId the one time a
@@ -729,12 +779,12 @@ service cloud.firestore {
     // ---- business_owner_applications/{id} — self-service "I own a
     // business" application, offered right after registration
     // (RoleSelectionScreen). Deliberately NOT instant self-service: granting
-    // the actual `businessOwner` role happens only through the existing
-    // admin_invites staging + self-claim flow (AdminRepository.createInvite/
-    // claimInvite, the same mechanism a manually-invited admin already
-    // uses) once an admin approves this application — letting a traveler
-    // self-grant businessOwner directly here would bypass that entirely and
-    // let anyone immediately satisfy businesses.create's role check below.
+    // the actual `businessOwner` role happens only when an admin approves
+    // this application and creates the applicant's admin_users doc
+    // (AdminRepository.grantRole, through admin_users' admin-only create
+    // rule above) — letting a traveler self-grant businessOwner directly
+    // here would bypass that entirely and let anyone immediately satisfy
+    // businesses.create's role check below.
     function isValidBusinessOwnerApplication() {
       return request.resource.data.businessName is string && request.resource.data.businessName.size() > 0 && request.resource.data.businessName.size() <= 100
         && request.resource.data.category in ['accommodation', 'foodAndDining', 'tourOperator', 'shop', 'transport', 'other']
@@ -803,16 +853,43 @@ service cloud.firestore {
                     || (isSignedIn() && resource.data.userId == '' && onlyChangedFields(['readBy'])
                         && request.resource.data.readBy.hasOnly(oldNotificationReadBy().concat([request.auth.uid]))
                         && oldNotificationReadBy().hasOnly(request.resource.data.readBy))
+                    // Deleting a broadcast from one's own inbox — same
+                    // append-only-your-own-uid guard, on `dismissedBy`.
+                    || (isSignedIn() && resource.data.userId == '' && onlyChangedFields(['dismissedBy'])
+                        && request.resource.data.dismissedBy.hasOnly(oldNotificationDismissedBy().concat([request.auth.uid]))
+                        && oldNotificationDismissedBy().hasOnly(request.resource.data.dismissedBy))
                     || hasAdminRole(['admin', 'lgu']);
-      // Broadcasts (empty userId) stay admin+lgu, matching the "Send
-      // Announcement" tile both roles see. A personal notification (e.g.
-      // "your business listing was approved/rejected/suspended") is
-      // admin-only, since only admin ever changes a business's status.
-      allow create: if (hasAdminRole(['admin', 'lgu']) && request.resource.data.userId == '')
-                    || (hasAdminRole(['admin']) && request.resource.data.userId is string && request.resource.data.userId != '');
+      // A broadcast (empty userId) reaches every traveler nationwide, so
+      // only an admin sends one — an LGU's "Send Announcement" goes through
+      // province_announcements below instead. A personal notification
+      // (e.g. "your business listing was approved/rejected/suspended") can
+      // come from either, since an LGU moderates the listings in its own
+      // province too.
+      allow create: if (hasAdminRole(['admin']) && request.resource.data.userId is string)
+                    || (hasAdminRole(['lgu']) && request.resource.data.userId is string && request.resource.data.userId != '');
       // A traveler may delete their own personal notifications (account
       // deletion cleanup); broadcasts stay admin/lgu-only, same as create.
       allow delete: if (isSignedIn() && resource.data.userId == request.auth.uid) || hasAdminRole(['admin', 'lgu']);
+    }
+
+    // ---- province_announcements/{id} — an LGU's "Send Announcement" -------
+    // Not something a traveler ever reads: the deliverProvinceAnnouncement
+    // Cloud Function (Admin SDK) turns each one into personal notifications
+    // for the travelers with a saved trip or a favorite in that province.
+    // An LGU can only ever announce to its own province (canManageProvince),
+    // and one is never edited or removed once sent.
+    match /province_announcements/{announcementId} {
+      allow read: if canManageProvince(resource.data.provinceId);
+      allow create: if request.resource.data.provinceId is string
+                    && canManageProvince(request.resource.data.provinceId)
+                    && request.resource.data.createdBy == request.auth.uid
+                    && request.resource.data.title is string
+                    && request.resource.data.title.size() > 0 && request.resource.data.title.size() <= 100
+                    && request.resource.data.body is string
+                    && request.resource.data.body.size() > 0 && request.resource.data.body.size() <= 500
+                    // Set only by the function, once it has delivered.
+                    && !('recipientCount' in request.resource.data);
+      allow update, delete: if false;
     }
 
     // ---- rate_limits/{id} --------------------------------------------------

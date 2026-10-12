@@ -55,8 +55,6 @@ class RoutePaths {
   static const String adminBroadcast = '/admin/broadcast';
   static const String adminAnalytics = '/admin/analytics';
   static const String adminUsers = '/admin/users';
-  static const String adminBulkImport = '/admin/bulk-import';
-  static const String adminBulkProvinceContent = '/admin/bulk-province-content';
   static const String myBusiness = '/my-business';
   static const String adminBusinessOwnerApplications =
       '/admin/business-owner-applications';

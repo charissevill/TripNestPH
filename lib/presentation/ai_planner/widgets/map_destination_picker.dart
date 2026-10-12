@@ -23,6 +23,11 @@ class MapPickedLocation {
     required this.longitude,
   });
 
+  /// What [name] is when the pin couldn't be reverse-geocoded — callers that
+  /// would show it as a title (a trip's name) check for it to ask for a
+  /// real one instead.
+  static const String fallbackName = 'Pinned location';
+
   final String name;
   final double latitude;
   final double longitude;
@@ -69,6 +74,21 @@ class MapDestinationPicker extends StatefulWidget {
 class _MapDestinationPickerState extends State<MapDestinationPicker> {
   static const _wholeCountryPosition = CameraPosition(target: LatLng(12.8797, 121.7740), zoom: 5.3);
   static const _anchorRadiusKm = 100.0;
+
+  /// A loose box around the whole Philippines — an instant, offline first
+  /// check that a pin is at least plausibly in the country. The reverse
+  /// geocode in [_dropPin] is still the precise test (this box also covers
+  /// some neighboring sea and the tip of Sabah), but that one silently
+  /// passes when the lookup itself fails, which is exactly when this still
+  /// catches a pin dropped on another continent.
+  static bool _isWithinPhilippinesBounds(LatLng p) =>
+      p.latitude >= 4.2 && p.latitude <= 21.5 && p.longitude >= 116.0 && p.longitude <= 127.0;
+
+  void _showOutsidePhilippinesMessage() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('That\'s outside the Philippines — pick a spot within the country.')),
+    );
+  }
 
   GoogleMapController? _mapController;
   final TextEditingController _searchController = TextEditingController();
@@ -155,6 +175,10 @@ class _MapDestinationPickerState extends State<MapDestinationPicker> {
 
     FocusScope.of(context).unfocus();
     final position = LatLng(lat, lng);
+    if (!_isWithinPhilippinesBounds(position)) {
+      _showOutsidePhilippinesMessage();
+      return;
+    }
     setState(() {
       _picked = position;
       _resolvedName = place.name.isNotEmpty ? place.name : place.address;
@@ -182,6 +206,10 @@ class _MapDestinationPickerState extends State<MapDestinationPicker> {
       );
       return;
     }
+    if (!_isWithinPhilippinesBounds(position)) {
+      _showOutsidePhilippinesMessage();
+      return;
+    }
 
     setState(() {
       _picked = position;
@@ -204,9 +232,7 @@ class _MapDestinationPickerState extends State<MapDestinationPicker> {
           _picked = null;
           _resolvedName = null;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('That\'s outside the Philippines — pick a spot within the country.')),
-        );
+        _showOutsidePhilippinesMessage();
         return;
       }
       setState(() => _resolvedName = result.name);
@@ -260,7 +286,7 @@ class _MapDestinationPickerState extends State<MapDestinationPicker> {
     final name = _resolvedName;
     Navigator.of(context).pop(
       MapPickedLocation(
-        name: (name != null && name.isNotEmpty) ? name : 'Pinned location',
+        name: (name != null && name.isNotEmpty) ? name : MapPickedLocation.fallbackName,
         latitude: picked.latitude,
         longitude: picked.longitude,
       ),

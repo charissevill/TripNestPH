@@ -1,11 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:material_symbols_icons/symbols.dart';
-import 'package:provider/provider.dart';
 
-import '../../core/providers/auth_provider.dart';
-import '../../core/routes/back_navigation.dart';
-import '../../core/routes/route_paths.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/utils/app_exception.dart';
@@ -17,10 +13,22 @@ import '../../core/widgets/states/loading_widget.dart';
 import '../../data/repositories/business_owner_application_repository.dart';
 import '../../domain/models/business.dart';
 import '../../domain/models/business_owner_application.dart';
+import 'widgets/admin_page_header.dart';
+import 'widgets/admin_search_sort_bar.dart';
 
-/// Admin-only queue for [BusinessOwnerApplication]s — approving one stages
-/// an `admin_invites` entry for the applicant (see the repository's
-/// `approve` doc comment), it never grants `businessOwner` directly.
+enum _ApplicationSort { newest, oldest, businessName, applicant, category }
+
+const Map<_ApplicationSort, String> _applicationSortLabels = {
+  _ApplicationSort.newest: 'Newest first',
+  _ApplicationSort.oldest: 'Oldest first',
+  _ApplicationSort.businessName: 'Business name (A–Z)',
+  _ApplicationSort.applicant: 'Applicant (A–Z)',
+  _ApplicationSort.category: 'Category',
+};
+
+/// Admin-only queue for [BusinessOwnerApplication]s — approving one grants
+/// the applicant `businessOwner` right away (see the repository's
+/// `approve` doc comment).
 class AdminBusinessOwnerApplicationsScreen extends StatefulWidget {
   const AdminBusinessOwnerApplicationsScreen({super.key});
 
@@ -31,6 +39,50 @@ class AdminBusinessOwnerApplicationsScreen extends StatefulWidget {
 
 class _AdminBusinessOwnerApplicationsScreenState extends State<AdminBusinessOwnerApplicationsScreen> {
   final _repository = BusinessOwnerApplicationRepository();
+
+  // Held in state so typing in the search box doesn't resubscribe (and
+  // flash the loading block) on every rebuild.
+  late final Stream<List<BusinessOwnerApplication>> _stream = _repository.streamPendingForAdmin();
+  final TextEditingController _search = TextEditingController();
+  _ApplicationSort _sort = _ApplicationSort.newest;
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+
+  /// [applications] narrowed to the search text and put in the chosen order.
+  List<BusinessOwnerApplication> _visible(List<BusinessOwnerApplication> applications) {
+    final query = _search.text.trim().toLowerCase();
+    final matches = applications
+        .where(
+          (a) =>
+              query.isEmpty ||
+              a.businessName.toLowerCase().contains(query) ||
+              a.applicantName.toLowerCase().contains(query) ||
+              a.applicantEmail.toLowerCase().contains(query),
+        )
+        .toList();
+    int byBusiness(BusinessOwnerApplication a, BusinessOwnerApplication b) =>
+        a.businessName.toLowerCase().compareTo(b.businessName.toLowerCase());
+    switch (_sort) {
+      case _ApplicationSort.newest:
+        matches.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      case _ApplicationSort.oldest:
+        matches.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+      case _ApplicationSort.businessName:
+        matches.sort(byBusiness);
+      case _ApplicationSort.applicant:
+        matches.sort((a, b) => a.applicantName.toLowerCase().compareTo(b.applicantName.toLowerCase()));
+      case _ApplicationSort.category:
+        matches.sort((a, b) {
+          final categories = BusinessCategory.label(a.category).compareTo(BusinessCategory.label(b.category));
+          return categories != 0 ? categories : byBusiness(a, b);
+        });
+    }
+    return matches;
+  }
 
   Future<void> _run(Future<void> Function() action) async {
     try {
@@ -47,12 +99,11 @@ class _AdminBusinessOwnerApplicationsScreenState extends State<AdminBusinessOwne
       context,
       title: 'Approve this application?',
       message:
-          '${application.applicantName} will be invited to accept Business Owner access — they still need to accept it on their Profile screen.',
+          '${application.applicantName} will get Business Owner access right away.',
       confirmLabel: 'Approve',
     );
     if (!confirmed || !mounted) return;
-    final adminName = context.read<AuthProvider>().currentUser?.name ?? '';
-    await _run(() => _repository.approve(application, adminName: adminName));
+    await _run(() => _repository.approve(application));
   }
 
   Future<String?> _promptReason() async {
@@ -99,40 +150,64 @@ class _AdminBusinessOwnerApplicationsScreenState extends State<AdminBusinessOwne
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        // Explicit rather than the implied arrow, which vanished whenever
-        // the desktop sidebar opened this screen with `go` — every other
-        // admin section keeps its Back button there.
-        leading: IconButton(
-          icon: const Icon(Symbols.arrow_back_rounded),
-          onPressed: () => context.popOrGo(RoutePaths.adminHome),
-        ),
-        title: const Text('Business Applications'),
+      appBar: adminPageHeader(
+        context,
+        title: 'Business Applications',
       ),
       body: SafeArea(
         child: StreamBuilder<List<BusinessOwnerApplication>>(
-          stream: _repository.streamPendingForAdmin(),
+          stream: _stream,
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
               return LoadingWidget.block(height: 300);
             }
-            final applications = snapshot.data ?? const [];
-            if (applications.isEmpty) {
+            // A failed load isn't "no applications" — say what went wrong.
+            if (snapshot.hasError) {
+              return EmptyStateWidget(
+                icon: Symbols.error_outline_rounded,
+                title: 'Couldn\'t load applications',
+                message: AppException.from(snapshot.error!).message,
+              );
+            }
+            final all = snapshot.data ?? const <BusinessOwnerApplication>[];
+            if (all.isEmpty) {
               return const EmptyStateWidget(
                 icon: Symbols.storefront_rounded,
                 title: 'No pending applications',
                 message: 'New Business Owner applications will show up here.',
               );
             }
+            final applications = _visible(all);
+            // Index 0 is the search + sort bar, so it scrolls with the list.
             return ListView.separated(
               padding: const EdgeInsets.all(AppSpacing.lg),
-              itemCount: applications.length,
+              itemCount: (applications.isEmpty ? 1 : applications.length) + 1,
               separatorBuilder: (_, _) => const SizedBox(height: AppSpacing.md),
-              itemBuilder: (context, i) => _ApplicationCard(
-                application: applications[i],
-                onApprove: () => _approve(applications[i]),
-                onReject: () => _reject(applications[i]),
-              ),
+              itemBuilder: (context, index) {
+                if (index == 0) {
+                  return AdminSearchSortBar<_ApplicationSort>(
+                    controller: _search,
+                    hintText: 'Search by business or applicant...',
+                    onQueryChanged: () => setState(() {}),
+                    sort: _sort,
+                    sortLabels: _applicationSortLabels,
+                    onSortChanged: (sort) => setState(() => _sort = sort),
+                  );
+                }
+                if (applications.isEmpty) {
+                  return const EmptyStateWidget(
+                    icon: Symbols.search_off_rounded,
+                    title: 'No matches',
+                    message: 'No pending applications match your search.',
+                  );
+                }
+                final application = applications[index - 1];
+                return _ApplicationCard(
+                  application: application,
+                  onApprove: () => _approve(application),
+                  onReject: () => _reject(application),
+                );
+              },
             );
           },
         ),

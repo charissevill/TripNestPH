@@ -1,5 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:provider/provider.dart';
@@ -21,6 +22,7 @@ import '../../data/repositories/itinerary_repository.dart';
 import '../../domain/models/expense.dart';
 import '../../domain/models/packing_item.dart';
 import '../../domain/models/saved_itinerary.dart';
+import 'trip_calendar_screen.dart';
 
 /// Every trip the signed-in traveler has saved from the trip planner, plus
 /// any trip a friend has shared with them — "View Saved Trips" from the
@@ -206,29 +208,15 @@ class _SavedItinerariesScreenState extends State<SavedItinerariesScreen> {
     final repository = ItineraryRepository();
 
     return Scaffold(
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Symbols.arrow_back_rounded),
-          onPressed: () => context.popOrGo(RoutePaths.profile),
-        ),
-        title: const Text('Saved Trips'),
-        actions: [
-          if (uid != null) ...[
-            IconButton(
-              icon: const Icon(Symbols.calendar_month_rounded),
-              tooltip: 'Trip calendar',
-              onPressed: () => context.push(RoutePaths.tripCalendar),
-            ),
-            IconButton(
-              icon: const Icon(Symbols.group_add_rounded),
-              tooltip: 'Join a shared trip',
-              onPressed: () => _joinTrip(repository, uid),
-            ),
-          ],
-        ],
-      ),
       body: Column(
         children: [
+          _SavedTripsHeader(
+            onBack: () => context.popOrGo(RoutePaths.profile),
+            onCalendar: uid == null
+                ? null
+                : () => showTripCalendarDialog(context),
+            onJoin: uid == null ? null : () => _joinTrip(repository, uid),
+          ),
           const OfflineBanner(),
           Expanded(
             child: uid == null
@@ -242,6 +230,7 @@ class _SavedItinerariesScreenState extends State<SavedItinerariesScreen> {
                     builder: (context, snapshot) {
                       if (snapshot.connectionState == ConnectionState.waiting) {
                         return ListView(
+                          padding: EdgeInsets.zero,
                           children: List.generate(
                             4,
                             (_) => LoadingWidget.listRow(),
@@ -258,7 +247,12 @@ class _SavedItinerariesScreenState extends State<SavedItinerariesScreen> {
                         );
                       }
                       return ListView.separated(
-                        padding: const EdgeInsets.all(AppSpacing.lg),
+                        padding: const EdgeInsets.fromLTRB(
+                          AppSpacing.md,
+                          AppSpacing.xs,
+                          AppSpacing.md,
+                          AppSpacing.xl,
+                        ),
                         itemCount: trips.length,
                         separatorBuilder: (_, _) =>
                             const SizedBox(height: AppSpacing.md),
@@ -328,109 +322,145 @@ class _SavedItineraryTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(AppRadius.lg),
-      child: Container(
-        padding: const EdgeInsets.all(AppSpacing.md),
-        decoration: BoxDecoration(
-          color: theme.colorScheme.surface,
-          borderRadius: BorderRadius.circular(AppRadius.lg),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
-              blurRadius: 12,
-              offset: const Offset(0, 6),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(AppRadius.md),
-              child: SizedBox(
-                width: 52,
-                height: 52,
-                child: trip.itinerary.coverImageUrl.isNotEmpty
-                    ? CachedNetworkImage(
-                        imageUrl: trip.itinerary.coverImageUrl,
-                        fit: BoxFit.cover,
-                        placeholder: (context, url) =>
-                            _TripThumbFallback(isOwner: isOwner),
-                        errorWidget: (context, url, error) =>
-                            _TripThumbFallback(isOwner: isOwner),
-                      )
-                    : _TripThumbFallback(isOwner: isOwner),
-              ),
-            ),
-            const SizedBox(width: AppSpacing.md),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(trip.title, style: theme.textTheme.titleMedium),
-                  const SizedBox(height: 2),
-                  Text(
-                    isOwner
-                        ? '${trip.itinerary.destinationName} · ${trip.itinerary.totalDays} days'
-                        : '${trip.itinerary.destinationName} · Shared with you',
-                    style: theme.textTheme.bodySmall,
-                  ),
-                  if (trip.itinerary.totalBudget > 0 ||
-                      trip.packingItems.isNotEmpty ||
-                      trip.isCompleted) ...[
-                    const SizedBox(height: 4),
-                    Wrap(
-                      spacing: AppSpacing.sm,
-                      runSpacing: 4,
-                      children: [
-                        if (trip.isCompleted)
-                          const _MetricPill(
-                            icon: Symbols.check_circle_rounded,
-                            label: 'Completed',
-                            color: AppColors.success,
-                          ),
-                        if (trip.itinerary.totalBudget > 0)
-                          _BudgetProgressPill(trip: trip),
-                        if (trip.packingItems.isNotEmpty)
-                          _PackingProgressPill(items: trip.packingItems),
-                      ],
+    final days = trip.itinerary.totalDays;
+    final hasPills =
+        trip.itinerary.totalBudget > 0 ||
+        trip.packingItems.isNotEmpty ||
+        isAvailableOffline;
+    return Container(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(AppRadius.xl),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.06),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Material(
+        type: MaterialType.transparency,
+        borderRadius: BorderRadius.circular(AppRadius.xl),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.sm),
+            child: LayoutBuilder(
+              builder: (context, constraints) => IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _TripCover(
+                      trip: trip,
+                      isOwner: isOwner,
+                      // Narrow phones give the text column the room instead.
+                      width: constraints.maxWidth < 320 ? 84 : 112,
                     ),
-                  ],
-                  if (isAvailableOffline) ...[
-                    const SizedBox(height: 2),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            trip.title,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(height: AppSpacing.xxs),
+                          _TripInfoRow(
+                            icon: Symbols.location_on_rounded,
+                            label: trip.itinerary.destinationName,
+                          ),
+                          const SizedBox(height: 2),
+                          _TripInfoRow(
+                            icon: Symbols.calendar_month_rounded,
+                            label: days == 1 ? '1 day' : '$days days',
+                          ),
+                          if (hasPills) ...[
+                            const SizedBox(height: AppSpacing.xs),
+                            Wrap(
+                              spacing: AppSpacing.xs,
+                              runSpacing: 6,
+                              children: [
+                                if (trip.itinerary.totalBudget > 0)
+                                  _BudgetProgressPill(trip: trip),
+                                if (trip.packingItems.isNotEmpty)
+                                  _PackingProgressPill(
+                                    items: trip.packingItems,
+                                  ),
+                                if (isAvailableOffline)
+                                  _MetricPill(
+                                    icon: Symbols.offline_pin_rounded,
+                                    label: 'Offline',
+                                    color: theme.colorScheme.primary,
+                                  ),
+                              ],
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                    Column(
                       children: [
-                        Icon(
-                          Symbols.offline_pin_rounded,
-                          size: 14,
-                          color: theme.colorScheme.primary,
-                        ),
-                        const SizedBox(width: 2),
-                        Text(
-                          'Available offline',
-                          style: theme.textTheme.labelSmall?.copyWith(
+                        _buildTopAction(theme),
+                        const SizedBox(height: AppSpacing.xxs),
+                        Container(
+                          width: 34,
+                          height: 34,
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.primary.withValues(
+                              alpha: 0.1,
+                            ),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            Symbols.chevron_right_rounded,
+                            size: 22,
                             color: theme.colorScheme.primary,
                           ),
                         ),
                       ],
                     ),
                   ],
-                ],
+                ),
               ),
             ),
-            if (isDownloading)
-              const Padding(
-                padding: EdgeInsets.all(AppSpacing.sm),
-                child: SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                ),
-              )
-            else if (isOwner)
-              PopupMenuButton<VoidCallback?>(
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// The control above the chevron: a download spinner, the owner's
+  /// overflow menu, or "leave" for a trip someone else shared.
+  Widget _buildTopAction(ThemeData theme) {
+    if (isDownloading) {
+      return const SizedBox(
+        width: 48,
+        height: 48,
+        child: Center(
+          child: SizedBox(
+            width: 18,
+            height: 18,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        ),
+      );
+    }
+    if (!isOwner) {
+      return IconButton(
+        icon: const Icon(Symbols.logout_rounded, color: AppColors.error),
+        tooltip: 'Leave trip',
+        onPressed: onLeave,
+      );
+    }
+    return PopupMenuButton<VoidCallback?>(
                 icon: const Icon(
                   Symbols.more_vert_rounded,
                   color: AppColors.textSecondary,
@@ -484,18 +514,295 @@ class _SavedItineraryTile extends StatelessWidget {
                     ),
                   ),
                 ],
-              )
-            else
-              IconButton(
-                icon: const Icon(
-                  Symbols.logout_rounded,
-                  color: AppColors.error,
-                ),
-                onPressed: onLeave,
+    );
+  }
+}
+
+/// The "Saved Trips" title block that stands in for an app bar: the same
+/// travel artwork the sign-in screens use, faded into the page so the title
+/// stays legible, with the calendar and join actions as round buttons.
+class _SavedTripsHeader extends StatelessWidget {
+  const _SavedTripsHeader({required this.onBack, this.onCalendar, this.onJoin});
+
+  final VoidCallback onBack;
+  final VoidCallback? onCalendar;
+  final VoidCallback? onJoin;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final background = theme.scaffoldBackgroundColor;
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: isDark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark,
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: Opacity(
+              opacity: isDark ? 0.25 : 1,
+              child: Image.asset(
+                'assets/images/bg.png',
+                fit: BoxFit.cover,
+                // The band of sky just above the artwork's shoreline.
+                alignment: const Alignment(0, 0.5),
               ),
-          ],
+            ),
+          ),
+          Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
+                  colors: [
+                    background.withValues(alpha: 0.9),
+                    background.withValues(alpha: 0),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  stops: const [0.6, 1],
+                  colors: [background.withValues(alpha: 0), background],
+                ),
+              ),
+            ),
+          ),
+          Padding(
+            padding: EdgeInsets.fromLTRB(
+              AppSpacing.xxs,
+              MediaQuery.paddingOf(context).top + AppSpacing.xs,
+              AppSpacing.md,
+              AppSpacing.xl,
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                IconButton(
+                  icon: const Icon(Symbols.arrow_back_rounded),
+                  tooltip: 'Back',
+                  onPressed: onBack,
+                ),
+                const SizedBox(width: AppSpacing.xxs),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Saved Trips',
+                        style: theme.textTheme.headlineMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              'Your dream trips, all in one place',
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: AppSpacing.xxs),
+                          Icon(
+                            Symbols.favorite_rounded,
+                            size: 16,
+                            color: theme.colorScheme.primary,
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                if (onCalendar != null) ...[
+                  const SizedBox(width: AppSpacing.xs),
+                  _HeaderRoundButton(
+                    icon: Symbols.calendar_month_rounded,
+                    tooltip: 'Trip calendar',
+                    onPressed: onCalendar!,
+                  ),
+                ],
+                if (onJoin != null) ...[
+                  const SizedBox(width: AppSpacing.xs),
+                  _HeaderRoundButton(
+                    icon: Symbols.group_add_rounded,
+                    tooltip: 'Join a shared trip',
+                    onPressed: onJoin!,
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HeaderRoundButton extends StatelessWidget {
+  const _HeaderRoundButton({
+    required this.icon,
+    required this.tooltip,
+    required this.onPressed,
+  });
+
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Material(
+      color: theme.colorScheme.surface,
+      shape: const CircleBorder(),
+      elevation: 3,
+      shadowColor: Colors.black.withValues(alpha: 0.25),
+      child: IconButton(
+        icon: Icon(icon, color: theme.colorScheme.primary),
+        tooltip: tooltip,
+        onPressed: onPressed,
+      ),
+    );
+  }
+}
+
+/// The trip's cover photo, as tall as its card, with a badge over the corner
+/// for the two states worth spotting while scrolling: finished, and shared
+/// by someone else.
+class _TripCover extends StatelessWidget {
+  const _TripCover({
+    required this.trip,
+    required this.isOwner,
+    required this.width,
+  });
+
+  final SavedItinerary trip;
+  final bool isOwner;
+  final double width;
+
+  @override
+  Widget build(BuildContext context) {
+    final coverUrl = trip.itinerary.coverImageUrl;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(AppRadius.md),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(minHeight: width),
+        child: SizedBox(
+          width: width,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              if (coverUrl.isNotEmpty)
+                CachedNetworkImage(
+                  imageUrl: coverUrl,
+                  fit: BoxFit.cover,
+                  placeholder: (context, url) =>
+                      _TripThumbFallback(isOwner: isOwner),
+                  errorWidget: (context, url, error) =>
+                      _TripThumbFallback(isOwner: isOwner),
+                )
+              else
+                _TripThumbFallback(isOwner: isOwner),
+              if (trip.isCompleted || !isOwner)
+                Positioned(
+                  top: 6,
+                  left: 6,
+                  right: 6,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (trip.isCompleted)
+                        const _CoverBadge(
+                          icon: Symbols.check_circle_rounded,
+                          label: 'Completed',
+                        ),
+                      if (trip.isCompleted && !isOwner)
+                        const SizedBox(height: AppSpacing.xxs),
+                      if (!isOwner)
+                        const _CoverBadge(
+                          icon: Symbols.group_rounded,
+                          label: 'Shared',
+                        ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
+    );
+  }
+}
+
+class _CoverBadge extends StatelessWidget {
+  const _CoverBadge({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: const Color(0xE61F2937),
+        borderRadius: BorderRadius.circular(AppRadius.pill),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12, color: AppColors.textOnDark),
+          const SizedBox(width: 3),
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: AppColors.textOnDark,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// One icon-and-text line under a trip's title (where it is, how long).
+class _TripInfoRow extends StatelessWidget {
+  const _TripInfoRow({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final color = theme.colorScheme.onSurfaceVariant;
+    return Row(
+      children: [
+        Icon(icon, size: 16, color: color),
+        const SizedBox(width: AppSpacing.xxs),
+        Expanded(
+          child: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.bodySmall?.copyWith(color: color),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -540,16 +847,16 @@ class _MetricPill extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
+        color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(AppRadius.pill),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 12, color: color),
-          const SizedBox(width: 3),
+          Icon(icon, size: 14, color: color),
+          const SizedBox(width: 4),
           Text(
             label,
             style: theme.textTheme.labelSmall?.copyWith(
@@ -581,10 +888,10 @@ class _BudgetProgressPill extends StatelessWidget {
         final spent = expenses.fold<double>(0, (sum, e) => sum + e.amount);
         final overBudget = spent > trip.itinerary.totalBudget;
         return _MetricPill(
-          icon: Symbols.payments_rounded,
+          icon: Symbols.account_balance_wallet_rounded,
           label:
               '₱${spent.toStringAsFixed(0)} / ₱${trip.itinerary.totalBudget.toStringAsFixed(0)}',
-          color: overBudget ? AppColors.error : AppColors.textSecondary,
+          color: overBudget ? AppColors.error : AppColors.primaryDark,
         );
       },
     );
@@ -604,9 +911,11 @@ class _PackingProgressPill extends StatelessWidget {
     final checked = items.where((i) => i.checked).length;
     final allPacked = checked == items.length;
     return _MetricPill(
-      icon: Symbols.checklist_rounded,
+      icon: allPacked
+          ? Symbols.check_circle_rounded
+          : Symbols.inventory_2_rounded,
       label: '$checked/${items.length} packed',
-      color: allPacked ? AppColors.success : AppColors.textSecondary,
+      color: AppColors.secondaryDark,
     );
   }
 }

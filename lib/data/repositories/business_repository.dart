@@ -56,15 +56,38 @@ class BusinessRepository {
   }
 
   /// Batched lookup by id — see `RestaurantRepository.getByIds` for the same
-  /// pattern. No `status` filter needed here (unlike that one): this
-  /// collection's read rule is evaluated per returned doc, so a since-
-  /// suspended/rejected listing just silently drops out of the result
-  /// instead of failing the whole query.
+  /// pattern, `status` filter included. Security rules aren't filters:
+  /// `firestore.rules` only lets a traveler read a listing that's
+  /// 'approved', and Firestore rejects a whole query that *could* return
+  /// anything else — so without the filter this failed with
+  /// permission-denied for every traveler and their saved Local Finds
+  /// came back empty. A since-suspended/rejected listing just drops out.
   Future<List<Business>> getByIds(List<String> ids) async {
     if (ids.isEmpty) return [];
     try {
       final snapshot = await _collection
           .where(FieldPath.documentId, whereIn: ids.take(30).toList())
+          .where('status', isEqualTo: 'approved')
+          .get();
+      return snapshot.docs.map(_fromDoc).toList();
+    } catch (e) {
+      throw AppException.from(e);
+    }
+  }
+
+  /// Approved listings whose mirrored `restaurants` doc is one of
+  /// [restaurantIds]. A Food & Dining listing is saved (and reviewed) under
+  /// that restaurant id rather than its own — see
+  /// `businessFavoriteAndReviewTarget` — so this is how a saved one is found
+  /// again as the Local Find it was saved from.
+  Future<List<Business>> getApprovedByRestaurantIds(
+    List<String> restaurantIds,
+  ) async {
+    if (restaurantIds.isEmpty) return [];
+    try {
+      final snapshot = await _collection
+          .where('status', isEqualTo: 'approved')
+          .where('restaurantId', whereIn: restaurantIds.take(30).toList())
           .get();
       return snapshot.docs.map(_fromDoc).toList();
     } catch (e) {
@@ -80,12 +103,16 @@ class BusinessRepository {
         .map((s) => s.docs.map(_fromDoc).toList());
   }
 
+  /// Goes live straight away: holding the `businessOwner` role already
+  /// means an admin verified this owner (their application's permit and ID,
+  /// or a direct invite), so there's no second review of the listing — an
+  /// admin/LGU moderates it afterwards by suspending it instead.
   Future<String> create(Business business) async {
     try {
       final doc = await _collection.add({
         ...business.toInfoMap(),
         'ownerId': business.ownerId,
-        'status': 'pending',
+        'status': 'approved',
         'rejectionReason': '',
         'viewCount': 0,
         'createdAt': FieldValue.serverTimestamp(),
@@ -164,7 +191,31 @@ class BusinessRepository {
 
   /// Admin-only queue — every business regardless of status, matching the
   /// `getAllForProvinceAdmin` pattern in `DestinationRepository`.
-  Stream<List<Business>> streamAllForAdmin() {
+  ///
+  /// An 'lgu' account has to pass its own [provinceId]: `firestore.rules`
+  /// only lets it read listings in that province, and rejects a query that
+  /// isn't provably limited to them. That query is sorted here rather than
+  /// by Firestore, which would need a composite index for it.
+  Stream<List<Business>> streamAllForAdmin({String? provinceId}) {
+    if (provinceId != null) {
+      return _collection
+          .where('provinceId', isEqualTo: provinceId)
+          .snapshots()
+          .map((s) {
+            // Newest first; a listing whose server timestamp hasn't
+            // resolved yet is the newest of all.
+            int millis(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
+              final createdAt = doc.data()['createdAt'];
+              return createdAt is Timestamp
+                  ? createdAt.millisecondsSinceEpoch
+                  : DateTime.now().millisecondsSinceEpoch;
+            }
+
+            final docs = [...s.docs]
+              ..sort((a, b) => millis(b).compareTo(millis(a)));
+            return docs.map(_fromDoc).toList();
+          });
+    }
     return _collection
         .orderBy('createdAt', descending: true)
         .snapshots()

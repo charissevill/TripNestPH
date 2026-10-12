@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
-import '../../core/routes/back_navigation.dart';
 import '../../core/routes/route_paths.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
@@ -21,6 +20,16 @@ import '../../domain/models/app_notification.dart';
 import '../../domain/models/content_report.dart';
 import '../../domain/models/review.dart';
 import '../../domain/models/review_report.dart';
+import 'widgets/admin_page_header.dart';
+import 'widgets/admin_search_sort_bar.dart';
+
+enum _ReportSort { newest, oldest, reason }
+
+const Map<_ReportSort, String> _reportSortLabels = {
+  _ReportSort.newest: 'Newest first',
+  _ReportSort.oldest: 'Oldest first',
+  _ReportSort.reason: 'Reason',
+};
 
 /// Admin-only moderation queue: every traveler-filed report, split into two
 /// tabs — reported Reviews (the original screen, unchanged), and reported
@@ -47,10 +56,72 @@ class _AdminReportedReviewsScreenState
   final RestaurantRepository _restaurantRepository = RestaurantRepository();
   final FestivalRepository _festivalRepository = FestivalRepository();
 
+  // Held in state so typing in the search box doesn't resubscribe (and
+  // flash the loading cards) on every rebuild.
+  late final Stream<List<ReviewReport>> _reviewReportsStream =
+      _reportRepository.streamAllForAdmin();
+  late final Stream<List<ContentReport>> _contentReportsStream =
+      _contentReportRepository.streamAllForAdmin();
+
+  // Each card's reported review / listing, fetched once per report — a
+  // lookup started in `build` would otherwise rerun (and blank the card) on
+  // every keystroke in the search box.
+  final Map<String, Future<Review?>> _reviewLookups = {};
+  final Map<String, Future<_TargetInfo?>> _targetLookups = {};
+
+  // One search + sort shared by both tabs.
+  final TextEditingController _search = TextEditingController();
+  _ReportSort _sort = _ReportSort.newest;
+
   @override
   void dispose() {
     _tabController.dispose();
+    _search.dispose();
     super.dispose();
+  }
+
+  /// [reports] narrowed to the search text and put in the chosen order.
+  /// [text] is what a report can be found by — its reason, and for a
+  /// listing report the kind of listing; the reported review or listing
+  /// itself is only fetched per card, so it isn't searchable here.
+  List<T> _visible<T>(
+    List<T> reports, {
+    required String Function(T) text,
+    required String Function(T) reason,
+    required DateTime Function(T) createdAt,
+  }) {
+    final query = _search.text.trim().toLowerCase();
+    final matches = reports
+        .where((r) => query.isEmpty || text(r).toLowerCase().contains(query))
+        .toList();
+    switch (_sort) {
+      case _ReportSort.newest:
+        matches.sort((a, b) => createdAt(b).compareTo(createdAt(a)));
+      case _ReportSort.oldest:
+        matches.sort((a, b) => createdAt(a).compareTo(createdAt(b)));
+      case _ReportSort.reason:
+        matches.sort((a, b) {
+          final reasons = reason(a).compareTo(reason(b));
+          return reasons != 0
+              ? reasons
+              : createdAt(b).compareTo(createdAt(a));
+        });
+    }
+    return matches;
+  }
+
+  Widget _searchSortBar() {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.md),
+      child: AdminSearchSortBar<_ReportSort>(
+        controller: _search,
+        hintText: 'Search by reason...',
+        onQueryChanged: () => setState(() {}),
+        sort: _sort,
+        sortLabels: _reportSortLabels,
+        onSortChanged: (sort) => setState(() => _sort = sort),
+      ),
+    );
   }
 
   Future<void> _dismiss(ReviewReport report) async {
@@ -88,6 +159,8 @@ class _AdminReportedReviewsScreenState
     if (!confirmed || !mounted) return;
     try {
       await _reviewRepository.setHidden(review, hidden);
+      // The card's cached copy of the review is now out of date.
+      if (mounted) setState(() => _reviewLookups.remove(report.id));
       if (hidden) {
         await _reportRepository.dismiss(report.id);
         // The review otherwise just vanished from the listing's page with
@@ -160,12 +233,9 @@ class _AdminReportedReviewsScreenState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Symbols.arrow_back_rounded),
-          onPressed: () => context.popOrGo(RoutePaths.adminHome),
-        ),
-        title: const Text('Reports'),
+      appBar: adminPageHeader(
+        context,
+        title: 'Reports',
         bottom: TabBar(
           controller: _tabController,
           tabs: const [Tab(text: 'Reviews'), Tab(text: 'Listings')],
@@ -182,11 +252,19 @@ class _AdminReportedReviewsScreenState
 
   Widget _buildReviewReports() {
     return StreamBuilder<List<ReviewReport>>(
-      stream: _reportRepository.streamAllForAdmin(),
+      stream: _reviewReportsStream,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return ListView(
             children: List.generate(4, (_) => LoadingWidget.cardBlock()),
+          );
+        }
+        // A failed load isn't "no reports" — say what went wrong.
+        if (snapshot.hasError) {
+          return EmptyStateWidget(
+            icon: Symbols.error_outline_rounded,
+            title: 'Couldn\'t load reports',
+            message: AppException.from(snapshot.error!).message,
           );
         }
         final reports = snapshot.data ?? const [];
@@ -197,6 +275,12 @@ class _AdminReportedReviewsScreenState
             message: 'Reviews travelers flag will show up here.',
           );
         }
+        final visible = _visible<ReviewReport>(
+          reports,
+          text: (r) => ReportReason.label(r.reason),
+          reason: (r) => ReportReason.label(r.reason),
+          createdAt: (r) => r.createdAt,
+        );
         return ListView.builder(
           padding: const EdgeInsets.fromLTRB(
             AppSpacing.lg,
@@ -204,11 +288,24 @@ class _AdminReportedReviewsScreenState
             AppSpacing.lg,
             AppSpacing.huge,
           ),
-          itemCount: reports.length,
-          itemBuilder: (context, i) {
-            final report = reports[i];
+          itemCount: (visible.isEmpty ? 1 : visible.length) + 1,
+          itemBuilder: (context, index) {
+            // Index 0 is the search + sort bar, so it scrolls with the list.
+            if (index == 0) return _searchSortBar();
+            if (visible.isEmpty) {
+              return const EmptyStateWidget(
+                icon: Symbols.search_off_rounded,
+                title: 'No matches',
+                message: 'No reports match your search.',
+              );
+            }
+            final report = visible[index - 1];
             return FutureBuilder<Review?>(
-              future: _reviewRepository.getById(report.reviewId),
+              key: ValueKey(report.id),
+              future: _reviewLookups.putIfAbsent(
+                report.id,
+                () => _reviewRepository.getById(report.reviewId),
+              ),
               builder: (context, reviewSnapshot) {
                 if (reviewSnapshot.connectionState !=
                     ConnectionState.done) {
@@ -238,8 +335,21 @@ class _AdminReportedReviewsScreenState
                             style: TextStyle(color: AppColors.textTertiary),
                           )
                         else ...[
-                          Text(
-                            '${review.authorName} · ${review.rating.toStringAsFixed(1)}★',
+                          Text.rich(
+                            TextSpan(
+                              text: '${review.authorName} · ${review.rating.toStringAsFixed(1)} ',
+                              children: [
+                                WidgetSpan(
+                                  alignment: PlaceholderAlignment.middle,
+                                  child: Icon(
+                                    Symbols.star_rounded,
+                                    size: 14,
+                                    color: Theme.of(context).colorScheme.tertiary,
+                                    fill: 1,
+                                  ),
+                                ),
+                              ],
+                            ),
                             style: Theme.of(context).textTheme.bodySmall,
                           ),
                           const SizedBox(height: 4),
@@ -299,11 +409,19 @@ class _AdminReportedReviewsScreenState
 
   Widget _buildContentReports() {
     return StreamBuilder<List<ContentReport>>(
-      stream: _contentReportRepository.streamAllForAdmin(),
+      stream: _contentReportsStream,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return ListView(
             children: List.generate(4, (_) => LoadingWidget.cardBlock()),
+          );
+        }
+        // A failed load isn't "no reports" — say what went wrong.
+        if (snapshot.hasError) {
+          return EmptyStateWidget(
+            icon: Symbols.error_outline_rounded,
+            title: 'Couldn\'t load reports',
+            message: AppException.from(snapshot.error!).message,
           );
         }
         final reports = snapshot.data ?? const [];
@@ -314,6 +432,13 @@ class _AdminReportedReviewsScreenState
             message: 'Listings travelers flag as outdated, closed, or inappropriate will show up here.',
           );
         }
+        final visible = _visible<ContentReport>(
+          reports,
+          text: (r) =>
+              '${ContentReportReason.label(r.reason)} ${r.targetType.name}',
+          reason: (r) => ContentReportReason.label(r.reason),
+          createdAt: (r) => r.createdAt,
+        );
         return ListView.builder(
           padding: const EdgeInsets.fromLTRB(
             AppSpacing.lg,
@@ -321,11 +446,24 @@ class _AdminReportedReviewsScreenState
             AppSpacing.lg,
             AppSpacing.huge,
           ),
-          itemCount: reports.length,
-          itemBuilder: (context, i) {
-            final report = reports[i];
+          itemCount: (visible.isEmpty ? 1 : visible.length) + 1,
+          itemBuilder: (context, index) {
+            // Index 0 is the search + sort bar, so it scrolls with the list.
+            if (index == 0) return _searchSortBar();
+            if (visible.isEmpty) {
+              return const EmptyStateWidget(
+                icon: Symbols.search_off_rounded,
+                title: 'No matches',
+                message: 'No reports match your search.',
+              );
+            }
+            final report = visible[index - 1];
             return FutureBuilder<_TargetInfo?>(
-              future: _loadTarget(report),
+              key: ValueKey(report.id),
+              future: _targetLookups.putIfAbsent(
+                report.id,
+                () => _loadTarget(report),
+              ),
               builder: (context, targetSnapshot) {
                 if (targetSnapshot.connectionState != ConnectionState.done) {
                   return const Padding(

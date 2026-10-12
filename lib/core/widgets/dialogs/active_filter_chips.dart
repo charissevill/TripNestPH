@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
 import '../../utils/listing_filters.dart';
+import '../indicators/rating_widget.dart';
 
 /// The "Province X · Rating 4+ · Clear all" row shown under a search bar
 /// once [showSearchFilterSheet] filters are active — shared by Search and
@@ -48,7 +49,7 @@ class ActiveFilterChips extends StatelessWidget {
         if (provinceName != null)
           Chip(label: Text(provinceName!), deleteIcon: const Icon(Symbols.close_rounded, size: 16), onDeleted: onRemoveProvince),
         if (minRating != null)
-          Chip(label: Text('${minRating!.toStringAsFixed(1)}+ ★'), deleteIcon: const Icon(Symbols.close_rounded, size: 16), onDeleted: onRemoveMinRating),
+          Chip(label: MinRatingLabel(rating: minRating!), deleteIcon: const Icon(Symbols.close_rounded, size: 16), onDeleted: onRemoveMinRating),
         if (priceTier != null)
           Chip(label: Text(priceTier!.label), deleteIcon: const Icon(Symbols.close_rounded, size: 16), onDeleted: onRemovePriceTier),
         if (maxDistanceKm != null)

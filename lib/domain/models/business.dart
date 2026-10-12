@@ -66,9 +66,10 @@ class Business {
   final String priceRange;
   final String openingHours;
 
-  /// 'pending' | 'approved' | 'rejected' | 'suspended' — only an admin can
-  /// change this (see `firestore.rules`); the owner can move a 'rejected'
-  /// listing back to 'pending' by resubmitting.
+  /// 'pending' | 'approved' | 'rejected' | 'suspended'. A new listing is
+  /// created 'approved' (see `BusinessRepository.create`); after that only
+  /// an admin can change this (see `firestore.rules`), except that the
+  /// owner can move a 'rejected' listing back to 'pending' by resubmitting.
   final String status;
 
   /// Set by an admin alongside `status: 'rejected'`; cleared on resubmit.

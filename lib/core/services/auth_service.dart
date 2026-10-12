@@ -1,4 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:google_sign_in/google_sign_in.dart';
 
 import '../utils/app_exception.dart';
@@ -48,6 +49,17 @@ class AuthService {
 
   Future<User> signInWithGoogle() async {
     try {
+      // The google_sign_in plugin can't be used on web here: it needs an
+      // OAuth client ID baked into the page (a `google-signin-client_id`
+      // meta tag) that neither web build ships, and without one its init
+      // dies on a null check — which surfaced on the Admin Portal as "We
+      // received an unexpected response". Firebase Auth's own popup flow
+      // needs no client ID at all, only the site's domain being listed
+      // under Authentication > Settings > Authorized domains.
+      if (kIsWeb) {
+        final userCredential = await _auth.signInWithPopup(GoogleAuthProvider());
+        return userCredential.user!;
+      }
       final account = await _googleSignIn.signIn();
       if (account == null) {
         throw const AppException('Sign-in was cancelled.');
@@ -144,6 +156,9 @@ class AuthService {
   }
 
   Future<void> signOut() async {
-    await Future.wait([_auth.signOut(), _googleSignIn.signOut()]);
+    // Web never goes through the google_sign_in plugin (see
+    // signInWithGoogle), so there's no plugin session to clear there — and
+    // calling it would hit the same missing-client-ID failure.
+    await Future.wait([_auth.signOut(), if (!kIsWeb) _googleSignIn.signOut()]);
   }
 }

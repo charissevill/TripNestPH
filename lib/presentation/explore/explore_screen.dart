@@ -25,6 +25,7 @@ import '../../core/widgets/dialogs/active_filter_chips.dart';
 import '../../core/widgets/dialogs/search_filter_sheet.dart';
 import '../../core/widgets/inputs/search_bar_widget.dart';
 import '../../core/widgets/layout/max_width_container.dart';
+import '../../core/widgets/layout/scroll_aware_search_header.dart';
 import '../../core/widgets/navigation/swipe_tab_switcher.dart';
 import '../../core/widgets/states/empty_state_widget.dart';
 import '../../core/widgets/states/loading_widget.dart';
@@ -739,16 +740,19 @@ class _ExploreScreenState extends State<ExploreScreen> {
         // like it already did for width via the responsive column count.
         child: RefreshIndicator(
           onRefresh: _refreshActiveTab,
-          child: SingleChildScrollView(
+          // Still one page-wide scrollable — split into slivers only so the
+          // search bar (and its filter chips) can float back in on
+          // scroll-up instead of staying scrolled off with the title.
+          child: CustomScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
-            child: Column(
-              children: [
-                Padding(
+            slivers: [
+              SliverToBoxAdapter(
+                child: Padding(
                   padding: EdgeInsets.fromLTRB(
                     sidePadding,
                     AppSpacing.sm,
                     sidePadding,
-                    AppSpacing.md,
+                    0,
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -759,7 +763,23 @@ class _ExploreScreenState extends State<ExploreScreen> {
                         'Find your next Philippine adventure',
                         style: theme.textTheme.bodyMedium,
                       ),
-                      const SizedBox(height: AppSpacing.lg),
+                      // Together with the floating header's top padding
+                      // this keeps the original AppSpacing.lg gap.
+                      const SizedBox(height: AppSpacing.lg - AppSpacing.xs),
+                    ],
+                  ),
+                ),
+              ),
+              FloatingSearchHeaderSliver(
+                padding: EdgeInsets.fromLTRB(
+                  sidePadding,
+                  AppSpacing.xs,
+                  sidePadding,
+                  0,
+                ),
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                       SearchBarWidget(
                         readOnly: true,
                         onTap: () => context.push(RoutePaths.search),
@@ -784,7 +804,11 @@ class _ExploreScreenState extends State<ExploreScreen> {
                       ],
                     ],
                   ),
-                ),
+              ),
+              SliverToBoxAdapter(
+                child: Column(
+              children: [
+                const SizedBox(height: AppSpacing.md),
                 SizedBox(
                   height: context.textScaledHeight(56, textLine: 20),
                   child: ListView.separated(
@@ -1010,7 +1034,9 @@ class _ExploreScreenState extends State<ExploreScreen> {
                   },
                 ),
               ],
-            ),
+                ),
+              ),
+            ],
           ),
         ),
       ),

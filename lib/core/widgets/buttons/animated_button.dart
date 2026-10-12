@@ -21,6 +21,8 @@ class AnimatedButton extends StatefulWidget {
     this.labelColor,
     this.strokeLabel = false,
     this.strokeColor = Colors.black,
+    this.trailingIcon,
+    this.borderRadius = AppRadius.lg,
   });
 
   final String label;
@@ -52,6 +54,14 @@ class AnimatedButton extends StatefulWidget {
 
   /// Stroke color used when [strokeLabel] is true.
   final Color strokeColor;
+
+  /// Optional icon shown after the label (e.g. a forward arrow), tinted the
+  /// same way as [icon].
+  final IconData? trailingIcon;
+
+  /// Corner radius — defaults to the standard button radius; pass
+  /// [AppRadius.pill] for a fully rounded CTA.
+  final double borderRadius;
 
   @override
   State<AnimatedButton> createState() => _AnimatedButtonState();
@@ -87,7 +97,7 @@ class _AnimatedButtonState extends State<AnimatedButton>
         border: widget.filled
             ? null
             : Border.all(color: theme.colorScheme.outline, width: 1.4),
-        borderRadius: BorderRadius.circular(AppRadius.lg),
+        borderRadius: BorderRadius.circular(widget.borderRadius),
         boxShadow: (!widget.filled || disabled)
             ? null
             : [
@@ -161,6 +171,19 @@ class _AnimatedButtonState extends State<AnimatedButton>
                     },
                   ),
                 ),
+                if (widget.trailingIcon != null) ...[
+                  const SizedBox(width: AppSpacing.xs),
+                  Icon(
+                    widget.trailingIcon,
+                    size: 20,
+                    color: disabled
+                        ? theme.colorScheme.onSurfaceVariant
+                        : (widget.labelColor ??
+                              (widget.filled
+                                  ? Colors.white
+                                  : theme.colorScheme.primary)),
+                  ),
+                ],
               ],
             ),
     );

@@ -1624,20 +1624,27 @@ final List<Festival> mockFestivals = [
     provinceName: 'Bulacan',
     regionId: 'region-3',
     cityId: 'malolos',
-    latitude: 14.8433,
-    longitude: 120.8114,
-    heroImageUrl: '',
-    galleryImageUrls: const [],
-    dateLabel: 'September 1–15, 2026',
+    latitude: 14.856648,
+    longitude: 120.81424,
+    heroImageUrl:
+        'https://thumb.wikimedia.org/wikipedia/commons/thumb/5/53/Singkaban_Festival_2025_in_Paseo_del_Congreso_St.%2C_Malolos%2C_Bulacan_%281%29.jpg/1280px-Singkaban_Festival_2025_in_Paseo_del_Congreso_St.%2C_Malolos%2C_Bulacan_%281%29.jpg',
+    galleryImageUrls: const [
+      'https://thumb.wikimedia.org/wikipedia/commons/thumb/5/53/Singkaban_Festival_2025_in_Paseo_del_Congreso_St.%2C_Malolos%2C_Bulacan_%281%29.jpg/1280px-Singkaban_Festival_2025_in_Paseo_del_Congreso_St.%2C_Malolos%2C_Bulacan_%281%29.jpg',
+      'https://thumb.wikimedia.org/wikipedia/commons/thumb/1/11/Singkaban_Festival_2025_in_Paseo_del_Congreso_St.%2C_Malolos%2C_Bulacan_%284%29.jpg/1280px-Singkaban_Festival_2025_in_Paseo_del_Congreso_St.%2C_Malolos%2C_Bulacan_%284%29.jpg',
+    ],
+    dateLabel: 'September 8–15, 2027',
     month: 'SEP',
-    startDate: DateTime(2026, 9, 1),
-    endDate: DateTime(2026, 9, 15),
+    startDate: DateTime(2027, 9, 8),
+    endDate: DateTime(2027, 9, 15),
     isUpcoming: true,
     rating: 0,
     reviewCount: 0,
+    venue: 'Bulacan Provincial Capitol grounds, City of Malolos',
     description:
-        'Bulacan\'s founding anniversary festival, tied to Malolos\' role as the seat of the 1898 '
-        'Malolos Congress, celebrated with folk dancing, trade and food fairs and a beauty pageant.',
+        'Bulacan\'s week-long festival of arts, culture and history, held every second week of September. '
+        'It leads up to September 15, the anniversary of the 1898 Malolos Congress, and takes its name from the '
+        'singkaban — the shaved-bamboo arches that decorate the streets. Expect a float parade, street dancing, '
+        'folk dance and music competitions, and a trade and food fair of Bulacan products.',
     highlights: const [
       'Folk dance competition',
       'Trade and food fair',

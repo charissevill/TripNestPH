@@ -1,3 +1,5 @@
+import 'dart:ui' show ImageFilter;
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -17,12 +19,14 @@ import '../../core/widgets/dialogs/confirmation_dialog.dart';
 import '../../core/widgets/layout/max_width_container.dart';
 import '../../core/widgets/media/avatar_preview.dart';
 import '../../data/repositories/admin_repository.dart';
+import '../../data/repositories/business_owner_application_repository.dart';
 import '../../data/repositories/destination_repository.dart';
 import '../../data/repositories/itinerary_repository.dart';
 import '../../data/repositories/review_repository.dart';
 import '../../data/repositories/user_repository.dart';
 import '../../domain/models/admin_invite.dart';
 import '../../domain/models/admin_user.dart';
+import '../../domain/models/business_owner_application.dart';
 import '../../domain/models/destination.dart';
 import '../../core/widgets/media/image_error_placeholder.dart';
 
@@ -342,6 +346,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                 ),
               ],
+              _BusinessDocuments(key: ValueKey(uid), uid: uid),
               const SizedBox(height: AppSpacing.xxl),
               Text('Account', style: theme.textTheme.titleLarge),
               const SizedBox(height: AppSpacing.sm),
@@ -471,6 +476,258 @@ class _MenuTile extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// The permit and valid-ID photos on this account's approved Business Owner
+/// application, so the owner can check what they submitted. Renders nothing
+/// for an account without one (every ordinary traveler).
+class _BusinessDocuments extends StatefulWidget {
+  const _BusinessDocuments({super.key, required this.uid});
+
+  final String? uid;
+
+  @override
+  State<_BusinessDocuments> createState() => _BusinessDocumentsState();
+}
+
+class _BusinessDocumentsState extends State<_BusinessDocuments> {
+  late final Future<BusinessOwnerApplication?> _future = _load();
+  bool _expanded = false;
+
+  Future<BusinessOwnerApplication?> _load() async {
+    final uid = widget.uid;
+    if (uid == null) return null;
+    try {
+      return await BusinessOwnerApplicationRepository()
+          .getLatestApprovedForUser(uid);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return FutureBuilder<BusinessOwnerApplication?>(
+      future: _future,
+      builder: (context, snapshot) {
+        final application = snapshot.data;
+        if (application == null ||
+            (application.permitUrl.isEmpty && application.idUrl.isEmpty)) {
+          return const SizedBox.shrink();
+        }
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: AppSpacing.xxl),
+            // Collapsed until asked for: Profile is an easy screen to have
+            // open around other people, so the photos aren't even built
+            // (or fetched) until the owner taps the heading. Collapsing
+            // again drops the tiles, so they come back blurred.
+            InkWell(
+              onTap: () => setState(() => _expanded = !_expanded),
+              borderRadius: BorderRadius.circular(AppRadius.md),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Business Documents',
+                        style: theme.textTheme.titleLarge,
+                      ),
+                    ),
+                    Icon(
+                      _expanded
+                          ? Symbols.expand_less_rounded
+                          : Symbols.expand_more_rounded,
+                      color: AppColors.textTertiary,
+                      semanticLabel: _expanded ? 'Hide' : 'Show',
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            if (_expanded) ...[
+              const SizedBox(height: AppSpacing.xs),
+              Text(
+                'What you submitted with your Business Owner application. '
+                'Only you and the reviewing admin can see these.',
+                style: theme.textTheme.bodySmall,
+              ),
+              const SizedBox(height: AppSpacing.md),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (application.permitUrl.isNotEmpty)
+                    Expanded(
+                      child: _DocumentTile(
+                        label: 'Business Permit',
+                        imageUrl: application.permitUrl,
+                        startBlurred: true,
+                      ),
+                    ),
+                  if (application.permitUrl.isNotEmpty &&
+                      application.idUrl.isNotEmpty)
+                    const SizedBox(width: AppSpacing.md),
+                  if (application.idUrl.isNotEmpty)
+                    Expanded(
+                      child: _DocumentTile(
+                        label: 'Valid ID',
+                        imageUrl: application.idUrl,
+                        startBlurred: true,
+                      ),
+                    ),
+                ],
+              ),
+            ],
+          ],
+        );
+      },
+    );
+  }
+}
+
+/// A document photo thumbnail that opens full-screen on tap. With
+/// [startBlurred] (both documents — this is a screen that's easy to have
+/// open around other people) it stays blurred until tapped once, and can
+/// be hidden again.
+class _DocumentTile extends StatefulWidget {
+  const _DocumentTile({
+    required this.label,
+    required this.imageUrl,
+    this.startBlurred = false,
+  });
+
+  final String label;
+  final String imageUrl;
+  final bool startBlurred;
+
+  @override
+  State<_DocumentTile> createState() => _DocumentTileState();
+}
+
+class _DocumentTileState extends State<_DocumentTile> {
+  late bool _revealed = !widget.startBlurred;
+
+  void _openFullScreen() {
+    showDialog<void>(
+      context: context,
+      builder: (context) => Dialog.fullscreen(
+        backgroundColor: Colors.black,
+        child: SafeArea(
+          child: Stack(
+            children: [
+              Positioned.fill(
+                child: InteractiveViewer(
+                  maxScale: 5,
+                  child: CachedNetworkImage(
+                    imageUrl: widget.imageUrl,
+                    fit: BoxFit.contain,
+                    errorWidget: (context, url, error) =>
+                        const ImageErrorPlaceholder(
+                          icon: Symbols.description_rounded,
+                        ),
+                  ),
+                ),
+              ),
+              Positioned(
+                top: AppSpacing.sm,
+                right: AppSpacing.sm,
+                child: IconButton(
+                  tooltip: 'Close',
+                  icon: const Icon(Symbols.close_rounded, color: Colors.white),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final image = CachedNetworkImage(
+      imageUrl: widget.imageUrl,
+      fit: BoxFit.cover,
+      errorWidget: (context, url, error) =>
+          const ImageErrorPlaceholder(icon: Symbols.description_rounded),
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          child: AspectRatio(
+            aspectRatio: 4 / 3,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                if (_revealed)
+                  image
+                else
+                  ImageFiltered(
+                    imageFilter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+                    child: image,
+                  ),
+                if (!_revealed)
+                  Container(
+                    color: Colors.black.withValues(alpha: 0.35),
+                    alignment: Alignment.center,
+                    child: const Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Symbols.visibility_off_rounded,
+                          color: Colors.white,
+                        ),
+                        SizedBox(height: 4),
+                        Text(
+                          'Tap to view',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                Positioned.fill(
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: _revealed
+                          ? _openFullScreen
+                          : () => setState(() => _revealed = true),
+                    ),
+                  ),
+                ),
+                if (_revealed && widget.startBlurred)
+                  Positioned(
+                    top: 4,
+                    right: 4,
+                    child: IconButton.filledTonal(
+                      tooltip: 'Hide',
+                      visualDensity: VisualDensity.compact,
+                      icon: const Icon(
+                        Symbols.visibility_off_rounded,
+                        size: 18,
+                      ),
+                      onPressed: () => setState(() => _revealed = false),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        Text(widget.label, style: theme.textTheme.labelLarge),
+      ],
     );
   }
 }

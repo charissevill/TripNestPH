@@ -14,6 +14,7 @@ import '../../core/widgets/states/loading_widget.dart';
 import '../../domain/models/place.dart';
 import '../../core/theme/breakpoints.dart';
 import '../../core/widgets/layout/max_width_container.dart';
+import '../../core/widgets/layout/scroll_aware_search_header.dart';
 import '../../core/routes/back_navigation.dart';
 import '../../core/routes/route_paths.dart';
 
@@ -316,6 +317,13 @@ class _NearbyPlacesScreenState extends State<NearbyPlacesScreen> {
                 ],
               ),
             ),
+            Expanded(
+              // Search bar, category chips and sort slide away together
+              // while scrolling results; the title row above stays.
+              child: CollapsibleSearchHeader(
+                enabled: !widget._isNearbyMode,
+                header: Column(
+                  children: [
             if (!widget._isNearbyMode)
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
@@ -388,8 +396,10 @@ class _NearbyPlacesScreenState extends State<NearbyPlacesScreen> {
               ),
             ),
             const SizedBox(height: AppSpacing.sm),
-            Expanded(
-              child: RefreshIndicator(onRefresh: _load, child: _buildResults()),
+                  ],
+                ),
+                body: RefreshIndicator(onRefresh: _load, child: _buildResults()),
+              ),
             ),
           ],
         ),

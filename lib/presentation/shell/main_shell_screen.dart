@@ -10,6 +10,7 @@ import '../../core/theme/breakpoints.dart';
 import '../../core/widgets/banners/offline_banner.dart';
 import '../../core/widgets/navigation/app_bottom_nav.dart';
 import '../../core/widgets/navigation/app_nav_sidebar.dart';
+import '../../core/widgets/navigation/swipe_tab_switcher.dart';
 import '../../data/repositories/admin_repository.dart';
 import '../../domain/models/admin_user.dart';
 
@@ -93,7 +94,18 @@ class MainShellScreen extends StatelessWidget {
           body: Column(
             children: [
               const OfflineBanner(),
-              Expanded(child: navigationShell),
+              Expanded(
+                // Swipe left/right to move between the bottom-nav tabs —
+                // phone layout only; anything horizontally scrollable
+                // inside a tab (carousels, Explore's own tabs) still gets
+                // the drag first.
+                child: SwipeTabSwitcher(
+                  index: navigationShell.currentIndex,
+                  length: navigationShell.route.branches.length,
+                  onIndexChanged: navigationShell.goBranch,
+                  child: navigationShell,
+                ),
+              ),
             ],
           ),
           floatingActionButton: fab,

@@ -52,6 +52,91 @@ function valueAfterLabel(lines, label, maxLines) {
   return '';
 }
 
+/**
+ * [valueAfterLabel] by position instead of by reading order. `boxes` are the
+ * photo's text lines with where each one sits (see [linesFromVision]).
+ *
+ * Reading order is what breaks on a real permit: OCR walks a two-column
+ * layout row by row, so "NAME OF BUSINESS:" can be followed in the text by
+ * the right-hand column's "TYPE OF PERMIT" rather than by the name printed
+ * right under it. On the page itself there's no such ambiguity — the value
+ * is whatever sits beside the label, or directly beneath it.
+ */
+function valueNearLabel(boxes, label, maxLines) {
+  const height = (b) => Math.max(1, b.y1 - b.y0);
+  const clean = (parts) => parts.join(' ').replace(/\s+/g, ' ').trim();
+  for (const box of boxes) {
+    const match = box.text.match(label);
+    if (!match) continue;
+    const sameLine = box.text.slice(match[0].length).replace(/^[\s:.\-–—]+/, '').trim();
+    if (sameLine) return clean([sameLine]);
+
+    // Beside it: same row, starting to the label's right.
+    const midY = (box.y0 + box.y1) / 2;
+    const beside = boxes
+      .filter((c) => c !== box && c.x0 >= box.x1 && c.y0 <= midY && c.y1 >= midY && !isStop(c.text))
+      .sort((a, b) => a.x0 - b.x0)[0];
+    if (beside && beside.x0 - box.x1 <= 12 * height(box)) return clean([beside.text]);
+
+    // Beneath it: the nearest lines below that share some of its width.
+    const below = boxes
+      .filter((c) => c !== box && c.y0 >= midY && Math.min(c.x1, box.x1) > Math.max(c.x0, box.x0))
+      .sort((a, b) => a.y0 - b.y0);
+    const parts = [];
+    let previous = box;
+    for (const candidate of below) {
+      if (parts.length >= maxLines || isStop(candidate.text)) break;
+      // The first line may sit a little way down (a big-font value under a
+      // small label); later lines of the same value follow closely.
+      const allowedGap = (parts.length ? 1.5 : 6) * height(previous);
+      if (candidate.y0 - previous.y1 > allowedGap) break;
+      parts.push(candidate.text);
+      previous = candidate;
+    }
+    if (parts.length) return clean(parts);
+  }
+  return '';
+}
+
+/**
+ * Vision's `fullTextAnnotation` as a flat list of text lines, each with the
+ * box it occupies: `{ text, x0, y0, x1, y1 }`. Returns [] for anything that
+ * isn't shaped like one.
+ */
+function linesFromVision(annotation) {
+  const lines = [];
+  for (const page of annotation?.pages ?? []) {
+    for (const block of page.blocks ?? []) {
+      for (const paragraph of block.paragraphs ?? []) {
+        let line = null;
+        const flush = () => {
+          if (line && line.text.trim()) lines.push({ ...line, text: line.text.trim() });
+          line = null;
+        };
+        for (const word of paragraph.words ?? []) {
+          const symbols = word.symbols ?? [];
+          const text = symbols.map((s) => s.text ?? '').join('');
+          // Vision omits a coordinate that is 0.
+          const xs = (word.boundingBox?.vertices ?? []).map((v) => v.x ?? 0);
+          const ys = (word.boundingBox?.vertices ?? []).map((v) => v.y ?? 0);
+          if (!text || !xs.length) continue;
+          line ??= { text: '', x0: Infinity, y0: Infinity, x1: -Infinity, y1: -Infinity };
+          line.text += text;
+          line.x0 = Math.min(line.x0, ...xs);
+          line.x1 = Math.max(line.x1, ...xs);
+          line.y0 = Math.min(line.y0, ...ys);
+          line.y1 = Math.max(line.y1, ...ys);
+          const brk = symbols.at(-1)?.property?.detectedBreak?.type;
+          if (brk === 'SPACE' || brk === 'SURE_SPACE') line.text += ' ';
+          else if (brk) flush();
+        }
+        flush();
+      }
+    }
+  }
+  return lines;
+}
+
 /** Every date found in `text`, in order, as `YYYY-MM-DD` strings. */
 function findDates(text) {
   const found = [];
@@ -105,11 +190,18 @@ function findIssuingLgu(lines) {
   return [lgu, province].filter(Boolean).join(', ');
 }
 
-function parsePermitFields(text) {
+/**
+ * `boxes` (optional, from [linesFromVision]) lets each labelled field be
+ * found by where it sits on the page; without them — or for a field the
+ * positions turn up nothing for — it falls back to the text's reading order.
+ */
+function parsePermitFields(text, boxes = []) {
   const lines = String(text ?? '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
   const joined = lines.join('\n');
+  const field = (label, maxLines) =>
+    valueNearLabel(boxes, label, maxLines) || valueAfterLabel(lines, label, maxLines);
 
-  let permitNo = valueAfterLabel(lines, LABELS.permitNo, 1);
+  let permitNo = field(LABELS.permitNo, 1);
   // The number often sits in its own box away from its label, so OCR can
   // emit something else right after "PERMIT NO." — only keep a value that
   // actually looks like a permit number, else fall back to the usual
@@ -119,13 +211,13 @@ function parsePermitFields(text) {
   }
 
   return {
-    businessName: valueAfterLabel(lines, LABELS.businessName, 1),
-    ownerName: valueAfterLabel(lines, LABELS.ownerName, 1),
-    address: valueAfterLabel(lines, LABELS.address, 3),
+    businessName: field(LABELS.businessName, 1),
+    ownerName: field(LABELS.ownerName, 1),
+    address: field(LABELS.address, 3),
     permitNo,
     validUntil: findValidUntil(joined),
     issuingLgu: findIssuingLgu(lines),
   };
 }
 
-module.exports = { parsePermitFields };
+module.exports = { parsePermitFields, linesFromVision };

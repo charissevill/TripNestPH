@@ -5,8 +5,6 @@ import '../../domain/models/festival.dart';
 import '../../domain/models/province.dart';
 import '../../presentation/admin/admin_analytics_screen.dart';
 import '../../presentation/admin/admin_broadcast_screen.dart';
-import '../../presentation/admin/admin_bulk_import_screen.dart';
-import '../../presentation/admin/admin_bulk_province_content_screen.dart';
 import '../../presentation/admin/admin_business_list_screen.dart';
 import '../../presentation/admin/admin_business_owner_applications_screen.dart';
 import '../../presentation/admin/admin_festival_form_screen.dart';
@@ -19,6 +17,7 @@ import '../../presentation/admin/admin_team_screen.dart';
 import '../../presentation/admin/admin_tourist_spot_form_screen.dart';
 import '../../presentation/admin/admin_tourist_spot_list_screen.dart';
 import '../../presentation/admin/admin_user_management_screen.dart';
+import '../../presentation/admin/widgets/admin_page_header.dart';
 import '../../presentation/admin/widgets/admin_sidebar_shell.dart';
 import '../../presentation/auth/forgot_password_screen.dart';
 import '../../presentation/business/my_business_screen.dart';
@@ -65,7 +64,7 @@ GoRouter buildAdminRouter(AuthProvider authProvider) {
     routes: [
       GoRoute(
         path: RoutePaths.splash,
-        builder: (context, state) => const SplashScreen(),
+        builder: (context, state) => const SplashScreen(showOnboarding: false),
       ),
       GoRoute(
         path: RoutePaths.login,
@@ -82,7 +81,7 @@ GoRouter buildAdminRouter(AuthProvider authProvider) {
       ),
       ShellRoute(
         builder: (context, state, child) =>
-            AdminSidebarShell(currentPath: state.matchedLocation, child: child),
+            AdminSidebarShell(currentPath: state.matchedLocation, child: AdminPortalTheme(child: child)),
         routes: [
           GoRoute(
             path: RoutePaths.adminHome,
@@ -157,14 +156,6 @@ GoRouter buildAdminRouter(AuthProvider authProvider) {
           GoRoute(
             path: RoutePaths.adminUsers,
             builder: (context, state) => const AdminUserManagementScreen(),
-          ),
-          GoRoute(
-            path: RoutePaths.adminBulkImport,
-            builder: (context, state) => const AdminBulkImportScreen(),
-          ),
-          GoRoute(
-            path: RoutePaths.adminBulkProvinceContent,
-            builder: (context, state) => const AdminBulkProvinceContentScreen(),
           ),
           GoRoute(
             path: RoutePaths.adminTeam,

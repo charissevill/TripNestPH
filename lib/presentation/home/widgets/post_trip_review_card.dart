@@ -6,6 +6,7 @@ import 'package:material_symbols_icons/symbols.dart';
 import '../../../core/routes/route_paths.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
+import '../../../data/repositories/destination_repository.dart';
 import '../../../data/repositories/itinerary_repository.dart';
 import '../../../data/repositories/review_repository.dart';
 import '../../../domain/models/review.dart';
@@ -45,6 +46,29 @@ class PostTripReviewSection extends StatelessWidget {
     return ended;
   }
 
+  /// The first of [candidates] the traveler hasn't reviewed yet and whose
+  /// destination is an actual catalog listing. A trip planned around a live
+  /// Google Places pick stores that place's id as its `destinationId`, which
+  /// has no details page to review on — so it's skipped rather than nudging
+  /// toward a "couldn't load this destination" dead end.
+  static Future<SavedItinerary?> _firstReviewable(
+    List<SavedItinerary> candidates,
+    String uid,
+  ) async {
+    final reviews = await ReviewRepository().getByUser(uid);
+    final reviewedIds = reviews
+        .where((r) => r.targetType == ReviewTargetType.destination)
+        .map((r) => r.targetId)
+        .toSet();
+    final destinations = DestinationRepository();
+    for (final candidate in candidates) {
+      final destinationId = candidate.itinerary.destinationId!;
+      if (reviewedIds.contains(destinationId)) continue;
+      if (await destinations.getById(destinationId) != null) return candidate;
+    }
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
     if (uid == null) return const SizedBox.shrink();
@@ -54,25 +78,13 @@ class PostTripReviewSection extends StatelessWidget {
         final candidates = _recentlyEnded(tripSnapshot.data ?? const []);
         if (candidates.isEmpty) return const SizedBox.shrink();
 
-        return FutureBuilder<List<Review>>(
+        return FutureBuilder<SavedItinerary?>(
           // A one-shot fetch, not a stream — this is a low-priority nudge,
           // not something that needs to react live to a review written in
           // another tab; it's re-evaluated fresh every time Home rebuilds.
-          future: ReviewRepository().getByUser(uid!),
-          builder: (context, reviewSnapshot) {
-            if (!reviewSnapshot.hasData) return const SizedBox.shrink();
-            final reviewedIds = reviewSnapshot.data!
-                .where((r) => r.targetType == ReviewTargetType.destination)
-                .map((r) => r.targetId)
-                .toSet();
-
-            SavedItinerary? trip;
-            for (final candidate in candidates) {
-              if (!reviewedIds.contains(candidate.itinerary.destinationId)) {
-                trip = candidate;
-                break;
-              }
-            }
+          future: _firstReviewable(candidates, uid!),
+          builder: (context, snapshot) {
+            final trip = snapshot.data;
             if (trip == null) return const SizedBox.shrink();
 
             return Padding(

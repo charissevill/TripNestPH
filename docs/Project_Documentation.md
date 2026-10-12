@@ -94,8 +94,10 @@ securely.
 - **Third-party API dependency.** Weather, routing, place search, and OCR
   features depend on the availability of Google's Places, Routes, Weather,
   and Vision APIs, and the AI chat/itinerary features depend on Groq's API.
-- **Online-only.** The system requires an internet connection for nearly
-  all functionality; there is no offline content cache.
+- **Mostly online.** The system requires an internet connection for nearly
+  all functionality. The only offline support is for saved trips, whose
+  places and photos are cached so an already-saved itinerary can still be
+  opened without a connection.
 - **Curated, not crowdsourced, base content.** Tourist spots and festivals
   are authored by admin/LGU accounts, not submitted directly by travelers
   (only business listings are self-service).
@@ -331,8 +333,68 @@ erDiagram
   packing races, review aggregate races, Explore/Search/Nearby request
   races, account deletion gaps, and admin suspension lag.
 
+### Navigation, Connectivity & Usability (September–October 2026)
+- A manual itinerary builder, so a traveler can plan a trip by hand
+  instead of generating it with AI.
+- Festival and trip reminders through local notifications, with past
+  reminder times rejected.
+- An app-wide internet connection notice: a "No internet connection" /
+  "Back online" message shown on every screen when the status changes.
+- Saved trips stay usable offline (their places and photos are cached).
+- Swipe navigation between tabs on Explore and the destination picker.
+- Consistent, safe Back navigation across the traveler app and the Admin
+  Portal (falls back to a sensible screen when there is nothing to pop).
+- User-friendly error messages everywhere, with raw technical errors no
+  longer shown to the user.
+- Responsive layout and overflow fixes across phone, tablet and desktop
+  screen sizes.
+
 ---
 
-*This document reflects the state of the TripNest PH codebase as of the
-most recent commits on the `main` branch and the Business Permit + OCR
-security hardening completed in this session.*
+## 7. Setup and Installation
+
+Full instructions are in the project [README](../README.md). In short:
+
+1. Install Flutter 3.44 or newer and an Android device or emulator.
+2. Run `flutter pub get`.
+3. Run `flutter run` for the traveler app, or
+   `flutter run -d chrome -t lib/main_admin.dart` for the Admin Portal.
+4. Build an installable APK with `flutter build apk --release`.
+
+The Firebase configuration for the `tripnest-ph` project is included in
+the repository, so no extra backend setup is needed to run the app.
+
+## 8. Data Flow
+
+Every screen follows the same path for reading and writing data:
+
+```mermaid
+flowchart LR
+    Screen["Screen<br/>(lib/presentation)"] --> Provider["Provider / state<br/>(lib/core/providers)"]
+    Provider --> Repo["Repository<br/>(lib/data/repositories)"]
+    Repo --> Firestore["Cloud Firestore"]
+    Repo --> Functions["Cloud Functions"]
+    Functions --> APIs["Groq / Google APIs"]
+    Screen --> Service["Service<br/>(lib/core/services)"]
+    Service --> Weather["Open-Meteo API"]
+```
+
+- **Screens never talk to Firestore directly.** Each collection has one
+  repository class that owns all of its reads and writes.
+- **Reads** are either one-time (`get`) or live (`snapshots`), so lists
+  such as My Trips update on screen as soon as the data changes.
+- **Writes** are checked twice: form validation in the app, then
+  Firestore Security Rules on the server.
+- **Calls that need a secret API key** (AI, Places, Routes, OCR) go
+  through Cloud Functions, so keys are never shipped in the app.
+- **Errors** are converted to user-friendly messages before they reach
+  the screen.
+
+See [API_Documentation.html](API_Documentation.html) for the external
+APIs and [CRUD_Documentation.md](CRUD_Documentation.md) for the
+create, read, update and delete operations.
+
+---
+
+*This document reflects the state of the TripNest PH codebase as of
+October 2026.*

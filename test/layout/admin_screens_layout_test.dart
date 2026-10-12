@@ -5,10 +5,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:tripnest_ph/data/repositories/destination_repository.dart';
-import 'package:tripnest_ph/data/repositories/province_repository.dart';
 import 'package:tripnest_ph/data/repositories/user_repository.dart';
 import 'package:tripnest_ph/presentation/admin/admin_analytics_screen.dart';
-import 'package:tripnest_ph/presentation/admin/admin_bulk_province_content_screen.dart';
 import 'package:tripnest_ph/presentation/admin/admin_user_management_screen.dart';
 
 import '../support/fake_image_http_overrides.dart';
@@ -79,17 +77,6 @@ void main() {
       }
     },
     verify: (_) => expect(find.textContaining('Juan Dela Cruz'), findsWidgets),
-  );
-
-  layoutMatrix(
-    'Admin: bulk province content',
-    () => AdminBulkProvinceContentScreen(provinceRepository: ProvinceRepository(firestore: firestore)),
-    setup: seed,
-    act: (tester) async {
-      for (var i = 0; i < 10; i++) {
-        await tester.pump(const Duration(milliseconds: 100));
-      }
-    },
   );
 
   layoutMatrix(

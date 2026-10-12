@@ -5,11 +5,12 @@ import '../../core/constants/legal_content.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/widgets/inputs/search_bar_widget.dart';
+import '../../core/widgets/layout/scroll_aware_search_header.dart';
 import '../../core/widgets/states/empty_state_widget.dart';
 import '../../domain/models/legal_section.dart';
-
 import '../../core/routes/back_navigation.dart';
 import '../../core/routes/route_paths.dart';
+
 /// Frequently asked questions — searchable, grouped by category, and
 /// rendered as an expandable list rather than a wall of text, since most
 /// travelers are only looking for one answer.
@@ -69,8 +70,10 @@ class _FaqScreenState extends State<FaqScreen> {
         leading: IconButton(icon: const Icon(Symbols.arrow_back_rounded), onPressed: () => context.popOrGo(RoutePaths.settings)),
         title: const Text('FAQ'),
       ),
-      body: Column(
-        children: [
+      // Search + category chips slide away while reading and return on scroll-up.
+      body: CollapsibleSearchHeader(
+        header: Column(
+          children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.sm, AppSpacing.lg, AppSpacing.md),
             child: SearchBarWidget(
@@ -109,8 +112,9 @@ class _FaqScreenState extends State<FaqScreen> {
             ),
           ),
           const SizedBox(height: AppSpacing.md),
-          Expanded(
-            child: filtered.isEmpty
+          ],
+        ),
+        body: filtered.isEmpty
                 ? EmptyStateWidget(
                     icon: Symbols.search_off_rounded,
                     title: 'No matches',
@@ -140,8 +144,6 @@ class _FaqScreenState extends State<FaqScreen> {
                       ],
                     ],
                   ),
-          ),
-        ],
       ),
     );
   }

@@ -96,6 +96,31 @@ class Place {
     return raw.isEmpty ? 'Place' : raw[0].toUpperCase() + raw.substring(1);
   }
 
+  /// True for somewhere to eat or drink — decided the same way as
+  /// [categoryLabel], so a place whose badge reads "Restaurant"/"Café" is
+  /// exactly a place this returns true for (a hotel that also has a
+  /// restaurant stays a hotel). Lets a saved place be filed under Food
+  /// rather than Attractions.
+  bool get isDining {
+    for (final type in _typeLabels.keys) {
+      if (types.contains(type)) return _diningLabelTypes.contains(type);
+    }
+    return types.any(
+      (t) => t.endsWith('_restaurant') || _otherDiningTypes.contains(t),
+    );
+  }
+
+  static const _diningLabelTypes = {'restaurant', 'cafe', 'coffee_shop'};
+  static const _otherDiningTypes = {
+    'food',
+    'bakery',
+    'bar',
+    'food_court',
+    'meal_takeaway',
+    'meal_delivery',
+    'ice_cream_shop',
+  };
+
   /// The category badge's fill color — one hue per category family (see
   /// [_typeColors]) so "Attraction", "Restaurant", "Hotel" etc. read as
   /// visually distinct at a glance instead of all sharing the same accent

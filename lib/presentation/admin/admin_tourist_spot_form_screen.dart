@@ -18,8 +18,8 @@ import '../../data/mock/mock_categories.dart';
 import '../../data/repositories/destination_repository.dart';
 import '../../domain/models/destination.dart';
 import '../../domain/models/province.dart';
-import '../../core/routes/back_navigation.dart';
 import '../../core/routes/route_paths.dart';
+import 'widgets/admin_page_header.dart';
 
 const List<String> _monthNames = [
   'January',
@@ -95,8 +95,7 @@ class _AdminTouristSpotFormScreenState
   // everyday single-listing form only ever carried over whatever
   // widget.existing already had (always null for "create"), silently
   // breaking the weather card, map, "Get Directions" and Nearby sections on
-  // the traveler-facing details screen for every admin-created spot. The
-  // separate CSV bulk-import path could set them, but this form couldn't.
+  // the traveler-facing details screen for every admin-created spot.
   late final _latitudeController = TextEditingController(
     text: widget.existing?.latitude?.toString() ?? '',
   );
@@ -274,12 +273,10 @@ class _AdminTouristSpotFormScreenState
     return DiscardChangesScope(
       isDirty: _dirty,
       child: Scaffold(
-        appBar: AppBar(
-          leading: IconButton(
-            icon: const Icon(Symbols.arrow_back_rounded),
-            onPressed: () => context.popOrGo(RoutePaths.adminTouristSpots),
-          ),
-          title: Text(_isEditing ? 'Edit Tourist Spot' : 'New Tourist Spot'),
+        appBar: adminPageHeader(
+          context,
+          title: _isEditing ? 'Edit Tourist Spot' : 'New Tourist Spot',
+          backTo: RoutePaths.adminTouristSpots,
         ),
         body: SafeArea(
           child: Form(

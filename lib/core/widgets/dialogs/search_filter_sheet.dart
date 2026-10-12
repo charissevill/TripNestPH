@@ -6,6 +6,7 @@ import '../../../domain/models/region.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_spacing.dart';
 import '../../utils/listing_filters.dart';
+import '../indicators/rating_widget.dart';
 
 const List<double> kRatingFilterOptions = [3, 4, 4.5];
 
@@ -231,7 +232,7 @@ class _SearchFilterSheetState extends State<SearchFilterSheet> {
                           children: kRatingFilterOptions.map((r) {
                             final selected = _minRating == r;
                             return ChoiceChip(
-                              label: Text('${r.toStringAsFixed(1)}+ ★'),
+                              label: MinRatingLabel(rating: r),
                               selected: selected,
                               onSelected: (v) => setState(() => _minRating = v ? r : null),
                             );

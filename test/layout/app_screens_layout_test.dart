@@ -26,7 +26,6 @@ import 'package:tripnest_ph/data/repositories/favorites_repository.dart';
 import 'package:tripnest_ph/data/repositories/user_repository.dart';
 import 'package:tripnest_ph/data/mock/mock_provinces.dart';
 import 'package:tripnest_ph/presentation/admin/admin_broadcast_screen.dart';
-import 'package:tripnest_ph/presentation/admin/admin_bulk_import_screen.dart';
 import 'package:tripnest_ph/presentation/admin/admin_business_list_screen.dart';
 import 'package:tripnest_ph/presentation/admin/admin_business_owner_applications_screen.dart';
 import 'package:tripnest_ph/presentation/admin/admin_festival_form_screen.dart';
@@ -145,7 +144,6 @@ void main() {
   screen('Admin: tourist spot form', () => AdminTouristSpotFormScreen(province: mockProvinces.first));
   screen('Admin: festivals', () => const AdminFestivalListScreen());
   screen('Admin: festival form', () => const AdminFestivalFormScreen());
-  screen('Admin: bulk import', () => const AdminBulkImportScreen());
   screen('Admin: businesses', () => const AdminBusinessListScreen());
   screen('Admin: business applications', () => const AdminBusinessOwnerApplicationsScreen());
   screen('Admin: reported reviews', () => const AdminReportedReviewsScreen());

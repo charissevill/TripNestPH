@@ -26,4 +26,22 @@ class AnalyticsSnapshotRepository {
       throw AppException.from(e);
     }
   }
+
+  /// Every snapshot dated [start] through [end] (both inclusive), oldest
+  /// first. `date` is stored as a `YYYY-MM-DD` string, which sorts the same
+  /// way the dates themselves do.
+  Future<List<AnalyticsSnapshot>> getRange(DateTime start, DateTime end) async {
+    String key(DateTime d) =>
+        '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+    try {
+      final snapshot = await _collection
+          .where('date', isGreaterThanOrEqualTo: key(start))
+          .where('date', isLessThanOrEqualTo: key(end))
+          .orderBy('date')
+          .get();
+      return snapshot.docs.map((d) => AnalyticsSnapshot.fromMap(d.id, d.data())).toList();
+    } catch (e) {
+      throw AppException.from(e);
+    }
+  }
 }

@@ -4,8 +4,6 @@ import '../../domain/models/destination.dart';
 import '../../domain/models/province.dart';
 import '../../presentation/admin/admin_analytics_screen.dart';
 import '../../presentation/admin/admin_broadcast_screen.dart';
-import '../../presentation/admin/admin_bulk_import_screen.dart';
-import '../../presentation/admin/admin_bulk_province_content_screen.dart';
 import '../../presentation/admin/admin_business_list_screen.dart';
 import '../../presentation/admin/admin_business_owner_applications_screen.dart';
 import '../../presentation/admin/admin_festival_form_screen.dart';
@@ -213,6 +211,7 @@ GoRouter buildAppRouter(AuthProvider authProvider) {
             // instead of silently substituting sample trip data.
             itinerary: extra?['itinerary'] as Itinerary,
             savedItineraryId: extra?['savedId'] as String?,
+            promptIfLeftEmpty: extra?['isNewManualTrip'] == true,
           );
         },
       ),
@@ -318,14 +317,6 @@ GoRouter buildAppRouter(AuthProvider authProvider) {
       GoRoute(
         path: RoutePaths.adminUsers,
         builder: (context, state) => const AdminUserManagementScreen(),
-      ),
-      GoRoute(
-        path: RoutePaths.adminBulkImport,
-        builder: (context, state) => const AdminBulkImportScreen(),
-      ),
-      GoRoute(
-        path: RoutePaths.adminBulkProvinceContent,
-        builder: (context, state) => const AdminBulkProvinceContentScreen(),
       ),
       GoRoute(
         path: RoutePaths.adminBusinessOwnerApplications,

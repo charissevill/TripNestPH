@@ -87,7 +87,10 @@ class AppException implements Exception {
       case 'invalid-action-code':
       case 'expired-action-code':
         return 'That link or code is invalid or has expired. Please request a new one.';
+      case 'popup-blocked':
+        return 'Your browser blocked the sign-in pop-up. Allow pop-ups for this site and try again.';
       case 'popup-closed-by-user':
+      case 'cancelled-popup-request':
       case 'canceled':
       case 'sign_in_canceled':
         return 'Sign-in was cancelled.';

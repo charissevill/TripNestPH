@@ -20,6 +20,7 @@ import '../../core/widgets/details/business_info_sheet.dart';
 import '../../core/widgets/details/place_details_sheet.dart';
 import '../../core/widgets/dialogs/add_to_collection_sheet.dart';
 import '../../core/widgets/dialogs/confirmation_dialog.dart';
+import '../../core/widgets/inputs/search_sort_bar.dart';
 import '../../core/widgets/layout/max_width_container.dart';
 import '../../core/widgets/states/empty_state_widget.dart';
 import '../../core/widgets/states/loading_widget.dart';
@@ -32,6 +33,7 @@ import '../../domain/models/business.dart';
 import '../../domain/models/destination.dart';
 import '../../domain/models/favorite_collection.dart';
 import '../../domain/models/festival.dart';
+import '../../domain/models/place.dart';
 import '../../domain/models/restaurant.dart';
 
 /// Image height used for every card in the two-column grid, kept in sync
@@ -39,12 +41,37 @@ import '../../domain/models/restaurant.dart';
 const double _gridImageHeight = 140;
 const double _gridCellExtent = _gridImageHeight + 92;
 
-/// Everything the traveler has bookmarked, split into Destinations,
-/// Restaurants, Festivals, Local Finds (businesses), and Attractions (live
-/// Google Places results) tabs, all backed by [FavoritesProvider] — the
-/// first four resolved live against their own Firestore collection given
-/// just a saved id, the last rendered directly from its own fully-hydrated
-/// snapshot (a `Place` has no other collection to resolve one from).
+/// One saved item as a tab lists it: what it's searched and sorted by, and
+/// how to draw its card at a given width.
+typedef _SavedEntry = ({
+  String name,
+  double rating,
+  Widget Function(double width) card,
+});
+
+enum _SavedSort { saved, nameAscending, nameDescending, rating }
+
+const Map<_SavedSort, String> _savedSortLabels = {
+  _SavedSort.saved: 'Default order',
+  _SavedSort.nameAscending: 'Name (A–Z)',
+  _SavedSort.nameDescending: 'Name (Z–A)',
+  _SavedSort.rating: 'Rating (High–Low)',
+};
+
+/// Never a real id list, so setting it forces the next lookup to rerun.
+const String _staleKey = '\u0000';
+
+/// Everything the traveler has bookmarked, split into Places, Food,
+/// Festivals and Local Finds (businesses) tabs, all backed by
+/// [FavoritesProvider] — catalog items resolved live against their own
+/// Firestore collection given just a saved id, live Google Places results
+/// rendered directly from their own fully-hydrated snapshot (a `Place` has
+/// no other collection to resolve one from).
+///
+/// A saved live place is filed by what it *is*, not where it came from: a
+/// restaurant or café saved from Google Places sits in Food alongside the
+/// catalog restaurants (see [Place.isDining]); every other live place sits
+/// in Places alongside the catalog tourist spots.
 class SavedScreen extends StatefulWidget {
   const SavedScreen({super.key});
 
@@ -55,7 +82,7 @@ class SavedScreen extends StatefulWidget {
 class _SavedScreenState extends State<SavedScreen>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController = TabController(
-    length: 5,
+    length: 4,
     vsync: this,
   );
   final DestinationRepository _destinationRepository = DestinationRepository();
@@ -68,9 +95,110 @@ class _SavedScreenState extends State<SavedScreen>
   /// Null means "All" — every tab shows its full saved list, unfiltered.
   String? _selectedCollectionId;
 
+  // One search + sort shared by every tab.
+  final TextEditingController _search = TextEditingController();
+  _SavedSort _sort = _SavedSort.saved;
+
+  // Each tab's lookup, kept until the ids it was made for change — started
+  // straight from `build` it would otherwise rerun on every keystroke in
+  // the search box.
+  final Map<String, ({String key, Future<Object> future})> _lookups = {};
+
+  Future<List<T>> _cached<T>(
+    String tab,
+    List<String> ids,
+    Future<List<T>> Function() load,
+  ) {
+    final key = ids.join(',');
+    final hit = _lookups[tab];
+    if (hit != null && hit.key == key) return hit.future as Future<List<T>>;
+    final future = load();
+    _lookups[tab] = (key: key, future: future);
+    return future;
+  }
+
+  /// Pull-to-refresh: drop every kept lookup so each tab fetches again.
+  Future<void> _refresh() async {
+    setState(() {
+      _lookups.clear();
+      _linkedKey = _staleKey;
+    });
+  }
+
+  /// [entries] narrowed to the search text and put in the chosen order.
+  List<_SavedEntry> _visible(List<_SavedEntry> entries) {
+    final query = _search.text.trim().toLowerCase();
+    final matches = entries
+        .where((e) => query.isEmpty || e.name.toLowerCase().contains(query))
+        .toList();
+    int byName(_SavedEntry a, _SavedEntry b) =>
+        a.name.toLowerCase().compareTo(b.name.toLowerCase());
+    switch (_sort) {
+      case _SavedSort.saved:
+        break;
+      case _SavedSort.nameAscending:
+        matches.sort(byName);
+      case _SavedSort.nameDescending:
+        matches.sort((a, b) => byName(b, a));
+      case _SavedSort.rating:
+        matches.sort((a, b) {
+          final ratings = b.rating.compareTo(a.rating);
+          return ratings != 0 ? ratings : byName(a, b);
+        });
+    }
+    return matches;
+  }
+
+  // A Food & Dining Local Find is saved under its mirrored restaurant's id,
+  // as a *restaurant* favorite (see `businessFavoriteAndReviewTarget`), so
+  // it never appeared under Local Finds — the tab it was saved from. These
+  // are those listings, looked up from the saved restaurant ids and
+  // refetched only when that set changes.
+  String _linkedKey = '';
+  Future<List<Business>> _linkedLocalFinds = Future.value(const []);
+  int _linkedCount = 0;
+
+  void _syncLinkedLocalFinds(List<String> restaurantIds) {
+    final key = (restaurantIds.toList()..sort()).join(',');
+    if (key == _linkedKey) return;
+    _linkedKey = key;
+    final lookup = _businessRepository
+        .getApprovedByRestaurantIds(restaurantIds)
+        // Best-effort: the directly saved Local Finds still show.
+        .catchError((Object _) => const <Business>[]);
+    _linkedLocalFinds = lookup;
+    lookup.then((linked) {
+      if (!mounted || _linkedLocalFinds != lookup) return;
+      if (linked.length != _linkedCount) {
+        setState(() => _linkedCount = linked.length);
+      }
+    });
+  }
+
+  /// Everything the Local Finds tab lists: listings saved in their own
+  /// right, then the Food & Dining ones saved through their restaurant.
+  Future<List<Business>> _loadLocalFinds(
+    List<String> businessIds,
+    Map<String, String?> collectionByKey,
+  ) async {
+    final direct = await _businessRepository.getByIds(businessIds);
+    final linked = await _linkedLocalFinds;
+    final seen = direct.map((b) => b.id).toSet();
+    return [
+      ...direct,
+      for (final business in linked)
+        if (seen.add(business.id) &&
+            (_selectedCollectionId == null ||
+                collectionByKey['${FavoriteType.restaurant.name}:${business.restaurantId}'] ==
+                    _selectedCollectionId))
+          business,
+    ];
+  }
+
   @override
   void dispose() {
     _tabController.dispose();
+    _search.dispose();
     super.dispose();
   }
 
@@ -246,6 +374,7 @@ class _SavedScreenState extends State<SavedScreen>
     final restaurantIds = saved.savedRestaurantIds.toList();
     final festivalIds = saved.savedFestivalIds.toList();
     final businessIds = saved.savedBusinessIds.toList();
+    _syncLinkedLocalFinds(restaurantIds);
 
     return Scaffold(
       body: SafeArea(
@@ -263,6 +392,22 @@ class _SavedScreenState extends State<SavedScreen>
                 child: Text('Saved', style: theme.textTheme.displayMedium),
               ),
             ),
+            Padding(
+              padding: EdgeInsets.fromLTRB(
+                MaxWidthContainer.sidePadding(context, maxWidth: 1400),
+                0,
+                MaxWidthContainer.sidePadding(context, maxWidth: 1400),
+                AppSpacing.xs,
+              ),
+              child: SearchSortBar<_SavedSort>(
+                controller: _search,
+                hintText: 'Search saved...',
+                onQueryChanged: () => setState(() {}),
+                sort: _sort,
+                sortLabels: _savedSortLabels,
+                onSortChanged: (sort) => setState(() => _sort = sort),
+              ),
+            ),
             TabBar(
               controller: _tabController,
               labelColor: theme.colorScheme.primary,
@@ -274,11 +419,13 @@ class _SavedScreenState extends State<SavedScreen>
               tabs: [
                 Tab(
                   icon: const Icon(Symbols.landscape_rounded),
-                  text: 'Places (${destinationIds.length})',
+                  text:
+                      'Places (${destinationIds.length + saved.savedPlaces.where((p) => !p.isDining).length})',
                 ),
                 Tab(
                   icon: const Icon(Symbols.restaurant_rounded),
-                  text: 'Food (${restaurantIds.length})',
+                  text:
+                      'Food (${restaurantIds.length + saved.savedPlaces.where((p) => p.isDining).length})',
                 ),
                 Tab(
                   icon: const Icon(Symbols.celebration_rounded),
@@ -286,11 +433,7 @@ class _SavedScreenState extends State<SavedScreen>
                 ),
                 Tab(
                   icon: const Icon(Symbols.storefront_rounded),
-                  text: 'Local Finds (${businessIds.length})',
-                ),
-                Tab(
-                  icon: const Icon(Symbols.attractions_rounded),
-                  text: 'Attractions (${saved.savedPlaces.length})',
+                  text: 'Local Finds (${businessIds.length + _linkedCount})',
                 ),
               ],
             ),
@@ -444,51 +587,146 @@ class _SavedScreenState extends State<SavedScreen>
                     _selectedCollectionId,
               )
               .toList();
+    final diningPlaces = filteredPlaces.where((p) => p.isDining).toList();
+    final attractionPlaces = filteredPlaces.where((p) => !p.isDining).toList();
+
+    Widget placeCard(Place place, double width) => _cardWithCollectionButton(
+      card: PlaceCard(
+        place: place,
+        width: width,
+        imageHeight: _gridImageHeight,
+        imageUrl: place.photoNames.isNotEmpty
+            ? _places.photoUrl(place.photoNames.first)
+            : '',
+        onTap: () => showPlaceDetailsSheet(
+          context,
+          place: place,
+          placesService: _places,
+        ),
+      ),
+      userId: uid,
+      collections: collections,
+      currentCollectionId:
+          collectionByKey['${FavoriteType.place.name}:${place.id}'],
+      type: FavoriteType.place,
+      itemId: place.id,
+    );
+
+    // One tab's grid: [entries] narrowed to the search text and put in the
+    // chosen order.
+    Widget grid({
+      required List<_SavedEntry> entries,
+      required bool isLoading,
+      required String emptyTitle,
+      required String emptyMessage,
+    }) {
+      final visible = _visible(entries);
+      final searching = entries.isNotEmpty && visible.isEmpty;
+      return _SavedGrid(
+        itemCount: visible.length,
+        isLoading: isLoading,
+        emptyTitle: searching ? 'No matches' : emptyTitle,
+        emptyMessage: searching
+            ? 'Nothing saved here matches your search.'
+            : emptyMessage,
+        itemBuilder: (context, width, i) => visible[i].card(width),
+      );
+    }
+
+    _SavedEntry placeEntry(Place place) => (
+      name: place.name,
+      rating: place.rating ?? 0,
+      card: (width) => placeCard(place, width),
+    );
 
     return TabBarView(
       controller: _tabController,
       children: [
         RefreshIndicator(
-          onRefresh: () async => setState(() {}),
+          onRefresh: _refresh,
           child: FutureBuilder<List<Destination>>(
-            future: _destinationRepository.getByIds(filteredDestinationIds),
-            builder: (context, snapshot) => _SavedGrid(
-              itemCount: snapshot.data?.length ?? 0,
+            future: _cached(
+              'places',
+              filteredDestinationIds,
+              () => _destinationRepository.getByIds(filteredDestinationIds),
+            ),
+            // Tourist spots first, then the saved Google attractions — those
+            // need no lookup: a saved place is never persisted anywhere
+            // else, so `saved.savedPlaces` is already the fully-hydrated
+            // favorite data straight off FavoritesProvider's live stream
+            // (see FavoritesRepository.streamSavedPlaces).
+            builder: (context, snapshot) => grid(
+              entries: [
+                for (final destination
+                    in snapshot.data ?? const <Destination>[])
+                  (
+                    name: destination.name,
+                    rating: destination.rating,
+                    card: (width) => _cardWithCollectionButton(
+                      card: DestinationCard(
+                        destination: destination,
+                        width: width,
+                        imageHeight: _gridImageHeight,
+                        onTap: () => context.push(
+                          RoutePaths.destinationDetails(destination.id),
+                        ),
+                      ),
+                      userId: uid,
+                      collections: collections,
+                      currentCollectionId:
+                          collectionByKey['${FavoriteType.destination.name}:${destination.id}'],
+                      type: FavoriteType.destination,
+                      itemId: destination.id,
+                    ),
+                  ),
+                ...attractionPlaces.map(placeEntry),
+              ],
               isLoading: snapshot.connectionState != ConnectionState.done,
               emptyTitle: _selectedCollectionId == null
                   ? 'No saved places yet'
                   : 'No places in this list yet',
               emptyMessage: _selectedCollectionId == null
-                  ? 'Tap the bookmark icon on any destination to save it here.'
+                  ? 'Tap the bookmark icon on any destination or attraction to save it here.'
                   : 'Add a saved place to this list from the small list icon on its card.',
-              itemBuilder: (context, width, i) {
-                final destination = snapshot.data![i];
-                return _cardWithCollectionButton(
-                  card: DestinationCard(
-                    destination: destination,
-                    width: width,
-                    imageHeight: _gridImageHeight,
-                    onTap: () => context.push(
-                      RoutePaths.destinationDetails(destination.id),
-                    ),
-                  ),
-                  userId: uid,
-                  collections: collections,
-                  currentCollectionId:
-                      collectionByKey['${FavoriteType.destination.name}:${destination.id}'],
-                  type: FavoriteType.destination,
-                  itemId: destination.id,
-                );
-              },
             ),
           ),
         ),
         RefreshIndicator(
-          onRefresh: () async => setState(() {}),
+          onRefresh: _refresh,
           child: FutureBuilder<List<Restaurant>>(
-            future: _restaurantRepository.getByIds(filteredRestaurantIds),
-            builder: (context, snapshot) => _SavedGrid(
-              itemCount: snapshot.data?.length ?? 0,
+            future: _cached(
+              'food',
+              filteredRestaurantIds,
+              () => _restaurantRepository.getByIds(filteredRestaurantIds),
+            ),
+            // Catalog restaurants first, then restaurants/cafés saved from
+            // live Google Places results — see the class doc.
+            builder: (context, snapshot) => grid(
+              entries: [
+                for (final restaurant
+                    in snapshot.data ?? const <Restaurant>[])
+                  (
+                    name: restaurant.name,
+                    rating: restaurant.rating,
+                    card: (width) => _cardWithCollectionButton(
+                      card: RestaurantCard(
+                        restaurant: restaurant,
+                        width: width,
+                        imageHeight: _gridImageHeight,
+                        onTap: () => context.push(
+                          RoutePaths.restaurantDetails(restaurant.id),
+                        ),
+                      ),
+                      userId: uid,
+                      collections: collections,
+                      currentCollectionId:
+                          collectionByKey['${FavoriteType.restaurant.name}:${restaurant.id}'],
+                      type: FavoriteType.restaurant,
+                      itemId: restaurant.id,
+                    ),
+                  ),
+                ...diningPlaces.map(placeEntry),
+              ],
               isLoading: snapshot.connectionState != ConnectionState.done,
               emptyTitle: _selectedCollectionId == null
                   ? 'No saved restaurants yet'
@@ -496,34 +734,41 @@ class _SavedScreenState extends State<SavedScreen>
               emptyMessage: _selectedCollectionId == null
                   ? 'Bookmark restaurants you want to try to see them here.'
                   : 'Add a saved restaurant to this list from the small list icon on its card.',
-              itemBuilder: (context, width, i) {
-                final restaurant = snapshot.data![i];
-                return _cardWithCollectionButton(
-                  card: RestaurantCard(
-                    restaurant: restaurant,
-                    width: width,
-                    imageHeight: _gridImageHeight,
-                    onTap: () => context.push(
-                      RoutePaths.restaurantDetails(restaurant.id),
-                    ),
-                  ),
-                  userId: uid,
-                  collections: collections,
-                  currentCollectionId:
-                      collectionByKey['${FavoriteType.restaurant.name}:${restaurant.id}'],
-                  type: FavoriteType.restaurant,
-                  itemId: restaurant.id,
-                );
-              },
             ),
           ),
         ),
         RefreshIndicator(
-          onRefresh: () async => setState(() {}),
+          onRefresh: _refresh,
           child: FutureBuilder<List<Festival>>(
-            future: _festivalRepository.getByIds(filteredFestivalIds),
-            builder: (context, snapshot) => _SavedGrid(
-              itemCount: snapshot.data?.length ?? 0,
+            future: _cached(
+              'festivals',
+              filteredFestivalIds,
+              () => _festivalRepository.getByIds(filteredFestivalIds),
+            ),
+            builder: (context, snapshot) => grid(
+              entries: [
+                for (final festival in snapshot.data ?? const <Festival>[])
+                  (
+                    name: festival.name,
+                    rating: festival.rating,
+                    card: (width) => _cardWithCollectionButton(
+                      card: FestivalCard(
+                        festival: festival,
+                        width: width,
+                        imageHeight: _gridImageHeight,
+                        onTap: () => context.push(
+                          RoutePaths.festivalDetails(festival.id),
+                        ),
+                      ),
+                      userId: uid,
+                      collections: collections,
+                      currentCollectionId:
+                          collectionByKey['${FavoriteType.festival.name}:${festival.id}'],
+                      type: FavoriteType.festival,
+                      itemId: festival.id,
+                    ),
+                  ),
+              ],
               isLoading: snapshot.connectionState != ConnectionState.done,
               emptyTitle: _selectedCollectionId == null
                   ? 'No saved festivals yet'
@@ -531,33 +776,47 @@ class _SavedScreenState extends State<SavedScreen>
               emptyMessage: _selectedCollectionId == null
                   ? 'Bookmark festivals to plan your trips around them.'
                   : 'Add a saved festival to this list from the small list icon on its card.',
-              itemBuilder: (context, width, i) {
-                final festival = snapshot.data![i];
-                return _cardWithCollectionButton(
-                  card: FestivalCard(
-                    festival: festival,
-                    width: width,
-                    imageHeight: _gridImageHeight,
-                    onTap: () =>
-                        context.push(RoutePaths.festivalDetails(festival.id)),
-                  ),
-                  userId: uid,
-                  collections: collections,
-                  currentCollectionId:
-                      collectionByKey['${FavoriteType.festival.name}:${festival.id}'],
-                  type: FavoriteType.festival,
-                  itemId: festival.id,
-                );
-              },
             ),
           ),
         ),
         RefreshIndicator(
-          onRefresh: () async => setState(() {}),
+          onRefresh: _refresh,
           child: FutureBuilder<List<Business>>(
-            future: _businessRepository.getByIds(filteredBusinessIds),
-            builder: (context, snapshot) => _SavedGrid(
-              itemCount: snapshot.data?.length ?? 0,
+            future: _cached(
+              'localFinds',
+              // Everything the combined lookup depends on, not just the ids.
+              [...filteredBusinessIds, _linkedKey, _selectedCollectionId ?? ''],
+              () => _loadLocalFinds(filteredBusinessIds, collectionByKey),
+            ),
+            builder: (context, snapshot) => grid(
+              entries: [
+                for (final business in snapshot.data ?? const <Business>[])
+                  (
+                    name: business.name,
+                    rating: business.rating,
+                    card: (width) {
+                      // The favorite this card stands for — the listing's
+                      // own, or its restaurant's for a Food & Dining one.
+                      final (favoriteType, _, favoriteId) =
+                          businessFavoriteAndReviewTarget(business);
+                      return _cardWithCollectionButton(
+                        card: BusinessCard(
+                          business: business,
+                          width: width,
+                          imageHeight: _gridImageHeight,
+                          onTap: () =>
+                              showBusinessInfoSheet(context, business),
+                        ),
+                        userId: uid,
+                        collections: collections,
+                        currentCollectionId:
+                            collectionByKey['${favoriteType.name}:$favoriteId'],
+                        type: favoriteType,
+                        itemId: favoriteId,
+                      );
+                    },
+                  ),
+              ],
               isLoading: snapshot.connectionState != ConnectionState.done,
               emptyTitle: _selectedCollectionId == null
                   ? 'No saved local finds yet'
@@ -565,63 +824,8 @@ class _SavedScreenState extends State<SavedScreen>
               emptyMessage: _selectedCollectionId == null
                   ? 'Tap the heart icon on any local find to save it here.'
                   : 'Add a saved local find to this list from the small list icon on its card.',
-              itemBuilder: (context, width, i) {
-                final business = snapshot.data![i];
-                return _cardWithCollectionButton(
-                  card: BusinessCard(
-                    business: business,
-                    width: width,
-                    imageHeight: _gridImageHeight,
-                    onTap: () => showBusinessInfoSheet(context, business),
-                  ),
-                  userId: uid,
-                  collections: collections,
-                  currentCollectionId:
-                      collectionByKey['${FavoriteType.business.name}:${business.id}'],
-                  type: FavoriteType.business,
-                  itemId: business.id,
-                );
-              },
             ),
           ),
-        ),
-        // No FutureBuilder/repository lookup — a saved place is never
-        // persisted anywhere else, so `saved.savedPlaces` is already the
-        // fully-hydrated favorite data straight off FavoritesProvider's live
-        // stream (see FavoritesRepository.streamSavedPlaces).
-        _SavedGrid(
-          itemCount: filteredPlaces.length,
-          isLoading: false,
-          emptyTitle: _selectedCollectionId == null
-              ? 'No saved attractions yet'
-              : 'No attractions in this list yet',
-          emptyMessage: _selectedCollectionId == null
-              ? 'Tap the bookmark icon on any attraction to save it here.'
-              : 'Add a saved attraction to this list from the small list icon on its card.',
-          itemBuilder: (context, width, i) {
-            final place = filteredPlaces[i];
-            return _cardWithCollectionButton(
-              card: PlaceCard(
-                place: place,
-                width: width,
-                imageHeight: _gridImageHeight,
-                imageUrl: place.photoNames.isNotEmpty
-                    ? _places.photoUrl(place.photoNames.first)
-                    : '',
-                onTap: () => showPlaceDetailsSheet(
-                  context,
-                  place: place,
-                  placesService: _places,
-                ),
-              ),
-              userId: uid,
-              collections: collections,
-              currentCollectionId:
-                  collectionByKey['${FavoriteType.place.name}:${place.id}'],
-              type: FavoriteType.place,
-              itemId: place.id,
-            );
-          },
         ),
       ],
     );

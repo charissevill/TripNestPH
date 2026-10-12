@@ -161,6 +161,38 @@ class AdminRepository {
 
   Future<void> declineInvite(String email) => revokeInvite(email);
 
+  /// Admin-side direct grant: creates [uid]'s `admin_users` doc outright,
+  /// with no invite for them to accept — for when the person already asked
+  /// for the role themselves (an approved business owner application), so
+  /// a second confirmation would be redundant. Leaves an existing Admin
+  /// Portal account untouched rather than overwriting its role or status.
+  /// Their Auth custom claims catch up on their own device (see
+  /// `AuthProvider`'s `admin_users` listener), since `syncMyAdminClaims`
+  /// can only ever run for the caller's own account.
+  Future<void> grantRole({
+    required String uid,
+    required String email,
+    required String name,
+    required String role,
+  }) async {
+    try {
+      final doc = _collection.doc(uid);
+      if ((await doc.get()).exists) return;
+      await doc.set({
+        'name': name,
+        'email': email,
+        'photoUrl': '',
+        'businessName': '',
+        'role': role,
+        'status': 'active',
+        'provinceId': null,
+        'provinceName': null,
+      });
+    } catch (e) {
+      throw AppException.from(e);
+    }
+  }
+
   /// Calls the `syncMyAdminClaims` Cloud Function to mirror the caller's own
   /// `admin_users` doc into their Auth custom claims, then force-refreshes
   /// the local ID token so the new claims take effect immediately — without

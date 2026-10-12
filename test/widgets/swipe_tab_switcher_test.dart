@@ -196,4 +196,37 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Selected: 1'), findsOneWidget);
   });
+
+  testWidgets('hands a swipe past its last tab up to an enclosing switcher', (
+    tester,
+  ) async {
+    var outer = 0;
+    var inner = 1;
+    await _pump(
+      tester,
+      StatefulBuilder(
+        builder: (context, setState) => SwipeTabSwitcher(
+          index: outer,
+          length: 3,
+          onIndexChanged: (i) => setState(() => outer = i),
+          child: SwipeTabSwitcher(
+            index: inner,
+            length: 2,
+            onIndexChanged: (i) => setState(() => inner = i),
+            child: SizedBox.expand(child: Text('outer $outer inner $inner')),
+          ),
+        ),
+      ),
+    );
+
+    // The inner switcher is already on its last tab, so the outer one moves.
+    await tester.drag(find.textContaining('outer'), const Offset(-200, 0));
+    await tester.pumpAndSettle();
+    expect(find.text('outer 1 inner 1'), findsOneWidget);
+
+    // Swiping back has somewhere to go inside, so the inner one takes it.
+    await tester.drag(find.textContaining('outer'), const Offset(200, 0));
+    await tester.pumpAndSettle();
+    expect(find.text('outer 1 inner 0'), findsOneWidget);
+  });
 }

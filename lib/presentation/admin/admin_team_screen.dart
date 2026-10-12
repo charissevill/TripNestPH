@@ -13,8 +13,23 @@ import '../../data/repositories/province_repository.dart';
 import '../../domain/models/admin_invite.dart';
 import '../../domain/models/admin_user.dart';
 import '../../domain/models/province.dart';
-import '../../core/routes/back_navigation.dart';
-import '../../core/routes/route_paths.dart';
+import 'widgets/admin_page_header.dart';
+import 'widgets/admin_search_sort_bar.dart';
+
+enum _TeamSort { name, role, status }
+
+const Map<_TeamSort, String> _teamSortLabels = {
+  _TeamSort.name: 'Name (A–Z)',
+  _TeamSort.role: 'Role',
+  _TeamSort.status: 'Status',
+};
+
+/// Where each role falls when sorting by role.
+const List<String> _roleOrder = [
+  AdminRole.admin,
+  AdminRole.lgu,
+  AdminRole.businessOwner,
+];
 
 /// Admin-only: the Admin Portal's own roster, plus staging invites for new
 /// accounts. Replaces having to run `tool/create_admin.js` for every new
@@ -38,6 +53,56 @@ class AdminTeamScreen extends StatefulWidget {
 
 class _AdminTeamScreenState extends State<AdminTeamScreen> {
   final AdminRepository _repository = AdminRepository();
+
+  // Held in state so typing in the search box doesn't resubscribe (and
+  // flash the loading rows) on every rebuild.
+  late final Stream<List<AdminInvite>> _invitesStream = _repository
+      .streamInvites();
+  late final Stream<List<AdminUser>> _adminsStream = _repository.streamAll();
+  final TextEditingController _search = TextEditingController();
+  _TeamSort _sort = _TeamSort.name;
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+
+  String _displayName(AdminUser admin) =>
+      (admin.name.isNotEmpty ? admin.name : admin.email).toLowerCase();
+
+  /// [admins] narrowed to the search text and put in the chosen order.
+  List<AdminUser> _visible(List<AdminUser> admins) {
+    final query = _search.text.trim().toLowerCase();
+    final matches = admins
+        .where(
+          (a) =>
+              query.isEmpty ||
+              a.name.toLowerCase().contains(query) ||
+              a.email.toLowerCase().contains(query) ||
+              (a.provinceName ?? '').toLowerCase().contains(query),
+        )
+        .toList();
+    int byName(AdminUser a, AdminUser b) =>
+        _displayName(a).compareTo(_displayName(b));
+    int then(int first, AdminUser a, AdminUser b) =>
+        first != 0 ? first : byName(a, b);
+    switch (_sort) {
+      case _TeamSort.name:
+        matches.sort(byName);
+      case _TeamSort.role:
+        int rank(AdminUser a) {
+          final i = _roleOrder.indexOf(a.role);
+          return i < 0 ? _roleOrder.length : i;
+        }
+        matches.sort((a, b) => then(rank(a).compareTo(rank(b)), a, b));
+      case _TeamSort.status:
+        // Active accounts first, suspended ones after.
+        int rank(AdminUser a) => a.isActive ? 0 : 1;
+        matches.sort((a, b) => then(rank(a).compareTo(rank(b)), a, b));
+    }
+    return matches;
+  }
 
   Future<void> _invite() async {
     final emailController = TextEditingController();
@@ -243,12 +308,9 @@ class _AdminTeamScreenState extends State<AdminTeamScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Scaffold(
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Symbols.arrow_back_rounded),
-          onPressed: () => context.popOrGo(RoutePaths.adminHome),
-        ),
-        title: const Text('Team'),
+      appBar: adminPageHeader(
+        context,
+        title: 'Team',
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _invite,
@@ -265,7 +327,7 @@ class _AdminTeamScreenState extends State<AdminTeamScreen> {
           ),
           children: [
             StreamBuilder<List<AdminInvite>>(
-              stream: _repository.streamInvites(),
+              stream: _invitesStream,
               builder: (context, snapshot) {
                 final invites = snapshot.data ?? const [];
                 if (invites.isEmpty) return const SizedBox.shrink();
@@ -300,7 +362,7 @@ class _AdminTeamScreenState extends State<AdminTeamScreen> {
             Text('Team', style: theme.textTheme.titleMedium),
             const SizedBox(height: AppSpacing.sm),
             StreamBuilder<List<AdminUser>>(
-              stream: _repository.streamAll(),
+              stream: _adminsStream,
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return Column(
@@ -310,15 +372,42 @@ class _AdminTeamScreenState extends State<AdminTeamScreen> {
                     ),
                   );
                 }
-                final admins = snapshot.data ?? const [];
-                if (admins.isEmpty)
+                // A failed load isn't "no admins" — say what went wrong.
+                if (snapshot.hasError) {
+                  return EmptyStateWidget(
+                    icon: Symbols.error_outline_rounded,
+                    title: 'Couldn\'t load the team',
+                    message: AppException.from(snapshot.error!).message,
+                  );
+                }
+                final all = snapshot.data ?? const <AdminUser>[];
+                if (all.isEmpty)
                   return const EmptyStateWidget(
                     icon: Symbols.group_rounded,
                     title: 'No admins yet',
                     message: '',
                   );
+                final admins = _visible(all);
                 return Column(
-                  children: admins.map((admin) {
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                      child: AdminSearchSortBar<_TeamSort>(
+                        controller: _search,
+                        hintText: 'Search by name or email...',
+                        onQueryChanged: () => setState(() {}),
+                        sort: _sort,
+                        sortLabels: _teamSortLabels,
+                        onSortChanged: (sort) => setState(() => _sort = sort),
+                      ),
+                    ),
+                    if (admins.isEmpty)
+                      const EmptyStateWidget(
+                        icon: Symbols.search_off_rounded,
+                        title: 'No matches',
+                        message: 'No team members match your search.',
+                      ),
+                    ...admins.map((admin) {
                     final isSelf = admin.uid == widget.currentUid;
                     return ListTile(
                       contentPadding: EdgeInsets.zero,
@@ -362,7 +451,8 @@ class _AdminTeamScreenState extends State<AdminTeamScreen> {
                               ],
                             ),
                     );
-                  }).toList(),
+                  }),
+                  ],
                 );
               },
             ),

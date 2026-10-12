@@ -21,6 +21,7 @@ import '../../core/widgets/cards/travel_tip_card.dart';
 import '../../core/widgets/details/place_details_sheet.dart';
 import '../../core/widgets/inputs/search_bar_widget.dart';
 import '../../core/widgets/layout/max_width_container.dart';
+import '../../core/widgets/layout/scroll_aware_search_header.dart';
 import '../../core/widgets/layout/section_header.dart';
 import '../../core/widgets/states/empty_state_widget.dart';
 import '../../core/widgets/states/loading_widget.dart';
@@ -317,7 +318,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   headerSidePadding,
                   AppSpacing.sm,
                   headerSidePadding,
-                  AppSpacing.md,
+                  0,
                 ),
                 sliver: SliverToBoxAdapter(
                   child: Column(
@@ -350,13 +351,39 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                           longitude: _travelerLng,
                         ),
                       ),
-                      const SizedBox(height: AppSpacing.md),
-                      SearchBarWidget(
-                        readOnly: true,
-                        onTap: () => context.push(RoutePaths.search),
-                        onFilterTap: () =>
-                            context.push(RoutePaths.search, extra: true),
-                      ),
+                      // Together with the floating header's top padding
+                      // this keeps the original AppSpacing.md gap.
+                      const SizedBox(height: AppSpacing.md - AppSpacing.xs),
+                    ],
+                  ),
+                ),
+              ),
+              // Scrolls away with the page, then floats back in at the top
+              // as soon as the traveler scrolls up again.
+              FloatingSearchHeaderSliver(
+                padding: EdgeInsets.fromLTRB(
+                  headerSidePadding,
+                  AppSpacing.xs,
+                  headerSidePadding,
+                  0,
+                ),
+                child: SearchBarWidget(
+                  readOnly: true,
+                  onTap: () => context.push(RoutePaths.search),
+                  onFilterTap: () =>
+                      context.push(RoutePaths.search, extra: true),
+                ),
+              ),
+              SliverPadding(
+                padding: EdgeInsets.fromLTRB(
+                  headerSidePadding,
+                  0,
+                  headerSidePadding,
+                  AppSpacing.md,
+                ),
+                sliver: SliverToBoxAdapter(
+                  child: Column(
+                    children: [
                       HomeHighlightsRow(
                         uid: uid,
                         festivalRepository: _festivalRepository,

@@ -70,7 +70,29 @@ start date, and manage it from "My Trips." Each document stores: `userId`,
 - Editing the start date is optional at every step — a trip can be saved
   and managed with no date at all.
 
-## 5. Screenshots
+## 5. CRUD Across the Rest of the App
+
+Saved itineraries are the entity documented in detail above. The same
+pattern (one repository per collection, in `lib/data/repositories/`) is
+used for the other entities:
+
+| Entity | Repository | Create | Read | Update | Delete |
+|---|---|---|---|---|---|
+| Saved itinerary | `itinerary_repository.dart` | `save()` | `streamForUser()`, `getById()` | `updateItinerary()`, `updateStartDate()` | `delete()` |
+| Trip expense | `expense_repository.dart` | `add()` | `streamForItinerary()` | `update()` | `delete()` |
+| Group poll | `poll_repository.dart` | `create()` | `streamForItinerary()` | `update()` | `delete()` |
+| Review | `review_repository.dart` | `addReview()` | `streamForTarget()`, `getByUser()` | `updateReview()` | `deleteReview()` |
+| Favorite / collection | `favorites_repository.dart` | `add()`, `createCollection()` | `streamFavorites()`, `streamCollections()` | `setCollection()` | `remove()`, `deleteCollection()` |
+| Tourist spot (admin) | `destination_repository.dart` | `create()` | `getById()`, `searchByName()` | `update()` | `delete()` |
+| Festival (admin) | `festival_repository.dart` | `create()` | `getUpcoming()`, `getById()` | `update()` | `delete()` |
+| Business listing | `business_repository.dart` | `create()` | `streamForOwner()`, `streamAllForAdmin()` | `update()`, `setStatus()` | `delete()` |
+| User profile | `user_repository.dart` | `createIfMissing()` | `getUser()`, `streamUser()` | `updateProfile()` | `deleteAccountData()` |
+
+Forms validate required fields before a write is sent, and Firestore
+Security Rules reject any write the signed-in user is not allowed to
+make. Delete actions ask for confirmation first.
+
+## 6. Screenshots
 
 | File | Operation |
 |---|---|

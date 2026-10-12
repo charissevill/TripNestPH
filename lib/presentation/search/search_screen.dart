@@ -23,6 +23,7 @@ import '../../core/widgets/details/place_details_sheet.dart';
 import '../../core/widgets/indicators/rating_widget.dart';
 import '../../core/widgets/inputs/search_bar_widget.dart';
 import '../../core/widgets/layout/max_width_container.dart';
+import '../../core/widgets/layout/scroll_aware_search_header.dart';
 import '../../core/widgets/media/image_error_placeholder.dart';
 import '../../core/widgets/states/empty_state_widget.dart';
 import '../../core/widgets/states/loading_widget.dart';
@@ -835,8 +836,11 @@ class _SearchScreenState extends State<SearchScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: SafeArea(
-        child: Column(
-          children: [
+        // Search row + filter chips slide away while scrolling results and
+        // come back on scroll-up (stays put while typing with the keyboard up).
+        child: CollapsibleSearchHeader(
+          header: Column(
+            children: [
             Padding(
               padding: EdgeInsets.fromLTRB(
                 MaxWidthContainer.sidePadding(context, maxWidth: 800),
@@ -891,8 +895,9 @@ class _SearchScreenState extends State<SearchScreen> {
                   onRemovePlaceTypeFilter: _removePlaceTypeFilter,
                 ),
               ),
-            Expanded(
-              child: _query.trim().isEmpty && !_hasFilters
+            ],
+          ),
+          body: _query.trim().isEmpty && !_hasFilters
                   ? _SuggestionsView(
                       recentSearches: _recentSearches,
                       trendingSearches: _trendingSearches,
@@ -940,8 +945,6 @@ class _SearchScreenState extends State<SearchScreen> {
                             )
                           : _buildResultsList(),
                     ),
-            ),
-          ],
         ),
       ),
     );

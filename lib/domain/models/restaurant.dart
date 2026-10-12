@@ -15,7 +15,7 @@ class ReviewDigest {
   factory ReviewDigest.fromMap(Map<String, dynamic> map) {
     final timestamp = map['generatedAt'];
     return ReviewDigest(
-      summary: map['summary'] as String? ?? '',
+      summary: _text(map['summary']),
       reviewCountAtGeneration: (map['reviewCountAtGeneration'] as num?)?.toInt() ?? 0,
       generatedAt: timestamp is Timestamp ? timestamp.toDate() : DateTime.now(),
     );
@@ -115,32 +115,32 @@ class Restaurant {
   factory Restaurant.fromMap(String id, Map<String, dynamic> map) {
     return Restaurant(
       id: id,
-      name: map['name'] as String? ?? '',
-      cuisine: map['cuisine'] as String? ?? '',
-      provinceId: map['provinceId'] as String? ?? '',
-      provinceName: map['provinceName'] as String? ?? '',
-      regionId: map['regionId'] as String? ?? '',
-      cityId: map['cityId'] as String? ?? '',
-      heroImageUrl: map['heroImageUrl'] as String? ?? '',
+      name: _text(map['name']),
+      cuisine: _text(map['cuisine']),
+      provinceId: _text(map['provinceId']),
+      provinceName: _text(map['provinceName']),
+      regionId: _text(map['regionId']),
+      cityId: _text(map['cityId']),
+      heroImageUrl: _text(map['heroImageUrl']),
       galleryImageUrls: List<String>.from(
         map['galleryImageUrls'] as List? ?? const [],
       ),
       rating: (map['rating'] as num?)?.toDouble() ?? 0,
       reviewCount: (map['reviewCount'] as num?)?.toInt() ?? 0,
-      priceRange: map['priceRange'] as String? ?? '₱',
-      description: map['description'] as String? ?? '',
-      openingHours: map['openingHours'] as String? ?? '',
+      priceRange: _text(map['priceRange'], fallback: '₱'),
+      description: _text(map['description']),
+      openingHours: _text(map['openingHours']),
       menuHighlights: (map['menuHighlights'] as List? ?? const [])
           .map((e) => MenuItem.fromMap(Map<String, dynamic>.from(e as Map)))
           .toList(),
       isPopular: map['isPopular'] as bool? ?? false,
       latitude: (map['latitude'] as num?)?.toDouble(),
       longitude: (map['longitude'] as num?)?.toDouble(),
-      phoneNumber: map['phoneNumber'] as String? ?? '',
-      websiteUrl: map['websiteUrl'] as String? ?? '',
-      facebookUrl: map['facebookUrl'] as String? ?? '',
-      ownerId: map['ownerId'] as String? ?? '',
-      businessId: map['businessId'] as String? ?? '',
+      phoneNumber: _text(map['phoneNumber']),
+      websiteUrl: _text(map['websiteUrl']),
+      facebookUrl: _text(map['facebookUrl']),
+      ownerId: _text(map['ownerId']),
+      businessId: _text(map['businessId']),
       accessibilityTags: List<String>.from(map['accessibilityTags'] as List? ?? const []),
       reviewDigest: map['reviewDigest'] is Map
           ? ReviewDigest.fromMap(Map<String, dynamic>.from(map['reviewDigest'] as Map))
@@ -220,9 +220,9 @@ class MenuItem {
 
   factory MenuItem.fromMap(Map<String, dynamic> map) {
     return MenuItem(
-      name: map['name'] as String? ?? '',
-      price: map['price'] as String? ?? '',
-      imageUrl: map['imageUrl'] as String? ?? '',
+      name: _text(map['name']),
+      price: _text(map['price']),
+      imageUrl: _text(map['imageUrl']),
     );
   }
 
@@ -231,4 +231,14 @@ class MenuItem {
     'price': price,
     'imageUrl': imageUrl,
   };
+}
+
+/// Reads a Firestore field that should be text, tolerating a record that
+/// was saved with a number instead (e.g. a menu price or phone number typed
+/// straight into the console) so one malformed listing can't fail the
+/// whole restaurants query.
+String _text(Object? value, {String fallback = ''}) {
+  if (value is String) return value;
+  if (value is num) return value.toString();
+  return fallback;
 }

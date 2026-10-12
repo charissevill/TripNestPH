@@ -60,9 +60,13 @@ class UserRepository {
       // `FieldValue.serverTimestamp()` in the same request) — without it,
       // `startAfterDocument` can't reliably tell which of a tied pair it's
       // resuming after.
+      // Descending like `createdAt` on purpose: the two sorting in the same
+      // direction is what Firestore's automatic single-field index already
+      // serves. Mixed directions need a composite index nobody had created,
+      // so the query failed and the list came up empty.
       var query = _users
           .orderBy('createdAt', descending: true)
-          .orderBy(FieldPath.documentId);
+          .orderBy(FieldPath.documentId, descending: true);
       // `startAfterDocument` must be chained before `limit` — real
       // Firestore doesn't care about builder call order, but
       // `fake_cloud_firestore` (this repository's test double) silently
@@ -89,6 +93,35 @@ class UserRepository {
   /// can't do case-insensitive matching without a separate lowercased
   /// field this collection doesn't have), so the caller should lowercase
   /// [prefix] to match how email is normally typed/stored.
+  /// Every account with no `createdAt` timestamp. [getPage] orders by that
+  /// field, and Firestore leaves a document out of any query ordered by a
+  /// field it doesn't have — so these never show up there, however far it's
+  /// paged. Reads the whole collection (in id order, 500 at a time) since
+  /// "field is missing" can't be queried for; call it once, after the last
+  /// page.
+  Future<List<AppUser>> getUndated() async {
+    const batchSize = 500;
+    try {
+      final undated = <AppUser>[];
+      DocumentSnapshot<Map<String, dynamic>>? cursor;
+      while (true) {
+        var query = _users.orderBy(FieldPath.documentId);
+        if (cursor != null) query = query.startAfterDocument(cursor);
+        final snapshot = await query.limit(batchSize).get();
+        for (final doc in snapshot.docs) {
+          if (doc.data()['createdAt'] is! Timestamp) {
+            undated.add(AppUser.fromMap(doc.id, doc.data()));
+          }
+        }
+        if (snapshot.docs.length < batchSize) break;
+        cursor = snapshot.docs.last;
+      }
+      return undated;
+    } catch (e) {
+      throw AppException.from(e);
+    }
+  }
+
   Future<List<AppUser>> searchByEmailPrefix(String prefix, {int limit = 20}) async {
     if (prefix.isEmpty) return const [];
     try {

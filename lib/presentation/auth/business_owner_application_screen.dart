@@ -297,7 +297,7 @@ class _BusinessOwnerApplicationScreenState extends State<BusinessOwnerApplicatio
         children: [
           Text(
             'Scan your business permit and a valid ID — we\'ll read the details for you to check. '
-            'An admin will review this and, once approved, you\'ll see an invite to accept on your Profile screen.',
+            'An admin will review this and, once approved, your account becomes a Business Owner account.',
             style: theme.textTheme.bodyMedium,
           ),
           const SizedBox(height: AppSpacing.xl),

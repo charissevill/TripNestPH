@@ -55,6 +55,7 @@ class AppNotification {
     required this.createdAt,
     this.isRead = false,
     this.readBy = const [],
+    this.dismissedBy = const [],
     this.relatedId,
     this.imageUrl = '',
   });
@@ -78,6 +79,12 @@ class AppNotification {
   /// once — see [isReadBy].
   final List<String> readBy;
 
+  /// "Deleted" state for a *broadcast* notification: the uids of every
+  /// traveler who's removed it from their own inbox. Same reasoning as
+  /// [readBy] — deleting the one shared doc would remove it for everyone,
+  /// so a traveler only ever hides it for themselves.
+  final List<String> dismissedBy;
+
   /// The read state to actually show a given viewer — [isRead] for a
   /// personal notification, whether they're in [readBy] for a broadcast.
   bool isReadBy(String? uid) => userId.isEmpty ? readBy.contains(uid) : isRead;
@@ -97,6 +104,7 @@ class AppNotification {
       createdAt: timestamp is Timestamp ? timestamp.toDate() : DateTime.now(),
       isRead: map['isRead'] as bool? ?? false,
       readBy: (map['readBy'] as List<dynamic>?)?.cast<String>() ?? const [],
+      dismissedBy: (map['dismissedBy'] as List<dynamic>?)?.cast<String>() ?? const [],
       relatedId: map['relatedId'] as String?,
       imageUrl: map['imageUrl'] as String? ?? '',
     );

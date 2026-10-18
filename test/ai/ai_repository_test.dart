@@ -1148,4 +1148,79 @@ void main() {
       expect(itinerary.nearbyAttractionIds, isEmpty);
     },
   );
+
+  test(
+    'generateItinerary() from an AI Chat plan labels each day and recommends restaurants, same as a Planner-form trip',
+    () async {
+      final firestore = FakeFirebaseFirestore();
+      Map<String, dynamic> restaurant(String name) => {
+        'name': name,
+        'cuisine': 'Filipino',
+        'provinceId': 'palawan',
+        'provinceName': 'Palawan',
+        'heroImageUrl': '',
+        'galleryImageUrls': <String>[],
+        'rating': 4.5,
+        'reviewCount': 10,
+        'priceRange': '₱₱',
+        'description': '',
+        'openingHours': '',
+        'menuHighlights': <String>[],
+        'status': 'published',
+      };
+      await firestore.collection('restaurants').doc('in-plan').set(restaurant('Real Seaside Grill'));
+      await firestore.collection('restaurants').doc('not-in-plan').set(restaurant('Other Palawan Cafe'));
+
+      // Only the budget-and-tips call reaches the AI on this path — the day
+      // plan itself is parsed straight from the chat reply below.
+      final caller = _fakeAiComplete({
+        'budgetBreakdown': [
+          {'label': 'Food', 'amount': 1000, 'iconKey': 'restaurant', 'colorKey': 'primary'},
+        ],
+        'travelTips': ['Bring sunscreen.'],
+        'totalBudget': 1000,
+      });
+
+      final repository = AiRepository(
+        openAiService: OpenAiService(caller: caller),
+        placesService: PlacesService(caller: _fakePlacesSearchText(const {})),
+        restaurantRepository: RestaurantRepository(firestore: firestore),
+        provinceRepository: ProvinceRepository(firestore: firestore),
+      );
+
+      final itinerary = await repository.generateItinerary(
+        const AiItineraryRequest(
+          destinationId: 'el-nido',
+          destinationName: 'El Nido',
+          provinceId: 'palawan',
+          provinceName: 'Palawan',
+          budgetTierLabel: 'Mid-range',
+          budgetRange: '₱15k - ₱40k',
+          days: 2,
+          travelers: 2,
+          travelerType: 'Couple',
+          transportation: {'Van / Car Rental'},
+          interests: {'Beaches'},
+          priorConversationContext: '''
+Destination: El Nido, Palawan
+Day 1 – Beaches
+- Morning: **Nacpan Beach** — Swim and relax.
+- Afternoon: **Las Cabanas Beach** — Zipline over the water.
+- Evening: **Real Seaside Grill** — Seafood dinner by the shore.
+Day 2 – Lagoons
+- Morning: **Big Lagoon** — Kayak through the lagoon.
+- Afternoon: **Secret Lagoon** — Squeeze through the rock opening.
+- Evening: **El Nido Town Proper** — Stroll and grab dessert.
+''',
+        ),
+        coverImageUrl: '',
+      );
+
+      expect(itinerary.days.map((d) => d.dateLabel), ['Day 1', 'Day 2']);
+      // The restaurant the chat plan actually visits leads the list; the
+      // rest of the province's restaurants fill in after it.
+      expect(itinerary.recommendedRestaurantIds.first, 'in-plan');
+      expect(itinerary.recommendedRestaurantIds, containsAll(['in-plan', 'not-in-plan']));
+    },
+  );
 }

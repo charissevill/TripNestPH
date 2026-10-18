@@ -195,12 +195,28 @@ class AiRepository {
               days: parsedDays.length,
             )
           : Future.value(<WeatherForecast>[]),
+      _restaurantRepository.filter(provinceId: request.provinceId, limit: 30),
     ]);
     final geocodedDays = results[0] as List<ItineraryDay>;
     final accommodations = results[1] as List<PlaceRecommendation>;
     final placeAttractions = results[2] as List<PlaceRecommendation>;
     final province = results[3] as Province?;
     final weather = results[4] as List<WeatherForecast>;
+    final candidateRestaurants = <Restaurant>[
+      ...results[5] as List<Restaurant>,
+    ];
+    final knownRestaurantIds = candidateRestaurants.map((r) => r.id).toSet();
+    for (final r
+        in request.priorConversationEntities.whereType<Restaurant>()) {
+      if (knownRestaurantIds.add(r.id)) candidateRestaurants.add(r);
+    }
+    _sortByDistanceFromAnchor(
+      candidateRestaurants,
+      request,
+      (r) => r.latitude,
+      (r) => r.longitude,
+      fallbackAnchor: destinationCoordinates,
+    );
 
     final (
       budgetBreakdown,
@@ -223,7 +239,10 @@ class AiRepository {
       budgetBreakdown: budgetBreakdown,
       weather: weather,
       travelTips: travelTips,
-      recommendedRestaurantIds: const [],
+      recommendedRestaurantIds: _chatPlanRestaurantIds(
+        candidateRestaurants,
+        geocodedDays,
+      ),
       nearbyAttractionIds: const [],
       recommendedAccommodations: accommodations,
       recommendedPlaceAttractions: placeAttractions,
@@ -234,6 +253,34 @@ class AiRepository {
       destinationLatitude: destinationCoordinates.latitude,
       destinationLongitude: destinationCoordinates.longitude,
     );
+  }
+
+  /// "Recommended Restaurants" for a chat-derived itinerary — the Planner
+  /// path gets these from the model's `recommendedRestaurantNames` (see
+  /// [_parseItinerary]), but [generateItineraryFromChatPlan] never asks a
+  /// model to pick places. Restaurants the day plan itself visits come
+  /// first, then the nearest others in [candidates] (already sorted by
+  /// distance) up to [limit], so the section shows up the same way it does
+  /// on a Planner-form trip.
+  List<String> _chatPlanRestaurantIds(
+    List<Restaurant> candidates,
+    List<ItineraryDay> days, {
+    int limit = 4,
+  }) {
+    final plannedNames = <String>{
+      for (final day in days)
+        for (final activity in day.activities) ...[
+          activity.title.trim().toLowerCase(),
+          activity.location.trim().toLowerCase(),
+        ],
+    };
+    final inPlan = candidates.where(
+      (r) => plannedNames.contains(r.name.trim().toLowerCase()),
+    );
+    return <String>{
+      ...inPlan.map((r) => r.id),
+      ...candidates.map((r) => r.id),
+    }.take(limit).toList();
   }
 
   /// Recognized time-of-day labels for a chat-parsed activity line — used
@@ -329,9 +376,11 @@ class AiRepository {
       }
       if (activities.isEmpty) continue;
       days.add(
+        // Same "Day N" label the Planner path's JSON always has — the day
+        // card's header shows it, and it was blank for chat-derived trips.
         ItineraryDay(
           dayNumber: dayNumber,
-          dateLabel: '',
+          dateLabel: 'Day $dayNumber',
           activities: activities,
         ),
       );

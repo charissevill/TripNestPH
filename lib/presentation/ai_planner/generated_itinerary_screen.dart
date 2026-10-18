@@ -5199,7 +5199,12 @@ class _DayCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(day.dateLabel, style: theme.textTheme.titleMedium),
+                    // Chat-derived trips saved before they got "Day N"
+                    // labels have an empty one — never a blank header.
+                    Text(
+                      day.dateLabel.trim().isEmpty ? 'Day ${day.dayNumber}' : day.dateLabel,
+                      style: theme.textTheme.titleMedium,
+                    ),
                     if (date != null)
                       Text(
                         DateFormat('EEE, MMM d, y').format(date!),

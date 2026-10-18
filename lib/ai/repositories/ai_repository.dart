@@ -195,7 +195,7 @@ class AiRepository {
               days: parsedDays.length,
             )
           : Future.value(<WeatherForecast>[]),
-      _restaurantRepository.filter(provinceId: request.provinceId, limit: 30),
+      _fetchChatPlanRestaurants(request),
     ]);
     final geocodedDays = results[0] as List<ItineraryDay>;
     final accommodations = results[1] as List<PlaceRecommendation>;
@@ -206,9 +206,15 @@ class AiRepository {
       ...results[5] as List<Restaurant>,
     ];
     final knownRestaurantIds = candidateRestaurants.map((r) => r.id).toSet();
+    // Only ones in this trip's province — a restaurant the chat mentioned
+    // for some other destination earlier would otherwise fill in here
+    // whenever the province itself has few.
     for (final r
         in request.priorConversationEntities.whereType<Restaurant>()) {
-      if (knownRestaurantIds.add(r.id)) candidateRestaurants.add(r);
+      if (r.provinceId == request.provinceId &&
+          knownRestaurantIds.add(r.id)) {
+        candidateRestaurants.add(r);
+      }
     }
     _sortByDistanceFromAnchor(
       candidateRestaurants,
@@ -242,6 +248,10 @@ class AiRepository {
       recommendedRestaurantIds: _chatPlanRestaurantIds(
         candidateRestaurants,
         geocodedDays,
+        anchorLatitude:
+            request.accommodationLatitude ?? destinationCoordinates.latitude,
+        anchorLongitude:
+            request.accommodationLongitude ?? destinationCoordinates.longitude,
       ),
       nearbyAttractionIds: const [],
       recommendedAccommodations: accommodations,
@@ -261,11 +271,17 @@ class AiRepository {
   /// model to pick places. Restaurants the day plan itself visits come
   /// first, then the nearest others in [candidates] (already sorted by
   /// distance) up to [limit], so the section shows up the same way it does
-  /// on a Planner-form trip.
+  /// on a Planner-form trip. Those fill-ins skip anything more than
+  /// [maxFillInKm] from the anchor — a big province's "nearest" can still
+  /// be hours away — while ones without coordinates stay, since they're in
+  /// the trip's province either way.
   List<String> _chatPlanRestaurantIds(
     List<Restaurant> candidates,
     List<ItineraryDay> days, {
+    double? anchorLatitude,
+    double? anchorLongitude,
     int limit = 4,
+    double maxFillInKm = 30,
   }) {
     final plannedNames = <String>{
       for (final day in days)
@@ -277,10 +293,41 @@ class AiRepository {
     final inPlan = candidates.where(
       (r) => plannedNames.contains(r.name.trim().toLowerCase()),
     );
+    bool closeEnough(Restaurant r) {
+      final lat = r.latitude;
+      final lng = r.longitude;
+      if (anchorLatitude == null ||
+          anchorLongitude == null ||
+          lat == null ||
+          lng == null) {
+        return true;
+      }
+      return haversineKm(anchorLatitude, anchorLongitude, lat, lng) <=
+          maxFillInKm;
+    }
+
     return <String>{
       ...inPlan.map((r) => r.id),
-      ...candidates.map((r) => r.id),
+      ...candidates.where(closeEnough).map((r) => r.id),
     }.take(limit).toList();
+  }
+
+  /// The province's restaurants for [_chatPlanRestaurantIds] — none at all
+  /// without a province (an unfiltered query would pull from the whole
+  /// country), and none on a failed query: "Recommended Restaurants" is an
+  /// extra, never worth failing the whole itinerary over.
+  Future<List<Restaurant>> _fetchChatPlanRestaurants(
+    AiItineraryRequest request,
+  ) async {
+    if (request.provinceId.isEmpty) return const [];
+    try {
+      return await _restaurantRepository.filter(
+        provinceId: request.provinceId,
+        limit: 30,
+      );
+    } catch (_) {
+      return const [];
+    }
   }
 
   /// Recognized time-of-day labels for a chat-parsed activity line — used

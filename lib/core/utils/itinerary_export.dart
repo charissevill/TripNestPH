@@ -10,6 +10,15 @@ import '../../domain/models/itinerary.dart';
 class ItineraryExport {
   ItineraryExport._();
 
+  /// "Day 2 — Beach Hopping", or just "Day 2" when the label is empty or
+  /// already says exactly that — chat-derived trips (and most Planner ones)
+  /// label each day "Day N", which used to export as "Day 2 — Day 2".
+  static String _dayHeading(ItineraryDay day, String separator) {
+    final base = 'Day ${day.dayNumber}';
+    final label = day.dateLabel.trim();
+    return label.isEmpty || label.toLowerCase() == base.toLowerCase() ? base : '$base$separator$label';
+  }
+
   static String buildShareText(Itinerary itinerary) {
     final buffer = StringBuffer()
       ..writeln('My ${itinerary.totalDays}-day TripNest PH itinerary: ${itinerary.destinationName}')
@@ -17,7 +26,7 @@ class ItineraryExport {
       ..writeln();
 
     for (final day in itinerary.days) {
-      buffer.writeln('Day ${day.dayNumber} — ${day.dateLabel}');
+      buffer.writeln(_dayHeading(day, ' — '));
       for (final activity in day.activities) {
         buffer.writeln('  ${activity.time} · ${activity.title} (${activity.location})');
       }
@@ -99,7 +108,7 @@ class ItineraryExport {
           pw.Text('Day-by-Day Plan', style: pw.TextStyle(fontSize: 15, fontWeight: pw.FontWeight.bold)),
           for (final day in itinerary.days) ...[
             pw.SizedBox(height: 10),
-            pw.Text('Day ${day.dayNumber} - ${s(day.dateLabel)}', style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold)),
+            pw.Text(s(_dayHeading(day, ' - ')), style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold)),
             for (final activity in day.activities)
               pw.Padding(
                 padding: const pw.EdgeInsets.only(top: 4, left: 8),

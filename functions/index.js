@@ -18,18 +18,18 @@ const auth = getAuth();
 
 // Both read via Secret Manager (`firebase functions:secrets:set NAME`), never
 // from a client-readable source — see `aiComplete`/`placesSearch*` below.
-const groqApiKey = defineSecret('GROQ_API_KEY');
+const openAiApiKey = defineSecret('OPENAI_API_KEY');
 const googlePlacesApiKey = defineSecret('GOOGLE_PLACES_API_KEY');
 
 /**
  * Per-uid, per-function rolling-window request cap, backed by one small
  * Firestore doc per (uid, key) pair — so a scripted or compromised client
- * can't run up billing on Groq/Places/Routes under a single signed-in
+ * can't run up billing on OpenAI/Places/Routes under a single signed-in
  * account. A rolling window (recent timestamps, not a fixed bucket) so a
  * burst right at a bucket boundary can't double the effective limit; a
  * transaction makes the read-check-write atomic against concurrent calls
  * from the same user. Throws `resource-exhausted`, which every caller here
- * already has to handle (it's the same code Groq's own 429 maps to above).
+ * already has to handle (it's the same code OpenAI's own 429 maps to above).
  */
 const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000;
 
@@ -366,7 +366,7 @@ exports.verifyEmailVerificationCode = onCall({ region: 'asia-southeast1' }, asyn
 });
 
 /**
- * Proxies Groq's OpenAI-compatible chat-completions endpoint so the raw API
+ * Proxies OpenAI's chat-completions endpoint so the raw API
  * key never has to ship inside the mobile/web client bundle. `flutter_dotenv`
  * loads `.env` as a plain app asset — anyone who unzips the APK/web build can
  * read it verbatim, which is a real exposure for a billed-per-token key.
@@ -374,8 +374,8 @@ exports.verifyEmailVerificationCode = onCall({ region: 'asia-southeast1' }, asyn
  * router redirects unauthenticated users to Login before they can open the
  * AI Planner or Trip Assistant at all, so this adds no new restriction).
  *
- * Swapped from OpenAI to Groq (temporary — see `groqApiKey` above); the
- * request/response shape is identical (`choices[0].message.content`,
+ * Back on OpenAI after a temporary stint on Groq; the request/response
+ * shape is identical (`choices[0].message.content`,
  * `response_format: { type: 'json_object' }`), so nothing on the client
  * (`OpenAiService`) needed to change to point at a different provider.
  */
@@ -392,19 +392,18 @@ const AI_MAX_MESSAGES = 40;
 // attacker-controlled input, so the cap here just needs to stop a truly
 // runaway payload, not squeeze normal usage.
 const AI_MAX_MESSAGE_CHARS = 16000;
-const GROQ_MODEL = 'openai/gpt-oss-120b';
-// gpt-oss models spend part of max_tokens on hidden reasoning before the
-// visible answer (default effort is 'medium') — confirmed directly: a
-// 10-token budget came back completely empty, the reasoning alone used it
-// all up. 'low' leaves more of the (already tight, 220-450 token) budget
-// for the actual answer instead of silently truncating it to nothing.
-const GROQ_REASONING_EFFORT = 'low';
+// A non-reasoning model on purpose: reasoning models (gpt-5*) spend part of
+// the budget on hidden reasoning and ignore `temperature`, and the callers'
+// token budgets here are tight (220-450 for chat), so every token should go
+// to the visible answer.
+const OPENAI_MODEL = 'gpt-4.1-mini';
+const OPENAI_CHAT_URL = 'https://api.openai.com/v1/chat/completions';
 
-exports.aiComplete = onCall({ region: 'asia-southeast1', secrets: [groqApiKey], timeoutSeconds: 60 }, async (request) => {
+exports.aiComplete = onCall({ region: 'asia-southeast1', secrets: [openAiApiKey], timeoutSeconds: 60 }, async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.');
   await enforceRateLimit(request.auth.uid, 'aiComplete', 30);
 
-  const apiKey = groqApiKey.value();
+  const apiKey = openAiApiKey.value();
   if (!apiKey) throw new HttpsError('failed-precondition', 'AI features aren\'t set up yet.');
 
   const { messages, temperature, maxTokens, jsonMode } = request.data ?? {};
@@ -422,15 +421,14 @@ exports.aiComplete = onCall({ region: 'asia-southeast1', secrets: [groqApiKey], 
 
   const boundedMaxTokens = typeof maxTokens === 'number' ? Math.min(Math.max(Math.trunc(maxTokens), 1), AI_MAX_TOKENS_CEILING) : 1200;
   const body = {
-    model: GROQ_MODEL,
+    model: OPENAI_MODEL,
     messages,
     temperature: typeof temperature === 'number' ? temperature : 0.7,
-    max_tokens: boundedMaxTokens,
-    reasoning_effort: GROQ_REASONING_EFFORT,
+    max_completion_tokens: boundedMaxTokens,
   };
   if (jsonMode) body.response_format = { type: 'json_object' };
 
-  const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+  const response = await fetch(OPENAI_CHAT_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
     body: JSON.stringify(body),
@@ -443,7 +441,7 @@ exports.aiComplete = onCall({ region: 'asia-southeast1', secrets: [groqApiKey], 
     return { content };
   }
   const apiMessage = json?.error?.message;
-  if (response.status === 401) throw new HttpsError('failed-precondition', apiMessage || 'The Groq API key is invalid.');
+  if (response.status === 401) throw new HttpsError('failed-precondition', apiMessage || 'The OpenAI API key is invalid.');
   if (response.status === 429) throw new HttpsError('resource-exhausted', 'Too many requests right now. Please wait a moment and try again.');
   if (response.status === 400) throw new HttpsError('invalid-argument', apiMessage || 'The AI could not process that request.');
   if (response.status >= 500) throw new HttpsError('unavailable', 'The AI service is temporarily unavailable. Please try again shortly.');
@@ -1145,32 +1143,31 @@ exports.deliverProvinceAnnouncement = onDocumentCreated('province_announcements/
 /**
  * A "Travelers say..." summary generated from a listing's own review text —
  * refreshed on a schedule (never on-demand from the app), so opening a
- * details page is never what triggers a billed Groq call. Restaurants only
+ * details page is never what triggers a billed OpenAI call. Restaurants only
  * for now: they're the one review target type with enough real review
  * volume in this app to make a summary worth the API cost.
  */
 const REVIEW_DIGEST_MIN_REVIEWS = 3;
 // A digest is only worth regenerating once enough new reviews have come in
-// since the last one — otherwise every run would spend a Groq call on every
+// since the last one — otherwise every run would spend an OpenAI call on every
 // popular listing for a summary that would barely have changed.
 const REVIEW_DIGEST_MIN_NEW_REVIEWS = 3;
 
 /**
- * Same Groq chat-completions endpoint `aiComplete` proxies, called directly
+ * Same OpenAI chat-completions endpoint `aiComplete` proxies, called directly
  * here instead of through it — `aiComplete` is a client-facing callable with
  * its own auth/rate-limit/argument-validation wrapper that makes no sense
  * for a server-triggered scheduled job, so this is a separate, minimal path
  * to the same upstream API rather than a refactor of that tested function.
  */
 async function summarizeReviews(apiKey, placeName, comments) {
-  const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+  const response = await fetch(OPENAI_CHAT_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
     body: JSON.stringify({
-      model: GROQ_MODEL,
+      model: OPENAI_MODEL,
       temperature: 0.4,
-      max_tokens: 220,
-      reasoning_effort: GROQ_REASONING_EFFORT,
+      max_completion_tokens: 220,
       messages: [
         {
           role: 'system',
@@ -1186,11 +1183,11 @@ async function summarizeReviews(apiKey, placeName, comments) {
   });
   if (response.status !== 200) {
     const json = await response.json().catch(() => null);
-    throw new Error(`Groq request failed (${response.status}): ${json?.error?.message ?? 'unknown error'}`);
+    throw new Error(`OpenAI request failed (${response.status}): ${json?.error?.message ?? 'unknown error'}`);
   }
   const json = await response.json();
   const content = json?.choices?.[0]?.message?.content;
-  if (!content || !content.trim()) throw new Error('Groq returned an empty response.');
+  if (!content || !content.trim()) throw new Error('OpenAI returned an empty response.');
   return content.trim();
 }
 
@@ -1257,9 +1254,9 @@ exports.snapshotDailyAnalytics = onSchedule(
 );
 
 exports.generateReviewDigests = onSchedule(
-  { region: 'asia-southeast1', schedule: 'every 24 hours', secrets: [groqApiKey], timeoutSeconds: 540 },
+  { region: 'asia-southeast1', schedule: 'every 24 hours', secrets: [openAiApiKey], timeoutSeconds: 540 },
   async () => {
-    const apiKey = groqApiKey.value();
+    const apiKey = openAiApiKey.value();
     if (!apiKey) return;
 
     const listingsSnap = await db.collection('restaurants').where('status', '==', 'published').get();
@@ -1295,7 +1292,7 @@ exports.generateReviewDigests = onSchedule(
           },
         });
       } catch (e) {
-        // Best-effort — one bad listing (a transient Groq error, say)
+        // Best-effort — one bad listing (a transient OpenAI error, say)
         // shouldn't stop the rest of this run from generating theirs.
         console.error(`generateReviewDigests: failed for restaurants/${doc.id}`, e);
       }

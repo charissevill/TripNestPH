@@ -301,6 +301,18 @@ class ItineraryActivity {
 
   IconData get icon => IconRegistry.resolve(iconKey);
 
+  ItineraryActivity copyWith({String? time}) {
+    return ItineraryActivity(
+      time: time ?? this.time,
+      title: title,
+      description: description,
+      iconKey: iconKey,
+      location: location,
+      latitude: latitude,
+      longitude: longitude,
+    );
+  }
+
   factory ItineraryActivity.fromMap(Map<String, dynamic> map) {
     return ItineraryActivity(
       time: map['time'] as String? ?? '',

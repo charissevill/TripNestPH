@@ -58,6 +58,10 @@ import '../../domain/models/saved_itinerary.dart';
 import 'widgets/map_destination_picker.dart';
 import '../../core/widgets/media/image_error_placeholder.dart';
 
+/// The only three time slots an activity may be assigned to, in their fixed
+/// display order — see [sortActivitiesByTimeSlot].
+const List<String> _timeSlotLabels = ['Morning', 'Afternoon', 'Evening'];
+
 /// Canonical position of a time-slot label in the fixed Morning → Afternoon
 /// → Evening sequence — anything else (a legacy free-text time from before
 /// activities were restricted to these three, or old saved data) sorts
@@ -77,14 +81,24 @@ int _timeSlotRank(String time) {
   }
 }
 
+/// The slot one step earlier (`delta == -1`) or later (`1`) than [time], or
+/// null past either end. A legacy free-text time (ranked after Evening)
+/// steps back into Evening and has nothing after it.
+String? _adjacentTimeSlot(String time, int delta) {
+  final target = _timeSlotRank(time) + delta;
+  return target >= 0 && target < _timeSlotLabels.length
+      ? _timeSlotLabels[target]
+      : null;
+}
+
 /// [activities] grouped and ordered by [_timeSlotRank] — Morning first,
 /// then Afternoon, then Evening, then anything else — with everything
 /// *within* the same slot kept in its original relative order (a stable
 /// sort, not [List.sort]'s unstable one, since two "Evening" activities
-/// swapped via [_GeneratedItineraryScreenState._reorderWithinSlot] must
+/// swapped via [_GeneratedItineraryScreenState._moveActivity] must
 /// actually show up swapped). This is the one place both
 /// [_TimelineActivity]'s display order and [_GeneratedItineraryScreenState
-/// ._reorderWithinSlot]'s neighbor lookup are computed from, so the two
+/// ._moveActivity]'s neighbor lookup are computed from, so the two
 /// can never disagree about what's "next to" what.
 List<ItineraryActivity> sortActivitiesByTimeSlot(
   List<ItineraryActivity> activities,
@@ -2535,41 +2549,104 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen>
     await _persistDays(updated);
   }
 
-  /// Reorders [activity] against its neighbor [delta] positions away *within
-  /// the same time slot* — the Morning → Afternoon → Evening sequence itself
-  /// is fixed and never changes (see [sortActivitiesByTimeSlot]); this only
-  /// ever matters when two or more activities share one slot (e.g. two
-  /// "Evening" stops) and the traveler wants to swap which one comes first.
-  /// A no-op if there's no same-slot neighbor in that direction — including
-  /// the ordinary case of exactly one activity per slot, where there's
-  /// nothing to reorder.
-  Future<void> _reorderWithinSlot(
+  /// Moves [activity] one step earlier (`delta == -1`) or later (`1`) in its
+  /// day. When the neighbor in that direction shares its time slot (e.g. two
+  /// "Evening" stops) the two swap places; otherwise [activity] crosses into
+  /// the adjacent slot — a Morning stop moved down becomes that day's first
+  /// Afternoon one, so a traveler who'd rather see Liliw in the afternoon
+  /// just taps ↓. The Morning → Afternoon → Evening sequence itself stays
+  /// fixed (see [sortActivitiesByTimeSlot]); only [activity]'s own label
+  /// changes. A no-op past either end of that sequence.
+  Future<void> _moveActivity(
     int dayNumber,
     ItineraryActivity activity,
     int delta,
   ) async {
-    final updated = _days.map((d) {
-      if (d.dayNumber != dayNumber) return d;
-      final sorted = sortActivitiesByTimeSlot(d.activities);
-      final displayIndex = sorted.indexOf(activity);
-      final otherDisplayIndex = displayIndex + delta;
-      if (otherDisplayIndex < 0 || otherDisplayIndex >= sorted.length) {
-        return d;
-      }
-      final other = sorted[otherDisplayIndex];
-      if (other.time != activity.time) return d;
+    final day = _days.firstWhere((d) => d.dayNumber == dayNumber);
+    final sorted = sortActivitiesByTimeSlot(day.activities);
+    final displayIndex = sorted.indexOf(activity);
+    final otherDisplayIndex = displayIndex + delta;
+    final other = otherDisplayIndex >= 0 && otherDisplayIndex < sorted.length
+        ? sorted[otherDisplayIndex]
+        : null;
 
-      final activities = [...d.activities];
+    if (other != null && other.time == activity.time) {
+      final activities = [...day.activities];
       final i = activities.indexOf(activity);
       final j = activities.indexOf(other);
       activities[i] = other;
       activities[j] = activity;
-      return ItineraryDay(
-        dayNumber: d.dayNumber,
-        dateLabel: d.dateLabel,
-        activities: activities,
+      await _persistDayActivities(dayNumber, activities);
+      return;
+    }
+
+    final targetSlot = _adjacentTimeSlot(activity.time, delta);
+    if (targetSlot == null || _isRepeatInSlot(day, activity, targetSlot)) {
+      return;
+    }
+    // Stored in display order with [activity] relabeled in place: being the
+    // last of its old slot (moving down) it now sorts first in the next
+    // one, and being the first (moving up) it sorts last in the previous —
+    // right next to where it already was on screen.
+    await _persistDayActivities(dayNumber, [
+      for (final a in sorted)
+        identical(a, activity) ? a.copyWith(time: targetSlot) : a,
+    ]);
+  }
+
+  /// Jumps [activity] straight to [time] (e.g. Morning → Evening in one
+  /// tap, from its time label's menu), landing last in that slot.
+  Future<void> _changeActivityTime(
+    int dayNumber,
+    ItineraryActivity activity,
+    String time,
+  ) async {
+    final day = _days.firstWhere((d) => d.dayNumber == dayNumber);
+    if (time == activity.time || _isRepeatInSlot(day, activity, time)) return;
+    await _persistDayActivities(dayNumber, [
+      ...day.activities.where((a) => !identical(a, activity)),
+      activity.copyWith(time: time),
+    ]);
+  }
+
+  /// Whether [day] already has another activity titled like [activity] in
+  /// [time] — the same exact-repeat rule [_AddActivityDialog] enforces —
+  /// telling the traveler so instead of silently creating the duplicate.
+  bool _isRepeatInSlot(ItineraryDay day, ItineraryActivity activity, String time) {
+    final title = activity.title.trim().toLowerCase();
+    final isRepeat = day.activities.any(
+      (a) =>
+          !identical(a, activity) &&
+          a.time == time &&
+          a.title.trim().toLowerCase() == title,
+    );
+    if (isRepeat) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '"${activity.title}" is already planned for this day\'s ${time.toLowerCase()}.',
+          ),
+        ),
       );
-    }).toList();
+    }
+    return isRepeat;
+  }
+
+  Future<void> _persistDayActivities(
+    int dayNumber,
+    List<ItineraryActivity> activities,
+  ) async {
+    final updated = _days
+        .map(
+          (d) => d.dayNumber == dayNumber
+              ? ItineraryDay(
+                  dayNumber: d.dayNumber,
+                  dateLabel: d.dateLabel,
+                  activities: activities,
+                )
+              : d,
+        )
+        .toList();
     await _persistDays(updated);
   }
 
@@ -2999,7 +3076,11 @@ class _GeneratedItineraryScreenState extends State<GeneratedItineraryScreen>
                     : null,
                 onMoveActivity: _showActivityEditControls
                     ? (activity, delta) =>
-                          _reorderWithinSlot(day.dayNumber, activity, delta)
+                          _moveActivity(day.dayNumber, activity, delta)
+                    : null,
+                onChangeActivityTime: _showActivityEditControls
+                    ? (activity, time) =>
+                          _changeActivityTime(day.dayNumber, activity, time)
                     : null,
                 onEditActivity: _showActivityEditControls
                     ? (activity) => _editActivity(day.dayNumber, activity)
@@ -3602,7 +3683,7 @@ class _AddActivityDialogState extends State<_AddActivityDialog> {
   /// [sortActivitiesByTimeSlot]'s doc comment for why free text isn't
   /// offered here any more: a stray custom label would sort after all
   /// three and break the fixed Morning → Afternoon → Evening sequence.
-  static const List<String> _timeSlots = ['Morning', 'Afternoon', 'Evening'];
+  static const List<String> _timeSlots = _timeSlotLabels;
 
   /// Defaults to Morning for a genuinely new activity, or [_timeSlots]'s
   /// first entry for an [_AddActivityDialogState.widget]'s existing]
@@ -5097,6 +5178,7 @@ class _DayCard extends StatelessWidget {
     this.onAddActivity,
     this.onRemoveActivity,
     this.onMoveActivity,
+    this.onChangeActivityTime,
     this.onEditActivity,
     this.onRegenerateActivity,
     this.regeneratingActivity,
@@ -5140,10 +5222,15 @@ class _DayCard extends StatelessWidget {
   final ItineraryActivity? regeneratingActivity;
 
   /// `(activity, delta)` — `delta` is `-1`/`1`, see
-  /// [_GeneratedItineraryScreenState._reorderWithinSlot]'s doc comment.
-  /// Reorders [activity] against its same-time-slot neighbor; never crosses
-  /// into a different slot, since Morning → Afternoon → Evening is fixed.
+  /// [_GeneratedItineraryScreenState._moveActivity]'s doc comment. Swaps
+  /// [activity] with a same-slot neighbor, or else moves it into the
+  /// adjacent time slot.
   final void Function(ItineraryActivity activity, int delta)? onMoveActivity;
+
+  /// `(activity, time)` — see
+  /// [_GeneratedItineraryScreenState._changeActivityTime].
+  final void Function(ItineraryActivity activity, String time)?
+  onChangeActivityTime;
 
   @override
   Widget build(BuildContext context) {
@@ -5233,15 +5320,24 @@ class _DayCard extends StatelessWidget {
                 onRemove: onRemoveActivity == null
                     ? null
                     : () => onRemoveActivity!(activity),
-                // Only enabled when the neighbor shares this exact time
-                // slot — reordering never crosses into a different one.
-                onMoveUp: onMoveActivity == null || prev?.time != activity.time
+                // Enabled when there's a same-slot neighbor to swap with,
+                // or an adjacent slot to move into — only the very first
+                // Morning / last Evening step has nowhere to go.
+                onMoveUp:
+                    onMoveActivity == null ||
+                        (prev?.time != activity.time &&
+                            _adjacentTimeSlot(activity.time, -1) == null)
                     ? null
                     : () => onMoveActivity!(activity, -1),
                 onMoveDown:
-                    onMoveActivity == null || next?.time != activity.time
+                    onMoveActivity == null ||
+                        (next?.time != activity.time &&
+                            _adjacentTimeSlot(activity.time, 1) == null)
                     ? null
                     : () => onMoveActivity!(activity, 1),
+                onChangeTime: onChangeActivityTime == null
+                    ? null
+                    : (time) => onChangeActivityTime!(activity, time),
                 onEdit: onEditActivity == null
                     ? null
                     : () => onEditActivity!(activity),
@@ -5301,6 +5397,7 @@ class _TimelineActivity extends StatelessWidget {
     this.onRemove,
     this.onMoveUp,
     this.onMoveDown,
+    this.onChangeTime,
     this.onEdit,
     this.onRegenerate,
     this.regenerating = false,
@@ -5313,13 +5410,16 @@ class _TimelineActivity extends StatelessWidget {
   /// — null hides the whole trailing action column, same "no callback, no
   /// affordance" pattern the rest of this screen already uses (e.g.
   /// [ChatBubble.onOpenPlanner]). [onMoveUp]/[onMoveDown] are independently
-  /// null both at either end of the day's own activity list *and* whenever
-  /// the neighbor in that direction is in a different time slot — reordering
-  /// never crosses Morning/Afternoon/Evening, see
-  /// [_GeneratedItineraryScreenState._reorderWithinSlot]'s doc comment.
+  /// null only when there's neither a same-slot neighbor to swap with nor an
+  /// adjacent time slot to move into in that direction, see
+  /// [_GeneratedItineraryScreenState._moveActivity]'s doc comment.
   final VoidCallback? onRemove;
   final VoidCallback? onMoveUp;
   final VoidCallback? onMoveDown;
+
+  /// Turns the time label into a Morning/Afternoon/Evening menu — see
+  /// [_GeneratedItineraryScreenState._changeActivityTime].
+  final ValueChanged<String>? onChangeTime;
   final VoidCallback? onEdit;
 
   /// AI-regenerates just this one activity's time slot — see
@@ -5367,18 +5467,57 @@ class _TimelineActivity extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Expanded(
-                        child: Text(
-                          activity.time,
-                          style: theme.textTheme.labelMedium?.copyWith(
-                            color: theme.colorScheme.primary,
-                          ),
-                        ),
+                        child: onChangeTime == null
+                            ? Text(
+                                activity.time,
+                                style: theme.textTheme.labelMedium?.copyWith(
+                                  color: theme.colorScheme.primary,
+                                ),
+                              )
+                            : Align(
+                                alignment: Alignment.centerLeft,
+                                child: PopupMenuButton<String>(
+                                  tooltip: 'Change time slot',
+                                  enabled: !regenerating,
+                                  initialValue: activity.time,
+                                  onSelected: onChangeTime,
+                                  itemBuilder: (context) => [
+                                    for (final slot in _timeSlotLabels)
+                                      CheckedPopupMenuItem(
+                                        value: slot,
+                                        checked: slot == activity.time,
+                                        child: Text(slot),
+                                      ),
+                                  ],
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Flexible(
+                                        child: Text(
+                                          activity.time,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: theme.textTheme.labelMedium
+                                              ?.copyWith(
+                                                color:
+                                                    theme.colorScheme.primary,
+                                              ),
+                                        ),
+                                      ),
+                                      Icon(
+                                        Symbols.arrow_drop_down_rounded,
+                                        size: 18,
+                                        color: theme.colorScheme.primary,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
                       ),
                       if (onRemove != null) ...[
                         Tooltip(
-                          message: 'Move up within this time slot',
+                          message: 'Move earlier',
                           child: InkWell(
-                            onTap: onMoveUp,
+                            onTap: regenerating ? null : onMoveUp,
                             child: Icon(
                               Symbols.arrow_upward_rounded,
                               size: 15,
@@ -5390,9 +5529,9 @@ class _TimelineActivity extends StatelessWidget {
                         ),
                         const SizedBox(width: 6),
                         Tooltip(
-                          message: 'Move down within this time slot',
+                          message: 'Move later',
                           child: InkWell(
-                            onTap: onMoveDown,
+                            onTap: regenerating ? null : onMoveDown,
                             child: Icon(
                               Symbols.arrow_downward_rounded,
                               size: 15,

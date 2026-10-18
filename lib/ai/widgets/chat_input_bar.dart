@@ -7,12 +7,14 @@ import '../../core/theme/app_spacing.dart';
 
 /// The message composer pinned to the bottom of the chat screen: a rounded
 /// text field plus a send button that disables itself while a reply is in
-/// flight or the field is empty.
+/// flight or the field is empty. While [onStop] is set (a reply is being
+/// generated), the send button turns into a stop button instead.
 class ChatInputBar extends StatefulWidget {
-  const ChatInputBar({super.key, required this.onSend, required this.enabled});
+  const ChatInputBar({super.key, required this.onSend, required this.enabled, this.onStop});
 
   final ValueChanged<String> onSend;
   final bool enabled;
+  final VoidCallback? onStop;
 
   @override
   State<ChatInputBar> createState() => _ChatInputBarState();
@@ -74,23 +76,41 @@ class _ChatInputBarState extends State<ChatInputBar> {
                   ),
                 ),
                 const SizedBox(width: AppSpacing.sm),
-                InkWell(
-                  onTap: _submit,
-                  borderRadius: BorderRadius.circular(AppRadius.pill),
-                  child: Container(
-                    width: 48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      color: widget.enabled ? theme.colorScheme.primary : theme.colorScheme.outline,
-                      shape: BoxShape.circle,
+                if (widget.onStop != null)
+                  Tooltip(
+                    message: 'Stop generating',
+                    child: InkWell(
+                      onTap: widget.onStop,
+                      borderRadius: BorderRadius.circular(AppRadius.pill),
+                      child: Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.primary,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Symbols.stop_rounded, color: Colors.white, size: 20, fill: 1),
+                      ),
                     ),
-                    child: Icon(
-                      Symbols.send_rounded,
-                      color: widget.enabled ? Colors.white : theme.colorScheme.onSurfaceVariant,
-                      size: 20,
+                  )
+                else
+                  InkWell(
+                    onTap: _submit,
+                    borderRadius: BorderRadius.circular(AppRadius.pill),
+                    child: Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: widget.enabled ? theme.colorScheme.primary : theme.colorScheme.outline,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Symbols.send_rounded,
+                        color: widget.enabled ? Colors.white : theme.colorScheme.onSurfaceVariant,
+                        size: 20,
+                      ),
                     ),
                   ),
-                ),
               ],
             ),
             const SizedBox(height: AppSpacing.xs),

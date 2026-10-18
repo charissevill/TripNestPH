@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:share_plus/share_plus.dart';
@@ -35,9 +36,15 @@ String _visibleContent(String content) =>
 /// markdown rendering (bold place names, bullet lists, headers for
 /// multi-day plans). Error replies get a warning tint instead.
 class ChatBubble extends StatelessWidget {
-  const ChatBubble({super.key, required this.message, this.onOpenPlanner});
+  const ChatBubble({super.key, required this.message, this.onOpenPlanner, this.onRegenerate});
 
   final AiChatMessage message;
+
+  /// Asks for this reply again — shown as "Try again" on an error bubble
+  /// and as a regenerate icon on a real answer. `AiChatScreen` only passes
+  /// it for the chat's latest reply, since that's the one
+  /// `AiChatProvider.regenerateLastReply` replaces.
+  final VoidCallback? onRegenerate;
 
   /// Set by `AiChatScreen` to resolve a real destination from the
   /// conversation and generate the itinerary directly — kept as a plain
@@ -97,7 +104,7 @@ class ChatBubble extends StatelessWidget {
                   ),
                 ),
               isUser
-                  ? Text(visibleContent, style: theme.textTheme.bodyLarge?.copyWith(color: Colors.white))
+                  ? SelectableText(visibleContent, style: theme.textTheme.bodyLarge?.copyWith(color: Colors.white))
                   : MarkdownBody(
                       data: visibleContent,
                       selectable: true,
@@ -131,21 +138,80 @@ class ChatBubble extends StatelessWidget {
                   ),
                 ),
               ],
+              if (message.isError && onRegenerate != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: AppSpacing.xs),
+                  child: OutlinedButton.icon(
+                    onPressed: onRegenerate,
+                    icon: const Icon(Symbols.refresh_rounded, size: 16),
+                    label: const Text('Try again'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: theme.colorScheme.error,
+                      side: BorderSide(color: theme.colorScheme.error.withValues(alpha: 0.5)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(AppRadius.pill),
+                      ),
+                      visualDensity: VisualDensity.compact,
+                      textStyle: theme.textTheme.labelMedium,
+                    ),
+                  ),
+                ),
               if (!isUser && !message.isError)
                 Align(
                   alignment: Alignment.centerRight,
-                  child: IconButton(
-                    onPressed: () => Share.share(visibleContent, subject: 'TripNest PH AI Recommendation'),
-                    icon: const Icon(Symbols.ios_share_rounded, size: 16),
-                    iconSize: 16,
-                    color: theme.textTheme.bodyMedium?.color,
-                    tooltip: 'Share this recommendation',
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _BubbleAction(
+                        icon: Symbols.content_copy_rounded,
+                        tooltip: 'Copy',
+                        onPressed: () => _copy(context, visibleContent),
+                      ),
+                      _BubbleAction(
+                        icon: Symbols.ios_share_rounded,
+                        tooltip: 'Share this recommendation',
+                        onPressed: () => Share.share(visibleContent, subject: 'TripNest PH AI Recommendation'),
+                      ),
+                      if (onRegenerate != null)
+                        _BubbleAction(
+                          icon: Symbols.refresh_rounded,
+                          tooltip: 'Regenerate reply',
+                          onPressed: onRegenerate!,
+                        ),
+                    ],
                   ),
                 ),
             ],
           ),
         ),
       ),
+    );
+  }
+
+  Future<void> _copy(BuildContext context, String text) async {
+    await Clipboard.setData(ClipboardData(text: text));
+    if (!context.mounted) return;
+    ScaffoldMessenger.maybeOf(context)
+      ?..hideCurrentSnackBar()
+      ..showSnackBar(const SnackBar(content: Text('Copied to clipboard.')));
+  }
+}
+
+class _BubbleAction extends StatelessWidget {
+  const _BubbleAction({required this.icon, required this.tooltip, required this.onPressed});
+
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      onPressed: onPressed,
+      icon: Icon(icon, size: 16),
+      iconSize: 16,
+      color: Theme.of(context).textTheme.bodyMedium?.color,
+      tooltip: tooltip,
     );
   }
 }

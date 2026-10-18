@@ -25,6 +25,7 @@ import 'core/theme/accent_colors.dart';
 import 'core/theme/app_theme.dart';
 import 'core/utils/app_exception.dart';
 import 'core/utils/safe_launch.dart';
+import 'core/utils/view_status.dart';
 import 'core/widgets/banners/connectivity_toast.dart';
 import 'firebase_options.dart';
 
@@ -116,6 +117,13 @@ class _TripNestAppState extends State<TripNestApp> {
 
   void _onAuthChanged() {
     final userId = _authProvider.firebaseUser?.uid;
+    // Ahead of the dedupe below (AiChatProvider dedupes on its own): it has
+    // to hear the first resolved auth state even when that's "signed out",
+    // since only an account restored at startup may claim chats saved
+    // before they were scoped per account — see its bindToUser.
+    if (userId != null || _authProvider.status != ViewStatus.loading) {
+      _aiChatProvider.bindToUser(userId);
+    }
     if (userId == _boundUserId) return;
     _boundUserId = userId;
     _favoritesProvider.bindToUser(userId);

@@ -1235,9 +1235,22 @@ class _AiChatScreenState extends State<AiChatScreen> {
     return null;
   }
 
-  Future<void> _send(String text) async {
-    final chat = context.read<AiChatProvider>();
-    _scrollToBottom();
+  Future<void> _send(String text) => _askAssistant(text);
+
+  /// Answers the traveler's last message again (after an error, a stopped
+  /// reply, or one they didn't like) — through the same grounding as a
+  /// fresh send, so the redo gets the same real-data context.
+  Future<void> _regenerate() async {
+    final text = context.read<AiChatProvider>().lastUserMessage;
+    if (text == null) return;
+    await _askAssistant(text, regenerate: true);
+  }
+
+  /// Handed to the provider rather than awaited here first, so the
+  /// traveler's message shows (and the composer locks, with a Stop button)
+  /// the moment they send, and the reply stays pinned to the chat that
+  /// asked even if they switch chats while this is still loading.
+  Future<String?> _loadUserContextFor(String text) async {
     // Awaited — this is the one that can actually change how the reply
     // about to be generated turns out (see _groundFromUserMessage's doc
     // comment for why it's worth the wait, and why it's skipped/instant
@@ -1249,7 +1262,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
       const Duration(seconds: 8),
       onTimeout: () {},
     );
-    if (!mounted) return;
+    if (!mounted) return null;
     // What the session-start load fetched can be out of date by now for
     // exactly the things this message asks about — same bound as above.
     final topics = relevantChatTopics(text);
@@ -1260,13 +1273,27 @@ class _AiChatScreenState extends State<AiChatScreen> {
           topics.contains(ChatContextTopic.saved))
         _loadTravelerData(),
     ]).timeout(const Duration(seconds: 8), onTimeout: () => const []);
-    if (!mounted) return;
-    await chat.sendMessage(text, userContext: _buildUserContext(text));
+    if (!mounted) return null;
+    return _buildUserContext(text);
+  }
+
+  Future<void> _askAssistant(String text, {bool regenerate = false}) async {
+    final chat = context.read<AiChatProvider>();
+    // Both calls start (and pick their chat) synchronously, so the id read
+    // right after is the chat this reply belongs to.
+    final reply = regenerate
+        ? chat.regenerateLastReply(loadUserContext: () => _loadUserContextFor(text))
+        : chat.sendMessage(text, loadUserContext: () => _loadUserContextFor(text));
+    final sessionId = chat.currentSessionId;
+    _scrollToBottom();
+    await reply;
+    if (!mounted || chat.currentSessionId != sessionId) return;
     _scrollToBottom();
     // Best-effort, deliberately not awaited before the next thing the
     // traveler does — grounds *upcoming* turns in this conversation (see
     // _groundDestinationContext's doc comment), never blocks the reply that
-    // already arrived.
+    // already arrived. Skipped when they've switched to another chat since:
+    // this reply's places say nothing about that conversation.
     final messages = chat.messages;
     if (messages.isNotEmpty &&
         !messages.last.isUser &&
@@ -1622,6 +1649,9 @@ class _AiChatScreenState extends State<AiChatScreen> {
   @override
   Widget build(BuildContext context) {
     final chat = context.watch<AiChatProvider>();
+    final awaitingReply = !chat.isSending &&
+        chat.messages.isNotEmpty &&
+        chat.messages.last.isUser;
 
     return Scaffold(
       appBar: AppBar(
@@ -1654,12 +1684,28 @@ class _AiChatScreenState extends State<AiChatScreen> {
                     child: ListView.builder(
                       controller: _scrollController,
                       padding: const EdgeInsets.all(AppSpacing.md),
+                      // One extra row after the last message: the typing
+                      // indicator while a reply is in flight, or a
+                      // "Get a reply" button when the last turn never got
+                      // one (stopped, or the app closed mid-request).
                       itemCount:
-                          chat.messages.length + (chat.isSending ? 1 : 0),
+                          chat.messages.length +
+                          (chat.isSending || awaitingReply ? 1 : 0),
                       itemBuilder: (context, i) {
-                        if (i == chat.messages.length)
-                          return const TypingIndicator();
+                        if (i == chat.messages.length) {
+                          if (chat.isSending) return const TypingIndicator();
+                          return Align(
+                            alignment: Alignment.centerLeft,
+                            child: TextButton.icon(
+                              onPressed: _regenerate,
+                              icon: const Icon(Symbols.refresh_rounded, size: 18),
+                              label: const Text('Get a reply'),
+                            ),
+                          );
+                        }
                         final message = chat.messages[i];
+                        final isLatestReply =
+                            !message.isUser && i == chat.messages.length - 1;
                         final matches = message.isUser || message.isError
                             ? const <Object>[]
                             : _matchedKnownEntities(message.content);
@@ -1669,6 +1715,9 @@ class _AiChatScreenState extends State<AiChatScreen> {
                             ChatBubble(
                               message: message,
                               onOpenPlanner: () => _generateFromChat(message),
+                              onRegenerate: isLatestReply && chat.canRegenerate
+                                  ? _regenerate
+                                  : null,
                             ),
                             if (matches.isNotEmpty)
                               _ChatEntityCardsRow(
@@ -1712,7 +1761,11 @@ class _AiChatScreenState extends State<AiChatScreen> {
             ),
           MaxWidthContainer(
             maxWidth: 900,
-            child: ChatInputBar(onSend: _send, enabled: !chat.isSending),
+            child: ChatInputBar(
+              onSend: _send,
+              enabled: !chat.isSending,
+              onStop: chat.isSending ? chat.stopGenerating : null,
+            ),
           ),
         ],
       ),

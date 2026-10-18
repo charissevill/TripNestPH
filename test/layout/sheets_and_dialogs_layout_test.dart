@@ -10,7 +10,6 @@ import 'package:tripnest_ph/core/providers/favorites_provider.dart';
 import 'package:tripnest_ph/core/services/places_service.dart';
 import 'package:tripnest_ph/core/widgets/details/place_details_sheet.dart';
 import 'package:tripnest_ph/core/widgets/details/review_form_sheet.dart';
-import 'package:tripnest_ph/core/widgets/dialogs/add_to_collection_sheet.dart';
 import 'package:tripnest_ph/core/widgets/dialogs/confirmation_dialog.dart';
 import 'package:tripnest_ph/core/widgets/dialogs/credential_dialog.dart';
 import 'package:tripnest_ph/core/widgets/dialogs/emergency_access_sheet.dart';
@@ -21,7 +20,6 @@ import 'package:tripnest_ph/data/mock/mock_provinces.dart';
 import 'package:tripnest_ph/data/mock/mock_regions.dart';
 import 'package:tripnest_ph/data/repositories/favorites_repository.dart';
 import 'package:tripnest_ph/data/repositories/province_repository.dart';
-import 'package:tripnest_ph/domain/models/favorite_collection.dart';
 import 'package:tripnest_ph/domain/models/place.dart';
 
 import '../support/fake_image_http_overrides.dart';
@@ -133,25 +131,6 @@ void main() {
       ),
     ),
     setup: () async => emergencyRepo = await hotlines(),
-    act: _tapOpen,
-  );
-
-  layoutMatrix(
-    'Add to collection sheet',
-    () => _opener(
-      (context) => showAddToCollectionSheet(
-        context,
-        collections: [
-          for (var i = 0; i < 8; i++)
-            FavoriteCollection(id: 'c$i', userId: 'u', name: 'A very long collection name for trip number $i', createdAt: DateTime(2026)),
-        ],
-        currentCollectionId: 'c1',
-        repository: FavoritesRepository(firestore: FakeFirebaseFirestore()),
-        userId: 'u',
-        type: FavoriteType.place,
-        itemId: 'p1',
-      ),
-    ),
     act: _tapOpen,
   );
 

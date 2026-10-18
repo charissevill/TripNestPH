@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
@@ -31,6 +33,28 @@ final RegExp _destinationLinePattern = RegExp(
 String _visibleContent(String content) =>
     content.replaceFirst(_destinationLinePattern, '').trimLeft();
 
+/// A markdown table row (`| a | b |`). A reply with a table gets a wider
+/// bubble so a 3-4 column comparison fits before it has to scroll.
+final RegExp _tableRowPattern = RegExp(r'^\s*\|.*\|\s*$', multiLine: true);
+
+/// Sizes a table column to its content like [IntrinsicColumnWidth], but
+/// caps it at [cap] so a long cell wraps onto a few lines instead of
+/// stretching the whole table into one very wide row. Extends
+/// [IntrinsicColumnWidth] on purpose: flutter_markdown only wraps a table in
+/// a horizontal scroll view when its column width is Fixed or Intrinsic, so
+/// a table that's still wider than the bubble scrolls instead of overflowing.
+class _CappedIntrinsicColumnWidth extends IntrinsicColumnWidth {
+  const _CappedIntrinsicColumnWidth(this.cap);
+
+  final double cap;
+
+  @override
+  double maxIntrinsicWidth(Iterable<RenderBox> cells, double containerWidth) => math.max(
+        minIntrinsicWidth(cells, containerWidth),
+        math.min(super.maxIntrinsicWidth(cells, containerWidth), cap),
+      );
+}
+
 /// One chat turn. User messages are a solid-primary bubble on the right;
 /// assistant messages are a surface-colored bubble on the left with
 /// markdown rendering (bold place names, bullet lists, headers for
@@ -63,6 +87,8 @@ class ChatBubble extends StatelessWidget {
         !message.isError &&
         onOpenPlanner != null &&
         _looksLikeItinerary(message.content);
+    final hasTable = !isUser && _tableRowPattern.hasMatch(visibleContent);
+    final tableLine = BorderSide(color: theme.colorScheme.outlineVariant);
 
     final bubbleColor = isUser
         ? theme.colorScheme.primary
@@ -74,7 +100,7 @@ class ChatBubble extends StatelessWidget {
       alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
       child: LayoutBuilder(
         builder: (context, constraints) => Container(
-          constraints: BoxConstraints(maxWidth: constraints.maxWidth * 0.8),
+          constraints: BoxConstraints(maxWidth: constraints.maxWidth * (hasTable ? 0.95 : 0.8)),
           margin: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
           decoration: BoxDecoration(
@@ -118,6 +144,25 @@ class ChatBubble extends StatelessWidget {
                         h1: theme.textTheme.titleLarge,
                         h2: theme.textTheme.titleMedium,
                         h3: theme.textTheme.titleSmall,
+                        tableHead: theme.textTheme.labelLarge?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          color: theme.colorScheme.primary,
+                        ),
+                        tableBody: theme.textTheme.bodyMedium,
+                        tableHeadAlign: TextAlign.left,
+                        tableColumnWidth: const _CappedIntrinsicColumnWidth(170),
+                        tableVerticalAlignment: TableCellVerticalAlignment.top,
+                        tableCellsPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        tableBorder: TableBorder(
+                          top: tableLine,
+                          bottom: tableLine,
+                          left: tableLine,
+                          right: tableLine,
+                          horizontalInside: tableLine,
+                          borderRadius: BorderRadius.circular(AppRadius.sm),
+                        ),
+                        tablePadding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                        tableScrollbarThumbVisibility: true,
                       ),
                     ),
               if (showPlannerCta) ...[

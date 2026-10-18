@@ -45,6 +45,24 @@ class MapsLauncher {
     await _open(uri, _mapsFailure);
   }
 
+  /// Google Maps search for [query] (e.g. 'hospital') centered on the
+  /// traveler's own GPS fix. Uses the `/search/<query>/@lat,lng,zoom` form
+  /// Google Maps itself produces, because the documented `api=1` search URL
+  /// can't carry a center and leaves "near me" to whatever location Maps
+  /// happens to have — none when Maps lacks location permission, or an IP
+  /// guess in a browser. With no fix, falls back to exactly that
+  /// `<query> near me` search.
+  static Uri nearbySearchUri(String query, {double? latitude, double? longitude}) {
+    if (latitude == null || longitude == null) {
+      return Uri.parse('https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent('$query near me')}');
+    }
+    final center = '${latitude.toStringAsFixed(6)},${longitude.toStringAsFixed(6)}';
+    return Uri.parse('https://www.google.com/maps/search/${Uri.encodeComponent(query)}/@$center,15z');
+  }
+
+  static Future<void> openNearbySearch(String query, {double? latitude, double? longitude}) =>
+      _open(nearbySearchUri(query, latitude: latitude, longitude: longitude), _mapsFailure);
+
   static Future<void> openUrl(String url) async {
     if (url.isEmpty) return;
     final uri = Uri.tryParse(url);

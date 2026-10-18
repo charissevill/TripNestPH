@@ -2,11 +2,31 @@ import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:tripnest_ph/core/services/location_service.dart';
 import 'package:tripnest_ph/core/widgets/dialogs/emergency_access_sheet.dart';
 import 'package:tripnest_ph/data/repositories/province_repository.dart';
 
+/// Records how Find Nearby asks for the traveler's position, without
+/// touching the real Geolocator platform channel (not available in
+/// `flutter_test`).
+class _RecordingLocationService extends LocationService {
+  final List<Duration> timeLimits = [];
+
+  @override
+  Future<LocationResult> resolveCurrentPositionWithin(Duration timeLimit) async {
+    timeLimits.add(timeLimit);
+    return const LocationResult(status: LocationAccessStatus.permissionDenied);
+  }
+}
+
 void main() {
-  Future<void> pumpOpener(WidgetTester tester, {required ProvinceRepository repository, String? provinceId, String? provinceName}) async {
+  Future<void> pumpOpener(
+    WidgetTester tester, {
+    required ProvinceRepository repository,
+    String? provinceId,
+    String? provinceName,
+    LocationService? locationService,
+  }) async {
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
@@ -18,6 +38,7 @@ void main() {
                   provinceId: provinceId,
                   provinceName: provinceName,
                   provinceRepository: repository,
+                  locationService: locationService,
                 ),
                 child: const Text('Open'),
               ),
@@ -84,5 +105,19 @@ void main() {
 
     expect(find.text('Hospital'), findsOneWidget);
     expect(find.text('Police'), findsOneWidget);
+  });
+
+  testWidgets('Find Nearby asks for a time-capped GPS fix, and still works without one', (tester) async {
+    final firestore = FakeFirebaseFirestore();
+    final location = _RecordingLocationService();
+    await pumpOpener(tester, repository: ProvinceRepository(firestore: firestore), locationService: location);
+
+    await tester.tap(find.text('Hospital'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Police'));
+    await tester.pumpAndSettle();
+
+    expect(location.timeLimits, const [Duration(seconds: 8), Duration(seconds: 8)]);
+    expect(tester.takeException(), isNull);
   });
 }

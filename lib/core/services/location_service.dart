@@ -29,7 +29,16 @@ class LocationResult {
 /// distance-in-kilometers helper used to sort destinations/restaurants by
 /// proximity to the traveler.
 class LocationService {
-  Future<LocationResult> resolveCurrentPosition() async {
+  Future<LocationResult> resolveCurrentPosition() => _resolve();
+
+  /// Same as [resolveCurrentPosition], but gives up on the GPS fix after
+  /// [timeLimit] (reported as [LocationAccessStatus.unavailable]) — for a
+  /// caller that must act promptly either way, like the Emergency sheet's
+  /// Find Nearby buttons. The permission prompt itself isn't timed, so a
+  /// traveler still reading it never gets cut off.
+  Future<LocationResult> resolveCurrentPositionWithin(Duration timeLimit) => _resolve(timeLimit: timeLimit);
+
+  Future<LocationResult> _resolve({Duration? timeLimit}) async {
     if (!await Geolocator.isLocationServiceEnabled()) {
       return const LocationResult(status: LocationAccessStatus.serviceDisabled);
     }
@@ -47,7 +56,7 @@ class LocationService {
 
     try {
       final position = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(accuracy: LocationAccuracy.medium),
+        locationSettings: LocationSettings(accuracy: LocationAccuracy.medium, timeLimit: timeLimit),
       );
       return LocationResult(status: LocationAccessStatus.granted, position: position);
     } catch (_) {

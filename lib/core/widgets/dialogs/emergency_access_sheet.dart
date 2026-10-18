@@ -3,6 +3,7 @@ import 'package:material_symbols_icons/symbols.dart';
 
 import '../../../data/repositories/province_repository.dart';
 import '../../../domain/models/province.dart';
+import '../../services/location_service.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_spacing.dart';
 import '../../utils/app_exception.dart';
@@ -12,7 +13,7 @@ import '../../utils/safe_launch.dart';
 /// One-tap emergency info: a nationwide hotline always shown first, that
 /// province's own hotlines (fetched live — [provinceId] may be known before
 /// the province's full content is loaded), and two "find nearby" shortcuts
-/// that hand off to Google Maps using the device's own location. Drop an
+/// that hand off to Google Maps centered on the device's GPS fix. Drop an
 /// entry point for this on any screen a traveler is realistically standing
 /// on the ground for — the three Details screens and the generated
 /// itinerary screen.
@@ -21,6 +22,7 @@ Future<void> showEmergencyAccessSheet(
   String? provinceId,
   String? provinceName,
   ProvinceRepository? provinceRepository,
+  LocationService? locationService,
 }) {
   return showModalBottomSheet(
     context: context,
@@ -34,6 +36,7 @@ Future<void> showEmergencyAccessSheet(
       provinceId: provinceId,
       provinceName: provinceName,
       provinceRepository: provinceRepository ?? ProvinceRepository(),
+      locationService: locationService ?? LocationService(),
     ),
   );
 }
@@ -43,11 +46,13 @@ class _EmergencyAccessSheet extends StatefulWidget {
     this.provinceId,
     this.provinceName,
     required this.provinceRepository,
+    required this.locationService,
   });
 
   final String? provinceId;
   final String? provinceName;
   final ProvinceRepository provinceRepository;
+  final LocationService locationService;
 
   @override
   State<_EmergencyAccessSheet> createState() => _EmergencyAccessSheetState();
@@ -89,6 +94,27 @@ class _EmergencyAccessSheetState extends State<_EmergencyAccessSheet> {
   }
 
   Future<void> _call(String number) => callNumber(number);
+
+  /// The Find Nearby query being located right now, so its button can show
+  /// progress and a second tap can't stack another search on top.
+  String? _locatingQuery;
+
+  /// Pins the Maps search to where the traveler is actually standing (see
+  /// [MapsLauncher.nearbySearchUri]). The GPS fix is capped so a slow or
+  /// stuck one never holds up an emergency search — no fix (denied, GPS
+  /// off, timed out) just falls back to Maps' own "near me".
+  Future<void> _findNearby(String query) async {
+    if (_locatingQuery != null) return;
+    setState(() => _locatingQuery = query);
+    final location = await widget.locationService.resolveCurrentPositionWithin(const Duration(seconds: 8));
+    if (mounted) setState(() => _locatingQuery = null);
+    final position = location.isGranted ? location.position : null;
+    await MapsLauncher.openNearbySearch(query, latitude: position?.latitude, longitude: position?.longitude);
+  }
+
+  Widget _findNearbyIcon(String query, IconData icon) => _locatingQuery == query
+      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+      : Icon(icon, size: 18);
 
   @override
   Widget build(BuildContext context) {
@@ -183,11 +209,12 @@ class _EmergencyAccessSheetState extends State<_EmergencyAccessSheet> {
                 children: [
                   Expanded(
                     child: OutlinedButton.icon(
-                      onPressed: () =>
-                          MapsLauncher.openPlaceSearch('hospital near me'),
-                      icon: const Icon(
+                      onPressed: _locatingQuery != null
+                          ? null
+                          : () => _findNearby('hospital'),
+                      icon: _findNearbyIcon(
+                        'hospital',
                         Symbols.local_hospital_rounded,
-                        size: 18,
                       ),
                       label: const Text('Hospital'),
                     ),
@@ -195,10 +222,13 @@ class _EmergencyAccessSheetState extends State<_EmergencyAccessSheet> {
                   const SizedBox(width: AppSpacing.sm),
                   Expanded(
                     child: OutlinedButton.icon(
-                      onPressed: () => MapsLauncher.openPlaceSearch(
-                        'police station near me',
+                      onPressed: _locatingQuery != null
+                          ? null
+                          : () => _findNearby('police station'),
+                      icon: _findNearbyIcon(
+                        'police station',
+                        Symbols.local_police_rounded,
                       ),
-                      icon: const Icon(Symbols.local_police_rounded, size: 18),
                       label: const Text('Police'),
                     ),
                   ),

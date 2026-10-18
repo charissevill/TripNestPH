@@ -1333,7 +1333,10 @@ class AiRepository {
         ...history.map((m) => {'role': m.apiRole, 'content': m.content}),
       ],
       temperature: 0.8,
-      maxTokens: 450,
+      // gpt-oss spends part of this on hidden reasoning (see
+      // GROQ_REASONING_EFFORT in functions/index.js) — 450 used to cut
+      // multi-day plans and detailed answers off mid-reply.
+      maxTokens: 1500,
     );
   }
 
